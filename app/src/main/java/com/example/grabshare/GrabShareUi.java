@@ -17,6 +17,8 @@ public class GrabShareUi extends AppCompatActivity {
     private static final UiScreen[] PAGES = {
             UiScreen.LOGIN, UiScreen.REGISTER, UiScreen.RESET_PASSWORD,
             UiScreen.ACCOUNT, UiScreen.EDIT_PROFILE, UiScreen.HELP, UiScreen.TERMS,
+            UiScreen.HOME, UiScreen.LOCATION, UiScreen.RESULTS,
+            UiScreen.DETAIL, UiScreen.REVIEW, UiScreen.PENDING,
             UiScreen.ACCEPTED, UiScreen.REJECTED, UiScreen.UPCOMING, UiScreen.CHAT,
             UiScreen.COMPLETE, UiScreen.MY_TRIPS, UiScreen.FAVORITES,
             UiScreen.DRIVER_TRIPS, UiScreen.POST, UiScreen.EDIT_TRIP,
