@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="180dp" android:layout_marginBottom="16dp" android:background="@drawable/bg_lavender" android:clipToOutline="true">
+    <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/map_route" android:contentDescription="Minh họa tuyến đường đi cùng" />
+    <TextView android:id="@+id/map_start" style="@style/Badge" android:text="Công viên Lê Văn Tám" android:textColor="@color/ink" android:background="@drawable/bg_card" android:layout_gravity="top|start" android:layout_margin="10dp" />
+    <TextView android:id="@+id/map_end" style="@style/Badge" android:text="Khu dân cư An Phú" android:textColor="@color/ink" android:background="@drawable/bg_card" android:layout_gravity="bottom|end" android:layout_margin="10dp" />
+</FrameLayout>

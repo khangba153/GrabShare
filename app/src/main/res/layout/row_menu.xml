@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Picker" android:paddingHorizontal="12dp" android:minHeight="58dp" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
+    <ImageView android:id="@+id/menu_icon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_user" android:importantForAccessibility="no" />
+    <TextView android:id="@+id/menu_label" style="@style/Body" android:text="Tài khoản" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="12dp" />
+    <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron" android:importantForAccessibility="no" />
+</LinearLayout>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp" android:background="@drawable/bg_dialog">
+    <ImageView android:id="@+id/dialog_icon" android:layout_width="64dp" android:layout_height="64dp" android:layout_gravity="center" android:padding="18dp" android:background="@drawable/bg_avatar" android:src="@drawable/ic_info" android:importantForAccessibility="no" />
+    <TextView android:id="@+id/dialog_title" style="@style/Subtitle" android:text="Xác nhận" android:layout_width="match_parent" android:gravity="center" android:layout_marginTop="18dp" />
+    <TextView android:id="@+id/dialog_body" style="@style/Body" android:text="Nội dung xác nhận" android:layout_width="match_parent" android:gravity="center" android:textColor="@color/muted" />
+    <LinearLayout style="@style/Row" android:layout_marginTop="14dp" android:layout_marginBottom="0dp">
+        <androidx.appcompat.widget.AppCompatButton android:id="@+id/dialog_cancel" style="@style/ButtonSecondary" android:layout_width="0dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:text="Quay lại" android:clickable="false" android:focusable="false" />
+        <androidx.appcompat.widget.AppCompatButton android:id="@+id/dialog_confirm" style="@style/ButtonPrimary" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="6dp" android:text="Xác nhận" android:clickable="false" android:focusable="false" />
+    </LinearLayout>
+</LinearLayout>

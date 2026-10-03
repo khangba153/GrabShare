@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card">
+    <include layout="@layout/view_driver" />
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_user" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/request_pickup" style="@style/Caption" android:text="1 người · Cổng công viên" android:layout_marginStart="8dp" />
+    </LinearLayout>
+    <TextView android:id="@+id/request_message" style="@style/Body" android:text="Mình sẽ có mặt trước 5 phút." />
+    <androidx.appcompat.widget.AppCompatButton android:id="@+id/request_open" style="@style/ButtonSecondary" android:text="Xem chi tiết" android:clickable="false" android:focusable="false" />
+</LinearLayout>

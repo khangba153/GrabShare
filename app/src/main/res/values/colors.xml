@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="primary">#4F46E5</color>
+    <color name="primary_dark">#3730A3</color>
+    <color name="ink">#172033</color>
+    <color name="muted">#7A8194</color>
+    <color name="background">#F7F8FC</color>
+    <color name="lavender">#EEF0FF</color>
+    <color name="coral">#F47C67</color>
+    <color name="coral_soft">#FFF0ED</color>
+    <color name="border">#E5E8F0</color>
+    <color name="amber">#D68B17</color>
+    <color name="amber_soft">#FFF4D8</color>
+    <color name="teal">#197B75</color>
+    <color name="teal_soft">#E8F5F2</color>
+</resources>

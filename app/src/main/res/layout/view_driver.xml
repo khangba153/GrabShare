@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Row">
+    <ImageView android:id="@+id/driver_avatar" android:layout_width="48dp" android:layout_height="48dp" android:src="@drawable/avatar_1" android:contentDescription="Ảnh chủ xe" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:orientation="vertical">
+        <TextView android:id="@+id/driver_name" style="@style/BodyBold" android:text="Thanh Minh" />
+        <TextView android:id="@+id/driver_meta" style="@style/Caption" android:text="★ 4.9 · Honda Wave" />
+    </LinearLayout>
+    <TextView android:id="@+id/verified_badge" style="@style/Badge" android:text="Đã xác minh" />
+</LinearLayout>

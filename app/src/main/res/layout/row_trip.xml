@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
+    <include layout="@layout/view_driver" />
+    <include layout="@layout/view_route" />
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_clock" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/trip_time" style="@style/Caption" android:text="Hôm nay · 17:30" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="8dp" />
+        <TextView android:id="@+id/trip_cost" style="@style/Badge" android:text="15.000đ" />
+    </LinearLayout>
+    <TextView android:id="@+id/trip_status" style="@style/Badge" android:text="Đã chấp nhận" />
+</LinearLayout>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
+    <include layout="@layout/view_driver" />
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_clock" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/ride_time" style="@style/Body" android:text="17:30" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="8dp" />
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_user" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/ride_seats" style="@style/Caption" android:text="1 chỗ" android:layout_marginHorizontal="6dp" />
+        <TextView android:id="@+id/ride_price" style="@style/Badge" android:text="15.000đ" android:background="@drawable/bg_price" android:textColor="@color/ink" />
+    </LinearLayout>
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_pin" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/ride_pickup" style="@style/Caption" android:text="Đón tại cổng công viên" android:layout_marginStart="8dp" />
+    </LinearLayout>
+</LinearLayout>

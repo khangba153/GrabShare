@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+    <LinearLayout android:id="@+id/pick_date" android:layout_width="0dp" android:layout_height="60dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_calendar" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:orientation="vertical">
+            <TextView style="@style/Caption" android:text="Ngày đi" />
+            <TextView android:id="@+id/pick_date_value" style="@style/BodyBold" android:text="Hôm nay" />
+        </LinearLayout>
+    </LinearLayout>
+    <View android:layout_width="1dp" android:layout_height="36dp" android:layout_gravity="center_vertical" android:layout_marginHorizontal="12dp" android:background="@color/border" />
+    <LinearLayout android:id="@+id/pick_time" android:layout_width="0dp" android:layout_height="60dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_clock" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:orientation="vertical">
+            <TextView style="@style/Caption" android:text="Giờ đi" />
+            <TextView android:id="@+id/pick_time_value" style="@style/BodyBold" android:text="17:30" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

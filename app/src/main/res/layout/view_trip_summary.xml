@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card">
+    <include layout="@layout/view_driver" />
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_clock" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/trip_time" style="@style/Caption" android:text="Hôm nay · 17:30" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="8dp" />
+        <TextView android:id="@+id/trip_seats" style="@style/Badge" android:text="1 chỗ trống" />
+    </LinearLayout>
+    <include layout="@layout/view_route" />
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="12dp" android:background="@color/border" />
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_pin" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/trip_pickup" style="@style/Caption" android:text="Điểm đón: Cổng công viên" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="8dp" />
+    </LinearLayout>
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_coin" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/trip_cost_label" style="@style/Caption" android:text="Đóng góp" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="8dp" />
+        <TextView android:id="@+id/trip_cost" style="@style/BodyBold" android:text="15.000đ" />
+    </LinearLayout>
+</LinearLayout>

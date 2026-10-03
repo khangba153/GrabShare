@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_pin" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/route_start" style="@style/BodyBold" android:text="Công viên Lê Văn Tám" android:layout_marginStart="10dp" />
+    </LinearLayout>
+    <LinearLayout style="@style/Row">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_pin" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/route_end" style="@style/BodyBold" android:text="Khu dân cư An Phú" android:layout_marginStart="10dp" />
+    </LinearLayout>
+</LinearLayout>

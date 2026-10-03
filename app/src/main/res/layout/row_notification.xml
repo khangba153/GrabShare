@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
+    <LinearLayout style="@style/Row">
+        <ImageView android:id="@+id/notification_icon" android:layout_width="36dp" android:layout_height="36dp" android:src="@drawable/ic_bell" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:orientation="vertical">
+            <TextView android:id="@+id/notification_title" style="@style/BodyBold" android:text="Yêu cầu đã được chấp nhận" />
+            <TextView android:id="@+id/notification_time" style="@style/Caption" android:text="2 phút trước" />
+        </LinearLayout>
+    </LinearLayout>
+    <TextView android:id="@+id/notification_body" style="@style/Body" android:text="Chủ xe đã phản hồi yêu cầu của bạn." />
+</LinearLayout>

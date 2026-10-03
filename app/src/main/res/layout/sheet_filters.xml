@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_sheet" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp">
+        <View android:layout_width="36dp" android:layout_height="4dp" android:layout_gravity="center" android:background="@color/border" android:layout_marginBottom="20dp" />
+        <TextView style="@style/Subtitle" android:text="Bộ lọc chuyến" />
+        <TextView style="@style/BodyBold" android:text="Khoảng giờ" />
+        <RadioGroup android:id="@+id/filter_time" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <RadioButton android:id="@+id/filter_15" style="@style/Radio" android:text="±15 phút" android:checked="true" android:clickable="false" android:focusable="false" />
+            <RadioButton android:id="@+id/filter_30" style="@style/Radio" android:text="±30 phút" android:clickable="false" android:focusable="false" />
+            <RadioButton android:id="@+id/filter_60" style="@style/Radio" android:text="±60 phút" android:clickable="false" android:focusable="false" />
+        </RadioGroup>
+        <TextView style="@style/BodyBold" android:text="Mức đóng góp" />
+        <RadioGroup android:id="@+id/filter_cost" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <RadioButton android:id="@+id/filter_all" style="@style/Radio" android:text="Tất cả" android:checked="true" android:clickable="false" android:focusable="false" />
+            <RadioButton android:id="@+id/filter_free" style="@style/Radio" android:text="Miễn phí" android:clickable="false" android:focusable="false" />
+            <RadioButton android:id="@+id/filter_under" style="@style/Radio" android:text="Dưới 20.000đ" android:clickable="false" android:focusable="false" />
+        </RadioGroup>
+        <CheckBox android:id="@+id/filter_verified" style="@style/Radio" android:text="Chỉ chủ xe đã xác minh" android:clickable="false" android:focusable="false" />
+        <androidx.appcompat.widget.AppCompatButton android:id="@+id/sheet_submit" style="@style/ButtonPrimary" android:text="Áp dụng" android:clickable="false" android:focusable="false" />
+    </LinearLayout>
+</ScrollView>

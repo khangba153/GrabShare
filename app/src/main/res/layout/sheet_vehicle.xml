@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_sheet" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp">
+        <View android:layout_width="36dp" android:layout_height="4dp" android:layout_gravity="center" android:background="@color/border" android:layout_marginBottom="20dp" />
+        <TextView style="@style/Subtitle" android:text="Thông tin xe của tôi" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
+            <TextView style="@style/Caption" android:text="Loại xe" />
+            <EditText android:id="@+id/vehicle_type" style="@style/Input" android:inputType="text" android:text="Xe máy" android:importantForAutofill="no" android:focusable="false" android:focusableInTouchMode="false" android:cursorVisible="false" android:longClickable="false" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
+            <TextView style="@style/Caption" android:text="Hãng / mẫu xe" />
+            <EditText android:id="@+id/vehicle_model" style="@style/Input" android:inputType="text" android:text="Honda Wave" android:importantForAutofill="no" android:focusable="false" android:focusableInTouchMode="false" android:cursorVisible="false" android:longClickable="false" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
+            <TextView style="@style/Caption" android:text="Biển số" />
+            <EditText android:id="@+id/vehicle_plate" style="@style/Input" android:inputType="text" android:text="59-X1 123.45" android:importantForAutofill="no" android:focusable="false" android:focusableInTouchMode="false" android:cursorVisible="false" android:longClickable="false" />
+        </LinearLayout>
+        <androidx.appcompat.widget.SwitchCompat android:id="@+id/vehicle_helmet" android:layout_width="match_parent" android:layout_height="48dp" android:text="Có mũ bảo hiểm cho người đi nhờ" android:checked="true" android:clickable="false" android:focusable="false" />
+        <TextView style="@style/Hint" android:text="Thông tin này hiển thị khi bạn đăng chuyến." />
+        <androidx.appcompat.widget.AppCompatButton android:id="@+id/sheet_submit" style="@style/ButtonPrimary" android:text="Lưu thông tin xe" android:clickable="false" android:focusable="false" />
+    </LinearLayout>
+</ScrollView>
