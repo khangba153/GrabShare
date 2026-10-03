@@ -16,7 +16,10 @@ import androidx.core.view.WindowInsetsCompat;
 public class GrabShareUi extends AppCompatActivity {
     private static final UiScreen[] PAGES = {
             UiScreen.LOGIN, UiScreen.REGISTER, UiScreen.RESET_PASSWORD,
-            UiScreen.ACCOUNT, UiScreen.EDIT_PROFILE, UiScreen.HELP, UiScreen.TERMS
+            UiScreen.ACCOUNT, UiScreen.EDIT_PROFILE, UiScreen.HELP, UiScreen.TERMS,
+            UiScreen.DRIVER_TRIPS, UiScreen.POST, UiScreen.EDIT_TRIP,
+            UiScreen.REQUESTS, UiScreen.REQUEST_DETAIL, UiScreen.MANAGE,
+            UiScreen.NOTIFICATIONS
     };
     private int pageIndex;
     private float downX, downY;
