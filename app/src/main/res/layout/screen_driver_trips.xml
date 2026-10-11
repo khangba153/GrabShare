@@ -6,12 +6,12 @@
     android:orientation="vertical"
     android:background="@color/background">
 
+    <!-- Tiêu đề -->
     <FrameLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
         android:layout_height="64dp"
-        android:paddingHorizontal="12dp"
-        android:visibility="visible">
+        android:paddingHorizontal="12dp">
 
         <ImageButton
             android:id="@+id/header_back"
@@ -29,7 +29,6 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginHorizontal="52dp"
-            android:layout_marginBottom="0dp"
             android:gravity="center"
             android:text="Chuyến của tôi" />
 
@@ -39,94 +38,107 @@
             android:layout_gravity="center_vertical|end"
             android:src="@drawable/ic_bell"
             android:contentDescription="Thông báo"
-            android:visibility="visible"
             android:clickable="false"
             android:focusable="false" />
     </FrameLayout>
 
-    <ScrollView
+    <!-- Lựa chọn vai trò -->
+    <LinearLayout
+        style="@style/Row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/role_passenger"
+            style="@style/ButtonSecondary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="44dp"
+            android:layout_marginHorizontal="3dp"
+            android:text="Đi nhờ"
+            android:clickable="false"
+            android:focusable="false" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/role_driver"
+            style="@style/ButtonPrimary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="44dp"
+            android:layout_marginHorizontal="3dp"
+            android:text="Chủ xe"
+            android:clickable="false"
+            android:focusable="false" />
+    </LinearLayout>
+
+    <!-- Bộ lọc danh sách -->
+    <LinearLayout
+        style="@style/Row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="4dp">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/tab_upcoming"
+            style="@style/ButtonPrimary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="44dp"
+            android:layout_marginHorizontal="3dp"
+            android:text="Sắp đi" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/tab_history"
+            style="@style/ButtonSecondary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="44dp"
+            android:layout_marginHorizontal="3dp"
+            android:text="Lịch sử" />
+    </LinearLayout>
+
+    <!-- Vùng danh sách, trạng thái tải và thông báo -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:fillViewport="true"
-        android:clipToPadding="false"
         android:layout_weight="1">
 
-        <LinearLayout
+        <ListView
+            android:id="@+id/trip_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="4dp"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/trip_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/trip_message"
+            style="@style/Body"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingHorizontal="20dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="24dp">
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:padding="24dp"
+            android:textAlignment="center"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone" />
+    </FrameLayout>
 
-            <LinearLayout style="@style/Row">
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/role_passenger"
-                    style="@style/ButtonSecondary"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="44dp"
-                    android:layout_marginHorizontal="3dp"
-                    android:text="Đi nhờ"
-                    android:clickable="false"
-                    android:focusable="false" />
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/role_driver"
-                    style="@style/ButtonPrimary"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="44dp"
-                    android:layout_marginHorizontal="3dp"
-                    android:text="Chủ xe"
-                    android:clickable="false"
-                    android:focusable="false" />
-            </LinearLayout>
-
-            <LinearLayout style="@style/Row">
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/tab_upcoming"
-                    style="@style/ButtonPrimary"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="44dp"
-                    android:layout_marginHorizontal="3dp"
-                    android:text="Sắp đi"
-                    android:clickable="false"
-                    android:focusable="false" />
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/tab_history"
-                    style="@style/ButtonSecondary"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="44dp"
-                    android:layout_marginHorizontal="3dp"
-                    android:text="Lịch sử"
-                    android:clickable="false"
-                    android:focusable="false" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/trip_list"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="24dp"
-                    android:gravity="center"
-                    android:textAlignment="center"
-                    android:text="Bạn chưa có chuyến nào được đăng. Các chuyến đã đăng sẽ hiển thị tại đây."
-                    style="@style/Body" />
-            </LinearLayout>
-        </LinearLayout>
-    </ScrollView>
-
+    <!-- Nút đăng chuyến -->
     <LinearLayout
         android:id="@+id/action_area"
         android:layout_width="match_parent"
@@ -135,31 +147,22 @@
         android:paddingHorizontal="20dp"
         android:paddingTop="4dp"
         android:paddingBottom="12dp"
-        android:background="@color/background"
-        android:visibility="visible">
+        android:background="@color/background">
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/primary_action"
             style="@style/ButtonPrimary"
             android:text="＋ Đăng chuyến" />
-
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/secondary_action"
-            style="@style/ButtonSecondary"
-            android:text="Quay lại"
-            android:visibility="gone"
-            android:clickable="false"
-            android:focusable="false" />
     </LinearLayout>
 
+    <!-- Thanh điều hướng chưa tích hợp -->
     <LinearLayout
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="@color/white"
-        android:elevation="6dp"
-        android:visibility="visible">
+        android:elevation="6dp">
 
         <LinearLayout
             android:id="@+id/nav_home"
@@ -169,11 +172,9 @@
             android:orientation="vertical"
             android:gravity="center"
             android:clickable="false"
-            android:focusable="false"
-            android:foreground="?attr/selectableItemBackground">
+            android:focusable="false">
 
             <ImageView
-                android:id="@+id/nav_home_icon"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_pin"
@@ -181,11 +182,9 @@
                 app:tint="@color/muted" />
 
             <TextView
-                android:id="@+id/nav_home_label"
                 style="@style/Caption"
                 android:text="Tìm chuyến"
                 android:layout_marginTop="5dp"
-                android:layout_marginBottom="0dp"
                 android:textColor="@color/muted" />
         </LinearLayout>
 
@@ -197,11 +196,9 @@
             android:orientation="vertical"
             android:gravity="center"
             android:clickable="false"
-            android:focusable="false"
-            android:foreground="?attr/selectableItemBackground">
+            android:focusable="false">
 
             <ImageView
-                android:id="@+id/nav_trips_icon"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_calendar"
@@ -209,11 +206,9 @@
                 app:tint="@color/primary" />
 
             <TextView
-                android:id="@+id/nav_trips_label"
                 style="@style/Caption"
                 android:text="Chuyến của tôi"
                 android:layout_marginTop="5dp"
-                android:layout_marginBottom="0dp"
                 android:textColor="@color/primary" />
         </LinearLayout>
 
@@ -225,11 +220,9 @@
             android:orientation="vertical"
             android:gravity="center"
             android:clickable="false"
-            android:focusable="false"
-            android:foreground="?attr/selectableItemBackground">
+            android:focusable="false">
 
             <ImageView
-                android:id="@+id/nav_account_icon"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_user"
@@ -237,12 +230,11 @@
                 app:tint="@color/muted" />
 
             <TextView
-                android:id="@+id/nav_account_label"
                 style="@style/Caption"
                 android:text="Tài khoản"
                 android:layout_marginTop="5dp"
-                android:layout_marginBottom="0dp"
                 android:textColor="@color/muted" />
         </LinearLayout>
     </LinearLayout>
+
 </LinearLayout>
