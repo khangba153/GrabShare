@@ -21,7 +21,7 @@ Tài liệu docs/ và script seed scripts/ chỉ lưu trên máy nhóm trưởng
 Package contract chứa hằng số/callback/interface dùng chung.
 Chưa có triển khai repository hoặc router thật.
 
-Thành, Thuận, Thuần tự chọn Thành/Thuận/Thuần. Leader quản lý base/tài khoản/tích hợp.
+Thành, Thuận, Thuần tự chọn A/B/C. Leader quản lý base/tài khoản/tích hợp.
 Java mới không lambda, không Handler, comment tiếng Việt trên hàm.
 
 ## Mở dự án
@@ -30,7 +30,7 @@ Mở thư mục clone bằng Android Studio, Sync Gradle. Mỗi máy cấu hình
 không commit local.properties, mật khẩu hoặc service account. Dùng cùng
 app/google-services.json, không tạo Firebase riêng theo nhánh Git.
 
-Debug đã có bộ chọn màn theo L/Thành/Thuận/Thuần, xem XML hoặc mở Activity đã triển khai;
+Debug đã có bộ chọn màn theo L/A/B/C, xem XML hoặc mở Activity đã triển khai;
 xem hướng dẫn chạy trên trang public. Công cụ đã build Debug; nhóm trưởng báo đã test và đạt. Release vẫn mở preview.
 Preview vẫn vuốt qua 27 XML, nút/ô nhập chưa có chức năng.
 Không tính dữ liệu minh họa trên XML là dữ liệu Firestore thật.
