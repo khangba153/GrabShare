@@ -16,15 +16,10 @@ Base đã push lên main tại commit `02af6bd`.
 ## Tài liệu bắt đầu
 
 Hướng dẫn trực quan public: https://grabshare-team-roadmap.snowy-frost-6677.chatgpt.site
-Ngữ cảnh nạp AI theo gói ở docs/ai; mỗi file TASK đã chứa cả quy tắc chung.
-Hợp đồng bàn giao đã chốt ở docs/HANDOFF_CONTRACT.md; package contract chứa
-hằng số/callback/interface. Chưa có triển khai repository hoặc router thật.
-
-- [Bắt đầu từ main](docs/START_HERE.md): pull, chọn gói, nhánh, context AI và PR.
-- [Hợp đồng dữ liệu](docs/DATA_CONTRACT.md): field, model, ID, trạng thái, query.
-- [Phân công A/B/C](docs/TEAM_TASKS.md): file, nhiệm vụ, tiêu chí, lịch và Git.
-- [Firebase base](docs/FIREBASE_BASE.md): cấu hình, Rules và quyền đọc.
-- [Seed demo](scripts/README.md): dành cho nhóm trưởng, không tự reset khi đang làm.
+Thành viên xem phân công, flow, hướng dẫn Git và tải ngữ cảnh AI trên trang public.
+Tài liệu docs/ và script seed scripts/ chỉ lưu trên máy nhóm trưởng, không phân phối qua Git.
+Package contract chứa hằng số/callback/interface dùng chung.
+Chưa có triển khai repository hoặc router thật.
 
 Thành, Thuận, Thuần tự chọn A/B/C. Leader quản lý base/tài khoản/tích hợp.
 Java mới không lambda, không Handler, comment tiếng Việt trên hàm.
@@ -36,6 +31,6 @@ không commit local.properties, mật khẩu hoặc service account. Dùng cùng
 app/google-services.json, không tạo Firebase riêng theo nhánh Git.
 
 Debug đã có bộ chọn màn theo L/A/B/C, xem XML hoặc mở Activity đã triển khai;
-xem docs/RUN_SCREEN.md. Công cụ đã build Debug; nhóm trưởng báo đã test và đạt. Release vẫn mở preview.
+xem hướng dẫn chạy trên trang public. Công cụ đã build Debug; nhóm trưởng báo đã test và đạt. Release vẫn mở preview.
 Preview vẫn vuốt qua 27 XML, nút/ô nhập chưa có chức năng.
 Không tính dữ liệu minh họa trên XML là dữ liệu Firestore thật.

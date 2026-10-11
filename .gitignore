@@ -15,3 +15,7 @@
 local.properties
 
 /.idea/
+
+# Tai lieu va script chi luu tren may nhom truong
+/docs/
+/scripts/
