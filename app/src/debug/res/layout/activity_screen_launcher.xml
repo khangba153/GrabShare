@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dev_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:padding="16dp"
+    android:background="@color/background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/dev_title" android:textSize="22sp" android:textStyle="bold"
+        android:textColor="@color/primary" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/dev_description" android:textSize="12sp"
+        android:layout_marginTop="6dp" />
+    <Spinner android:id="@+id/dev_group" android:layout_width="match_parent"
+        android:layout_height="48dp" android:entries="@array/dev_groups" />
+    <androidx.appcompat.widget.SwitchCompat android:id="@+id/dev_real_mode"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/dev_real_mode" android:checked="false" />
+    <LinearLayout android:id="@+id/dev_ids" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:orientation="vertical"
+        android:visibility="gone">
+        <EditText android:id="@+id/dev_trip_id" android:layout_width="match_parent"
+            android:layout_height="48dp" android:hint="@string/dev_trip_hint"
+            android:inputType="text" android:maxLines="1" android:singleLine="true" />
+        <EditText android:id="@+id/dev_request_id" android:layout_width="match_parent"
+            android:layout_height="48dp" android:hint="@string/dev_request_hint"
+            android:inputType="text" android:maxLines="1" android:singleLine="true" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/dev_id_note" android:textSize="11sp" />
+    </LinearLayout>
+    <Button android:id="@+id/dev_preview_all" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="@string/dev_all_preview" />
+    <LinearLayout android:id="@+id/dev_screens" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:orientation="vertical" />
+    </LinearLayout>
+</ScrollView>

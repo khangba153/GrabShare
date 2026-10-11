@@ -1,6 +1,6 @@
 package com.example.grabshare;
 
-/** Screens available in this clone. */
+/** Các màn XML hiện có trong dự án. */
 enum UiScreen {
     LOGIN(R.layout.screen_login, "Đăng nhập"),
     REGISTER(R.layout.screen_register, "Đăng ký"),
@@ -32,5 +32,6 @@ enum UiScreen {
 
     final int layout;
     final String title;
+    /** Gắn tài nguyên XML và nhãn hiển thị cho mỗi màn. */
     UiScreen(int layout, String title) { this.layout = layout; this.title = title; }
 }

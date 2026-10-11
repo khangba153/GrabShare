@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "334276006780",
+    "project_id": "grabshare",
+    "storage_bucket": "grabshare.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:334276006780:android:53b0b7191c1c6917c84af9",
+        "android_client_info": {
+          "package_name": "com.example.grabshare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCsGh0mJYldTGLrddL1f8XgVwMXBN6L7k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

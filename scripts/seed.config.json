@@ -1,0 +1,182 @@
+{
+  "projectId": "grabshare",
+  "projectNumber": "334276006780",
+  "databaseId": "(default)",
+  "accounts": {
+    "D1": {
+      "uid": "lyl3DvFLjegzIFnggYgGxtGyQNu2",
+      "displayName": "Minh Demo",
+      "vehicleName": "Honda Wave",
+      "vehiclePlate": "DEMO-001"
+    },
+    "P1": {
+      "uid": "4p8CTioum2TJwmNG30GK07gwN713",
+      "displayName": "An Demo",
+      "vehicleName": "",
+      "vehiclePlate": ""
+    },
+    "P2": {
+      "uid": "xc2sDuP38Lak32OAac5Q61mz7FG2",
+      "displayName": "Bình Demo",
+      "vehicleName": "",
+      "vehiclePlate": ""
+    }
+  },
+  "origin": {
+    "name": "Công viên Lê Văn Tám — điểm demo",
+    "latitude": 10.7875,
+    "longitude": 106.6949
+  },
+  "destination": {
+    "name": "An Phú — điểm demo",
+    "latitude": 10.802,
+    "longitude": 106.747
+  },
+  "trips": [
+    {
+      "id": "seed_trip_paid",
+      "status": "OPEN",
+      "costVnd": 15000,
+      "time": "17:30",
+      "note": "Có mũ bảo hiểm, vui lòng đến trước 5 phút."
+    },
+    {
+      "id": "seed_trip_free",
+      "status": "OPEN",
+      "costVnd": 0,
+      "time": "18:00",
+      "note": "Chuyến miễn phí dành cho cộng đồng."
+    },
+    {
+      "id": "seed_trip_pending",
+      "status": "OPEN",
+      "costVnd": 10000,
+      "time": "18:30",
+      "note": "Đón tại điểm hẹn, vui lòng đến đúng giờ."
+    },
+    {
+      "id": "seed_trip_full",
+      "status": "FULL",
+      "costVnd": 20000,
+      "time": "19:00",
+      "acceptedPassenger": "P1",
+      "note": "Chuyến demo đã nhận một người."
+    },
+    {
+      "id": "seed_trip_rejected",
+      "status": "OPEN",
+      "costVnd": 12000,
+      "time": "19:30",
+      "note": "Chuyến demo có yêu cầu bị từ chối."
+    },
+    {
+      "id": "seed_trip_cancelled",
+      "status": "CANCELLED",
+      "costVnd": 15000,
+      "time": "20:00",
+      "acceptedPassenger": "P1",
+      "note": "Chuyến demo đã bị chủ xe hủy."
+    },
+    {
+      "id": "seed_trip_completed",
+      "status": "COMPLETED",
+      "costVnd": 15000,
+      "time": "17:30",
+      "acceptedPassenger": "P1",
+      "note": "Chuyến demo đã hoàn thành."
+    }
+  ],
+  "requests": [
+    {
+      "tripId": "seed_trip_pending",
+      "passenger": "P1",
+      "status": "PENDING"
+    },
+    {
+      "tripId": "seed_trip_pending",
+      "passenger": "P2",
+      "status": "PENDING"
+    },
+    {
+      "tripId": "seed_trip_full",
+      "passenger": "P1",
+      "status": "ACCEPTED"
+    },
+    {
+      "tripId": "seed_trip_rejected",
+      "passenger": "P2",
+      "status": "REJECTED"
+    },
+    {
+      "tripId": "seed_trip_cancelled",
+      "passenger": "P1",
+      "status": "ACCEPTED"
+    },
+    {
+      "tripId": "seed_trip_completed",
+      "passenger": "P1",
+      "status": "ACCEPTED"
+    }
+  ],
+  "favorites": [
+    {
+      "user": "P1",
+      "tripId": "seed_trip_paid"
+    },
+    {
+      "user": "P1",
+      "tripId": "seed_trip_free"
+    }
+  ],
+  "ratings": [
+    {
+      "tripId": "seed_trip_completed",
+      "author": "P1",
+      "target": "D1",
+      "score": 5,
+      "comment": "Đến đúng giờ, đi an toàn."
+    }
+  ],
+  "notifications": [
+    {
+      "type": "REQUEST_SENT",
+      "tripId": "seed_trip_pending",
+      "passenger": "P1",
+      "actor": "P1",
+      "recipient": "D1",
+      "isRead": false
+    },
+    {
+      "type": "REQUEST_ACCEPTED",
+      "tripId": "seed_trip_full",
+      "passenger": "P1",
+      "actor": "D1",
+      "recipient": "P1",
+      "isRead": false
+    },
+    {
+      "type": "REQUEST_REJECTED",
+      "tripId": "seed_trip_rejected",
+      "passenger": "P2",
+      "actor": "D1",
+      "recipient": "P2",
+      "isRead": true
+    },
+    {
+      "type": "TRIP_CANCELLED",
+      "tripId": "seed_trip_cancelled",
+      "passenger": "P1",
+      "actor": "D1",
+      "recipient": "P1",
+      "isRead": false
+    },
+    {
+      "type": "TRIP_COMPLETED",
+      "tripId": "seed_trip_completed",
+      "passenger": "P1",
+      "actor": "D1",
+      "recipient": "P1",
+      "isRead": true
+    }
+  ]
+}

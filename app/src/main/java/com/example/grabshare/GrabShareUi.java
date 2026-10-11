@@ -2,6 +2,7 @@ package com.example.grabshare;
 
 import android.os.Bundle;
 import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -11,9 +12,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.OnApplyWindowInsetsListener;
 
-/** Displays complete XML screens. Only swipe navigation and reading scroll remain. */
+/** Xem XML bằng vuốt, hỗ trợ mở thẳng màn được chọn từ công cụ Debug. */
 public class GrabShareUi extends AppCompatActivity {
+    public static final String EXTRA_PREVIEW_SCREEN = "preview_screen";
     private static final UiScreen[] PAGES = {
             UiScreen.LOGIN, UiScreen.REGISTER, UiScreen.RESET_PASSWORD,
             UiScreen.ACCOUNT, UiScreen.EDIT_PROFILE, UiScreen.HELP, UiScreen.TERMS,
@@ -31,21 +34,37 @@ public class GrabShareUi extends AppCompatActivity {
     private boolean verticalScroll;
     private int touchSlop;
 
+    /** Mở trang đã lưu hoặc màn được yêu cầu; không chạy nghiệp vụ. */
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-        if (savedInstanceState != null) pageIndex = savedInstanceState.getInt("preview_page", 0);
+        if (savedInstanceState != null) {
+            pageIndex = savedInstanceState.getInt("preview_page", 0);
+        } else {
+            String screenName = getIntent().getStringExtra(EXTRA_PREVIEW_SCREEN);
+            for (int index = 0; index < PAGES.length; index++) {
+                if (PAGES[index].name().equals(screenName)) {
+                    pageIndex = index;
+                    break;
+                }
+            }
+        }
         pageIndex = Math.max(0, Math.min(pageIndex, PAGES.length - 1));
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (view, insets) -> {
-            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            return insets;
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), new OnApplyWindowInsetsListener() {
+            /** Chừa vùng thanh hệ thống khi hiển thị màn preview. */
+            @Override
+            public WindowInsetsCompat onApplyWindowInsets(View view, WindowInsetsCompat insets) {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return insets;
+            }
         });
         showPage();
     }
 
+    /** Nạp XML hiện tại và nhãn vị trí trong danh sách preview. */
     private void showPage() {
         UiScreen page = PAGES[pageIndex];
         FrameLayout container = findViewById(R.id.screen_container);
@@ -56,11 +75,13 @@ public class GrabShareUi extends AppCompatActivity {
                 + "\nVuốt trái / phải để xem màn");
     }
 
+    /** Giữ trang đang xem khi xoay màn hình. */
     @Override protected void onSaveInstanceState(Bundle out) {
         out.putInt("preview_page", pageIndex);
         super.onSaveInstanceState(out);
     }
 
+    /** Cho phép vuốt đổi trang và cuộn nội dung, chặn thao tác nghiệp vụ trong preview. */
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
@@ -72,7 +93,7 @@ public class GrabShareUi extends AppCompatActivity {
             case MotionEvent.ACTION_MOVE:
                 float dx = event.getX() - downX;
                 float dy = event.getY() - downY;
-                // Forward vertical drags only so long XML pages can be read.
+                // Chỉ chuyển kéo dọc cho XML để đọc nội dung dài.
                 if (!verticalScroll && Math.abs(dy) > touchSlop && Math.abs(dy) > Math.abs(dx) * 1.3f) {
                     verticalScroll = true;
                     if (downEvent != null) super.dispatchTouchEvent(downEvent);
@@ -99,11 +120,13 @@ public class GrabShareUi extends AppCompatActivity {
         }
     }
 
+    /** Giải phóng sự kiện chạm đã giữ và đặt lại trạng thái kéo. */
     private void clearGesture() {
         if (downEvent != null) { downEvent.recycle(); downEvent = null; }
         verticalScroll = false;
     }
 
+    /** Dọn sự kiện chạm khi kết thúc màn preview. */
     @Override protected void onDestroy() {
         clearGesture();
         super.onDestroy();

@@ -1,5 +1,5 @@
 package com.example.grabshare;
 
-/** Android entry point for the read-only XML screen gallery. */
+/** Màn xem XML; bản Debug có bộ chọn riêng, router thật sẽ do leader bàn giao. */
 public class MainActivity extends GrabShareUi {
 }

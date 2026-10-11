@@ -1,27 +1,38 @@
-# GrabShare — Thành viên 1 và tài nguyên dùng chung
+# GrabShare — dự án cộng đồng đi chung xe
 
-Giao diện cộng đồng Android native XML + Java.
+Android Java/XML, nhóm 4 người, Firebase dùng chung project grabshare.
+Hạn nộp 25/10/2026; mỗi chuyến xe máy có tối đa một chỗ đi nhờ.
 
-## Màn của thành viên 1
+## Trạng thái hiện tại
 
-- `screen_login.xml`
-- `screen_register.xml`
-- `screen_reset_password.xml`
-- `screen_account.xml`
-- `screen_edit_profile.xml`
-- `screen_help.xml`
-- `screen_terms.xml`
+- Đã có 27 màn XML và trình xem bằng vuốt, chưa có nghiệp vụ Android.
+- Đã chuẩn bị cấu hình Authentication/Firestore và model dữ liệu chung.
+- Nhóm trưởng đã seed 27 document và Publish Rules đọc giai đoạn base.
+- Playground đã kiểm tra quyền đọc trip/users; chưa kiểm chứng kết nối Android.
+- Build Debug thành công; chưa Run emulator. Auth/router thật, quyền ghi, SQLite và API còn phải làm.
 
-Các màn nằm trong `app/src/main/res/layout`, có nội dung tĩnh để xem trực tiếp bằng Design trong Android Studio.
+## Tài liệu bắt đầu
 
-## File dùng chung
+Hướng dẫn trực quan public: https://grabshare-team-roadmap.snowy-frost-6677.chatgpt.site
+Ngữ cảnh nạp AI theo gói ở docs/ai; mỗi file TASK đã chứa cả quy tắc chung.
+Hợp đồng bàn giao đã chốt ở docs/HANDOFF_CONTRACT.md; package contract chứa
+hằng số/callback/interface. Chưa có triển khai repository hoặc router thật.
 
-Cấu hình Gradle và wrapper; manifest; launcher icon; `activity_main.xml`; `view_*.xml`, `row_*.xml`, `dialog_confirm.xml`, `sheet_*.xml`; màu, style, theme, chuỗi và vector; `MainActivity.java`, `GrabShareUi.java`, `UiScreen.java`.
+- [Hợp đồng dữ liệu](docs/DATA_CONTRACT.md): field, model, ID, trạng thái, query.
+- [Phân công A/B/C](docs/TEAM_TASKS.md): file, nhiệm vụ, tiêu chí, lịch và Git.
+- [Firebase base](docs/FIREBASE_BASE.md): cấu hình, Rules và quyền đọc.
+- [Seed demo](scripts/README.md): dành cho nhóm trưởng, không tự reset khi đang làm.
 
-## Chạy
+Thành, Thuận, Thuần tự chọn A/B/C. Leader quản lý base/tài khoản/tích hợp.
+Java mới không lambda, không Handler, comment tiếng Việt trên hàm.
 
-Mở project bằng Android Studio rồi Run. Vuốt trái/phải để xem 7 màn; cuộn dọc chỉ đọc nội dung dài. Nút và ô nhập chỉ để xem, không có popup hoặc nghiệp vụ.
+## Mở dự án
 
-Màn của thành viên 2, 3 và 4 chưa được đưa lên. Khi bổ sung màn, thêm mục trong `UiScreen.java` và danh sách `PAGES` trong `GrabShareUi.java`.
+Mở thư mục clone bằng Android Studio, Sync Gradle. Mỗi máy cấu hình SDK riêng;
+không commit local.properties, mật khẩu hoặc service account. Dùng cùng
+app/google-services.json, không tạo Firebase riêng theo nhánh Git.
 
-Build: `gradlew.bat :app:assembleDebug`, dùng JDK đi kèm Android Studio. Mỗi máy cấu hình SDK riêng; không commit `local.properties`.
+Debug đã có bộ chọn màn theo L/A/B/C, xem XML hoặc mở Activity đã triển khai;
+xem docs/RUN_SCREEN.md. Công cụ đã build Debug, chưa Run emulator. Release vẫn mở preview.
+Preview vẫn vuốt qua 27 XML, nút/ô nhập chưa có chức năng.
+Không tính dữ liệu minh họa trên XML là dữ liệu Firestore thật.

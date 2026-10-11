@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dev_title">GrabShare · Mở màn riêng</string>
+    <string name="dev_description">Công cụ Debug cho nhóm. Chọn gói và chạm tên màn để mở.</string>
+    <string name="dev_real_mode">Mở Activity thật (thành viên cần triển khai)</string>
+    <string name="dev_trip_hint">trip_id, ví dụ: seed_trip_paid</string>
+    <string name="dev_request_hint">request_id lấy từ collection requests</string>
+    <string name="dev_id_note">ID chỉ truyền vào Activity thật. Màn không cần ID có thể để trống. Công cụ này không đăng nhập hoặc bỏ qua Rules.</string>
+    <string name="dev_all_preview">Xem toàn bộ 27 XML</string>
+    <string name="dev_missing_activity">Activity chưa có hoặc chưa đăng ký Manifest: %1$s. Chuyển về chế độ xem XML để xem bố cục.</string>
+    <string name="dev_launch_error">Không mở được Activity: %1$s</string>
+    <string name="dev_preview_hint">Xem XML · chưa phải chức năng thật</string>
+    <string name="dev_activity_hint">Mở Activity · %1$s</string>
+    <string-array name="dev_groups">
+        <item>Tất cả các gói</item>
+        <item>L · Nhóm trưởng</item>
+        <item>A · Tìm chuyến</item>
+        <item>B · Người đi nhờ</item>
+        <item>C · Chủ xe</item>
+    </string-array>
+</resources>
