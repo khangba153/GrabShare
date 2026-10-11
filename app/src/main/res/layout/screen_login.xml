@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/background" android:descendantFocusability="blocksDescendants" android:importantForAccessibility="noHideDescendants">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/background">
     <FrameLayout android:id="@+id/header" android:layout_width="match_parent" android:layout_height="64dp" android:paddingHorizontal="12dp" android:visibility="gone">
         <ImageButton android:id="@+id/header_back" style="@style/IconButton" android:layout_gravity="center_vertical|start" android:src="@drawable/ic_back" android:contentDescription="Quay lại" android:visibility="visible" android:clickable="false" android:focusable="false" />
         <TextView android:id="@+id/header_title" style="@style/Subtitle" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginHorizontal="52dp" android:layout_marginBottom="0dp" android:gravity="center" android:text="Đăng nhập" />
@@ -17,15 +17,20 @@
             <LinearLayout style="@style/Card">
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
                     <TextView style="@style/Caption" android:text="Email" />
-                    <EditText android:id="@+id/login_email" style="@style/Input" android:inputType="textEmailAddress" android:hint="Nhập email của bạn" android:importantForAutofill="no" android:focusable="false" android:focusableInTouchMode="false" android:cursorVisible="false" android:longClickable="false" />
+                    <EditText android:id="@+id/login_email" style="@style/Input" android:inputType="textEmailAddress" android:hint="Nhập email của bạn" android:importantForAutofill="no"/>
                 </LinearLayout>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
                     <TextView style="@style/Caption" android:text="Mật khẩu" />
-                    <EditText android:id="@+id/login_password" style="@style/Input" android:inputType="textPassword" android:hint="Nhập mật khẩu" android:importantForAutofill="no" android:focusable="false" android:focusableInTouchMode="false" android:cursorVisible="false" android:longClickable="false" />
+                    <EditText android:id="@+id/login_password" style="@style/Input" android:inputType="textPassword" android:hint="Nhập mật khẩu" android:importantForAutofill="no" />
                 </LinearLayout>
                 <androidx.appcompat.widget.AppCompatButton android:id="@+id/forgot_password" style="@style/ButtonSecondary" android:text="Quên mật khẩu?" android:clickable="false" android:focusable="false" />
             </LinearLayout>
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/login_submit" style="@style/ButtonPrimary" android:text="Đăng nhập" android:clickable="false" android:focusable="false" />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/login_submit" style="@style/ButtonPrimary" android:text="Đăng nhập" />
+            <TextView android:id="@+id/login_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="@color/ink" android:textSize="14sp" android:accessibilityLiveRegion="polite" android:visibility="gone" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/login_google"
+                style="@style/ButtonSecondary"
+                android:text="Đăng nhập với Google" />
             <androidx.appcompat.widget.AppCompatButton android:id="@+id/go_register" style="@style/ButtonSecondary" android:text="Chưa có tài khoản? Đăng ký" android:clickable="false" android:focusable="false" />
         </LinearLayout>
     </ScrollView>
