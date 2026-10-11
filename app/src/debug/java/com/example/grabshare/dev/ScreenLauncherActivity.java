@@ -95,7 +95,7 @@ public class ScreenLauncherActivity extends AppCompatActivity {
 
     /** Lọc gói mà không thay đổi màn hoặc dữ liệu Firebase. */
     private void filterScreens() {
-        String[] groups = {"", "L", "A", "B", "C"};
+        String[] groups = {"", "L", "Thành", "Thuận", "Thuần"};
         String selected = groups[Math.max(0, group.getSelectedItemPosition())];
         screenList.removeAllViews();
         for (ScreenCatalog screen : ScreenCatalog.SCREENS) {
