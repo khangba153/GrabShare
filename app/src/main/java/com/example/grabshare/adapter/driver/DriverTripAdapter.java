@@ -33,7 +33,7 @@ public class DriverTripAdapter extends BaseAdapter {
      */
     public DriverTripAdapter(Context context) {
         layoutInflater = LayoutInflater.from(context);
-        trips = new ArrayList<Trip>();
+        trips = new ArrayList<>();
     }
 
     /**
@@ -97,15 +97,11 @@ public class DriverTripAdapter extends BaseAdapter {
             View convertView,
             ViewGroup parent
     ) {
-        View tripItemView = convertView;
-
-        if (tripItemView == null) {
-            tripItemView = layoutInflater.inflate(
-                    R.layout.item_driver_trip,
-                    parent,
-                    false
-            );
-        }
+        View tripItemView = (convertView != null) ? convertView : layoutInflater.inflate(
+                R.layout.item_driver_trip,
+                parent,
+                false
+        );
 
         Trip currentTrip = getItem(position);
 
@@ -183,7 +179,7 @@ public class DriverTripAdapter extends BaseAdapter {
 
         SimpleDateFormat dateFormatter = new SimpleDateFormat(
                 "dd/MM/yyyy · HH:mm",
-                new Locale("vi", "VN")
+                Locale.forLanguageTag("vi-VN")
         );
 
         return dateFormatter.format(
@@ -204,12 +200,12 @@ public class DriverTripAdapter extends BaseAdapter {
             return "Chưa có chi phí";
         }
 
-        if (contributionAmount.longValue() == 0L) {
+        if (contributionAmount == 0L) {
             return "Miễn phí";
         }
 
         NumberFormat numberFormatter = NumberFormat.getIntegerInstance(
-                new Locale("vi", "VN")
+                Locale.forLanguageTag("vi-VN")
         );
 
         return numberFormatter.format(contributionAmount) + " đ";

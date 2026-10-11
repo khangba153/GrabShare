@@ -15,6 +15,7 @@ import android.widget.Toast;
 import android.widget.DatePicker;
 import android.widget.TimePicker;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
@@ -25,7 +26,7 @@ import java.util.Locale;
 
 /**
  * Hiển thị và xử lý biểu mẫu đăng chuyến dành cho chủ xe.
- *
+ * <p>
  * Giai đoạn này chỉ xử lý giao diện và kiểm tra dữ liệu đầu vào.
  * Chưa ghi chuyến lên Firestore.
  */
@@ -63,7 +64,6 @@ public class PostTripActivity extends AppCompatActivity {
     private TextView destinationPlaceValue;
 
     private EditText contributionAmountInput;
-    private EditText tripNoteInput;
 
     private CheckBox freeContributionCheckBox;
 
@@ -115,7 +115,7 @@ public class PostTripActivity extends AppCompatActivity {
         destinationPlaceValue = findViewById(R.id.post_end_value);
 
         contributionAmountInput = findViewById(R.id.post_cost);
-        tripNoteInput = findViewById(R.id.post_note);
+        findViewById(R.id.post_note);
 
         freeContributionCheckBox = findViewById(R.id.post_free);
     }
@@ -169,7 +169,7 @@ public class PostTripActivity extends AppCompatActivity {
      * @param savedInstanceState nơi lưu trạng thái giao diện
      */
     @Override
-    protected void onSaveInstanceState(Bundle savedInstanceState) {
+    protected void onSaveInstanceState(@NonNull Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
 
         savedInstanceState.putBoolean(
@@ -250,16 +250,19 @@ public class PostTripActivity extends AppCompatActivity {
      * Hiển thị hộp thoại chọn ngày khởi hành.
      */
     private void showDepartureDatePicker() {
-        Calendar currentCalendar = Calendar.getInstance();
-
-        int initialYear = currentCalendar.get(Calendar.YEAR);
-        int initialMonth = currentCalendar.get(Calendar.MONTH);
-        int initialDay = currentCalendar.get(Calendar.DAY_OF_MONTH);
+        int initialYear;
+        int initialMonth;
+        int initialDay;
 
         if (hasSelectedDepartureDate) {
             initialYear = selectedDepartureYear;
             initialMonth = selectedDepartureMonth;
             initialDay = selectedDepartureDay;
+        } else {
+            Calendar currentCalendar = Calendar.getInstance();
+            initialYear = currentCalendar.get(Calendar.YEAR);
+            initialMonth = currentCalendar.get(Calendar.MONTH);
+            initialDay = currentCalendar.get(Calendar.DAY_OF_MONTH);
         }
 
         DatePickerDialog datePickerDialog = new DatePickerDialog(
@@ -348,7 +351,7 @@ public class PostTripActivity extends AppCompatActivity {
 
         SimpleDateFormat dateFormatter = new SimpleDateFormat(
                 "dd/MM/yyyy",
-                new Locale("vi", "VN")
+                Locale.forLanguageTag("vi-VN")
         );
 
         departureDateValue.setText(
@@ -380,14 +383,16 @@ public class PostTripActivity extends AppCompatActivity {
      * Hiển thị hộp thoại chọn giờ theo định dạng 24 giờ.
      */
     private void showDepartureTimePicker() {
-        Calendar currentCalendar = Calendar.getInstance();
-
-        int initialHour = currentCalendar.get(Calendar.HOUR_OF_DAY);
-        int initialMinute = currentCalendar.get(Calendar.MINUTE);
+        int initialHour;
+        int initialMinute;
 
         if (hasSelectedDepartureTime) {
             initialHour = selectedDepartureHour;
             initialMinute = selectedDepartureMinute;
+        } else {
+            Calendar currentCalendar = Calendar.getInstance();
+            initialHour = currentCalendar.get(Calendar.HOUR_OF_DAY);
+            initialMinute = currentCalendar.get(Calendar.MINUTE);
         }
 
         TimePickerDialog timePickerDialog = new TimePickerDialog(
@@ -457,7 +462,7 @@ public class PostTripActivity extends AppCompatActivity {
                      */
                     @Override
                     public void onCheckedChanged(
-                            CompoundButton button,
+                            @NonNull CompoundButton button,
                             boolean isChecked
                     ) {
                         if (isChecked) {
@@ -481,7 +486,7 @@ public class PostTripActivity extends AppCompatActivity {
 
     /**
      * Kết nối nút kiểm tra biểu mẫu.
-     *
+     * <p>
      * Nút này chỉ kiểm tra dữ liệu, chưa tạo chuyến trên Firestore.
      */
     private void connectFormValidationButton() {

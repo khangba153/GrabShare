@@ -1,5 +1,7 @@
 package com.example.grabshare.repository.driver;
 
+import androidx.annotation.NonNull;
+
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Trip;
 
@@ -20,7 +22,7 @@ import java.util.List;
 
 /**
  * Đọc danh sách chuyến do tài khoản hiện tại đăng.
- *
+ * <p>
  * Repository này chỉ đọc dữ liệu, không tạo hoặc cập nhật chuyến.
  */
 public class DriverTripRepository {
@@ -44,7 +46,7 @@ public class DriverTripRepository {
 
     /**
      * Tải các chuyến thuộc tài khoản đang đăng nhập.
-     *
+     * <p>
      * Truy vấn lọc ngay trên Firestore bằng driverId và sắp xếp
      * theo thời gian khởi hành giảm dần.
      *
@@ -56,7 +58,6 @@ public class DriverTripRepository {
         FirebaseUser currentUser = firebaseAuth.getCurrentUser();
 
         if (currentUser == null
-                || currentUser.getUid() == null
                 || currentUser.getUid().trim().isEmpty()) {
 
             callback.onError(
@@ -78,7 +79,7 @@ public class DriverTripRepository {
                 )
                 .get(Source.SERVER)
                 .addOnSuccessListener(
-                        new OnSuccessListener<QuerySnapshot>() {
+                        new OnSuccessListener<>() {
 
                             /**
                              * Chuyển kết quả truy vấn thành danh sách Trip.
@@ -90,7 +91,7 @@ public class DriverTripRepository {
                                     QuerySnapshot querySnapshot
                             ) {
                                 List<Trip> loadedTrips =
-                                        new ArrayList<Trip>();
+                                        new ArrayList<>();
 
                                 for (DocumentSnapshot documentSnapshot
                                         : querySnapshot.getDocuments()) {
@@ -138,7 +139,7 @@ public class DriverTripRepository {
                              * @param exception lỗi Firestore trả về
                              */
                             @Override
-                            public void onFailure(Exception exception) {
+                            public void onFailure(@NonNull Exception exception) {
                                 callback.onError(exception);
                             }
                         }

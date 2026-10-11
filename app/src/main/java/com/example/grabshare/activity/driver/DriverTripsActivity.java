@@ -4,12 +4,11 @@ import android.content.res.ColorStateList;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
 
@@ -29,7 +28,7 @@ import java.util.Locale;
 
 /**
  * Hiển thị danh sách chuyến do tài khoản hiện tại đăng.
- *
+ * <p>
  * Chỉ đọc dữ liệu Firestore, không tạo hoặc cập nhật chuyến.
  */
 public class DriverTripsActivity extends AppCompatActivity {
@@ -52,7 +51,7 @@ public class DriverTripsActivity extends AppCompatActivity {
     private DriverTripRepository tripRepository;
     private FirebaseAuth firebaseAuth;
 
-    private final List<Trip> allTrips = new ArrayList<Trip>();
+    private final List<Trip> allTrips = new ArrayList<>();
 
     private int selectedFilter = FILTER_UPCOMING;
 
@@ -122,7 +121,7 @@ public class DriverTripsActivity extends AppCompatActivity {
 
     /**
      * Tải lại danh sách khi màn hình được mở hoặc quay trở lại.
-     *
+     * <p>
      * Lần quay lại từ màn hình đăng, sửa hoặc quản lý chuyến sẽ làm mới
      * dữ liệu thay vì mặc định giữ danh sách cũ.
      */
@@ -139,7 +138,7 @@ public class DriverTripsActivity extends AppCompatActivity {
      * @param savedInstanceState nơi lưu trạng thái màn hình
      */
     @Override
-    protected void onSaveInstanceState(Bundle savedInstanceState) {
+    protected void onSaveInstanceState(@NonNull Bundle savedInstanceState) {
         savedInstanceState.putInt(
                 STATE_SELECTED_FILTER,
                 selectedFilter
@@ -175,7 +174,7 @@ public class DriverTripsActivity extends AppCompatActivity {
         messageTextView.setVisibility(View.GONE);
 
         tripRepository.loadTripsForCurrentDriver(
-                new RepositoryCallback<List<Trip>>() {
+                new RepositoryCallback<>() {
 
                     /**
                      * Nhận danh sách chuyến sau khi truy vấn thành công.
@@ -321,11 +320,11 @@ public class DriverTripsActivity extends AppCompatActivity {
 
     /**
      * Lọc danh sách theo trạng thái được lưu trong Firestore.
-     *
+     * <p>
      * Không suy ra trạng thái COMPLETED từ thời gian khởi hành.
      */
     private void displayFilteredTrips() {
-        List<Trip> filteredTrips = new ArrayList<Trip>();
+        List<Trip> filteredTrips = new ArrayList<>();
 
         for (Trip currentTrip : allTrips) {
             String tripStatus = currentTrip.getStatus();
