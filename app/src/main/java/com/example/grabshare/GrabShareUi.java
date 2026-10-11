@@ -8,7 +8,10 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.Objects;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -28,6 +31,18 @@ public class GrabShareUi extends AppCompatActivity {
             UiScreen.REQUESTS, UiScreen.REQUEST_DETAIL, UiScreen.MANAGE,
             UiScreen.NOTIFICATIONS
     };
+    private static int findPageIndex(String screenName) {
+        if (screenName == null) {
+            return 0;
+        }
+        for (int i = 0; i < PAGES.length; i++) {
+            if (Objects.equals(PAGES[i].name(), screenName)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
     private int pageIndex;
     private float downX, downY;
     private MotionEvent downEvent;
@@ -43,19 +58,14 @@ public class GrabShareUi extends AppCompatActivity {
         if (savedInstanceState != null) {
             pageIndex = savedInstanceState.getInt("preview_page", 0);
         } else {
-            String screenName = getIntent().getStringExtra(EXTRA_PREVIEW_SCREEN);
-            for (int index = 0; index < PAGES.length; index++) {
-                if (PAGES[index].name().equals(screenName)) {
-                    pageIndex = index;
-                    break;
-                }
-            }
+            pageIndex = findPageIndex(getIntent().getStringExtra(EXTRA_PREVIEW_SCREEN));
         }
         pageIndex = Math.max(0, Math.min(pageIndex, PAGES.length - 1));
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), new OnApplyWindowInsetsListener() {
             /** Chừa vùng thanh hệ thống khi hiển thị màn preview. */
+            @NonNull
             @Override
-            public WindowInsetsCompat onApplyWindowInsets(View view, WindowInsetsCompat insets) {
+            public WindowInsetsCompat onApplyWindowInsets(@NonNull View view, @NonNull WindowInsetsCompat insets) {
                 Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
                 view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
                 return insets;
