@@ -89,7 +89,7 @@ Catalog có 26 màn thuộc gói, không có chat scope phụ. Activity được
 Manifest, chưa có thì báo thiếu. Catalog không gọi reflection hoặc sinh Activity.
 Tên class đã chốt; nếu đổi phải gửi leader sửa catalog/context cùng lúc.
 
-## 5. Checklist tự kiểm tra (chưa thực hiện)
+## 5. Checklist tự kiểm tra (nhóm trưởng báo test bộ chọn đạt; không xác nhận toàn bộ checklist)
 
 - Debug Run mở bộ chọn, Release không có ScreenLauncherActivity.
 - L/A/B/C hiện đúng màn và chạm mở đúng XML.
@@ -101,6 +101,6 @@ Tên class đã chốt; nếu đổi phải gửi leader sửa catalog/context c
 
 ## 6. Bước sau
 
-Build đã đạt; nhóm trưởng cần xác nhận Run thực tế trước bàn giao, rồi bước 4
-chọn file base commit/push main. Thành viên chưa nhận được các file này qua pull.
+Build đã đạt; nhóm trưởng báo đã test bộ chọn màn và đạt. Base đã push main
+tại commit 02af6bd; thành viên làm theo docs/START_HERE.md để pull và chọn nhánh.
 Auth/Rules ghi/index vẫn là mốc 2 để nối chức năng thật.

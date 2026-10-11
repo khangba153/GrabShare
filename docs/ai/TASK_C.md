@@ -1,4 +1,4 @@
-# PROJECT_CONTEXT.md — GrabShare v1.3 / 11-10-2026
+# PROJECT_CONTEXT.md — GrabShare v1.4 / 11-10-2026
 
 ## Mục tiêu
 Đồ án phát triển mobile, app cộng đồng chia sẻ chuyến xe máy, không riêng sinh viên.
@@ -15,8 +15,8 @@ Mỗi trip tối đa 1 chỗ đi nhờ, mỗi user có thể vừa driver vừa 
 ## Hiện trạng — đừng giả đã có chức năng
 Repo https://github.com/khangba153/GrabShare.git; mỗi máy dùng đường dẫn clone riêng.
 27 XML + preview swipe chặn chạm. 8 model trong com.example.grabshare.model.
-6 khai báo contract đã tạo local: NavigationKeys, LocationKeys, RepositoryCallback,
-FavoriteStore, TripCacheStore, CachedTrip. Chưa push base Android.
+6 khai báo contract đã có trên main: NavigationKeys, LocationKeys, RepositoryCallback,
+FavoriteStore, TripCacheStore, CachedTrip. Base Android đã push main tại commit 02af6bd.
 Debug có ScreenLauncherActivity chọn L/A/B/C, mở XML hoặc Activity thật đã có
 trong Manifest; có ô trip_id/request_id. Không auto auth/ghi hoặc bỏ qua Rules.
 Release vẫn preview; router app thật chưa có. Hướng dẫn chạy chi tiết bên dưới.
@@ -25,8 +25,8 @@ Config/dependencies đã chuẩn bị; seed 27 docs đã ghi theo báo cáo lead
 Rules hiện chỉ đọc: trips/publicProfiles/ratings khi đăng nhập; users chính chủ get;
 requests driver/passenger liên quan; favorites owner; notifications recipient.
 Playground kiểm tra trip/auth và users đúng chủ; chưa xác nhận Android đọc thật.
-Model/contract/công cụ Debug đã compile :app:assembleDebug thành công; chưa Run
-emulator hoặc tests. Chưa repository/Activity nghiệp vụ/SQLite/API/index/Rules ghi.
+Model/contract/công cụ Debug đã compile :app:assembleDebug thành công; leader
+báo đã test bộ chọn màn và đạt. Chưa xác nhận đọc/ghi Firebase Android; chưa chạy tests. Chưa repository/Activity nghiệp vụ/SQLite/API/index/Rules ghi.
 
 ## Ranh giới AI
 Trước khi sửa: đọc repo/AGENTS nếu có, git status/branch và code hiện tại, đối chiếu
@@ -75,7 +75,7 @@ Sau mỗi bước AI báo: file đã sửa, flow đã nối, phần phụ thuộ
 # Hợp đồng bàn giao giữa các gói — chốt bước 2, v1.2
 
 Nhóm trưởng đã đồng ý; A/B/C tự chọn, không cần nhập tên. Các khai báo ở package
-com.example.grabshare.contract đã tạo local và compile Debug thành công, chưa push; repository và Activity
+com.example.grabshare.contract đã compile Debug và push main tại 02af6bd; repository và Activity
 nghiệp vụ chưa được triển khai. Hợp đồng này không mở quyền ghi Firestore.
 
 ## 1. Mở màn theo ID
@@ -183,7 +183,7 @@ state/cross-document trong cùng transaction, không chỉ kiểm tra UID.
 - Một request_id mở đúng màn B; Complete truy ra trip từ request.
 - Mọi XML/function thuộc owner; thay Manifest/router qua leader.
 - Khai báo hợp đồng không có dữ liệu giả, không phải chức năng đã chạy.
-- Còn thiếu: Activity thật, implementation B, auth, Rules ghi/index, router, Run thực tế.
+- Còn thiếu: Activity thật, implementation B, auth, Rules ghi/index, router nghiệp vụ. Base đã push main 02af6bd; nhóm trưởng báo test bộ chọn đạt.
 
 Nguồn Activity Result API: https://developer.android.com/training/basics/intents/result
 
@@ -278,7 +278,7 @@ Catalog có 26 màn thuộc gói, không có chat scope phụ. Activity được
 Manifest, chưa có thì báo thiếu. Catalog không gọi reflection hoặc sinh Activity.
 Tên class đã chốt; nếu đổi phải gửi leader sửa catalog/context cùng lúc.
 
-## 5. Checklist tự kiểm tra (chưa thực hiện)
+## 5. Checklist tự kiểm tra (nhóm trưởng báo test bộ chọn đạt; không xác nhận toàn bộ checklist)
 
 - Debug Run mở bộ chọn, Release không có ScreenLauncherActivity.
 - L/A/B/C hiện đúng màn và chạm mở đúng XML.
@@ -290,9 +290,85 @@ Tên class đã chốt; nếu đổi phải gửi leader sửa catalog/context c
 
 ## 6. Bước sau
 
-Build đã đạt; nhóm trưởng cần xác nhận Run thực tế trước bàn giao, rồi bước 4
-chọn file base commit/push main. Thành viên chưa nhận được các file này qua pull.
+Build đã đạt; nhóm trưởng báo đã test bộ chọn màn và đạt. Base đã push main
+tại commit 02af6bd; thành viên làm theo docs/START_HERE.md để pull và chọn nhánh.
 Auth/Rules ghi/index vẫn là mốc 2 để nối chức năng thật.
+
+# Bắt đầu từ base trên main — 11/10/2026
+
+Base đã push tại commit `02af6bd`. Build Debug thành công; nhóm trưởng báo đã test bộ chọn màn và đạt. Đây là base để làm từng phần độc lập. Android chưa đăng nhập/đọc Firestore thật; Rules hiện chặn mọi ghi.
+
+## 1. Nhận code và tạo nhánh
+
+Nếu chưa clone:
+
+```bash
+git clone https://github.com/khangba153/GrabShare.git
+cd GrabShare
+```
+
+Nếu đã clone, kiểm tra `git status`. Có thay đổi đang làm thì commit hoặc stash trước khi chuyển nhánh; không bỏ thay đổi bằng reset.
+
+```bash
+git switch main
+git pull --ff-only origin main
+git config user.name "Ten cua ban"
+git config user.email "Email da xac minh tren GitHub cua ban"
+```
+
+Tự chọn một gói chưa có người nhận, báo nhóm trưởng để tránh trùng. Tạo đúng một nhánh theo gói đã chọn:
+
+```bash
+git switch -c codex/task-a
+# Gói B: codex/task-b; gói C: codex/task-c
+```
+
+## 2. Mở và chạy
+
+Mở thư mục clone bằng Android Studio, Sync Gradle, chọn build variant Debug rồi Run app. Bộ chọn màn cho xem XML hoặc mở Activity thật đã được tạo và đăng ký. Đọc `docs/RUN_SCREEN.md`.
+
+Giữ `app/google-services.json` từ base: tất cả dùng Firebase project grabshare, database (default). Không tạo Firebase riêng hoặc tự chạy seed. Mỗi máy dùng SDK/local.properties riêng, không commit file đó. JSON cấu hình không tự đăng nhập tài khoản.
+
+## 3. Nạp ngữ cảnh AI
+
+Gửi `docs/ai/TASK_A.md`, `TASK_B.md` hoặc `TASK_C.md` tương ứng. File đã có quy tắc chung, schema, flow, file sở hữu, phụ thuộc và checklist. Đối chiếu `docs/TEAM_TASKS.md`, `DATA_CONTRACT.md`, `HANDOFF_CONTRACT.md` khi cần.
+
+Prompt: “Đọc TASK của tôi và repo hiện tại. Kiểm tra nhánh, file và phần base đã có. Đề xuất thứ tự theo phụ thuộc, bắt đầu từ UI/Activity độc lập. Chỉ làm gói của tôi, Java không lambda/Handler, comment tiếng Việt trên hàm. Không giả dữ liệu XML là dữ liệu Firebase thật. Báo đầu vào còn thiếu trước khi nối chức năng phụ thuộc.”
+
+## 4. Bắt đầu công việc
+
+- A: Home/Location/Results/Detail/Review; chuẩn bị form, Activity Result và trạng thái hiển thị.
+- B: màn trạng thái/MyTrips/Favorites; chuẩn bị adapter, interface FavoriteStore/TripCacheStore và SQLite theo hợp đồng.
+- C: màn chủ xe/Post/Edit/Manage/Requests/Notifications; chuẩn bị form và các trạng thái hiển thị.
+- Mỗi gói làm Activity trong package đã chốt, sửa XML của mình, giữ dữ liệu form/ID khi xoay. Dữ liệu tạm phải ghi rõ là demo.
+- Đăng ký Activity trong Manifest là thay đổi file chung: gửi phần khai báo trong PR để leader review. Không đổi model/theme/router/schema riêng lẻ.
+- Chờ leader bàn giao Auth, Rules ghi và index phù hợp trước demo Firestore có ghi. Màn của gói khác và repository chưa triển khai cũng là phụ thuộc, không tạo bản sao.
+
+## 5. Commit → PR → main
+
+Commit theo phần thực sự hoàn thành, không chia commit giả hoặc đổi author:
+
+```bash
+git status
+git add duong/dan/file-cua-ban
+git commit -m "feat(search): implement trip search screen"
+git push -u origin codex/task-a
+```
+
+Thay nhánh/tên commit theo gói và nội dung thực tế. Tạo Pull Request vào main, ghi chức năng/file, phụ thuộc, kết quả tự kiểm tra, ảnh và phần còn thiếu. Leader review rồi dùng **Create a merge commit** để giữ lịch sử/author. Thành viên không push trực tiếp main.
+
+Trước PR hoặc nhận base mới, trên nhánh đang làm:
+
+```bash
+git fetch origin
+git merge origin/main
+```
+
+Giải quyết xung đột, xem lại phần mình rồi push. Các thành viên khác nhận code đã merge bằng cách merge origin/main vào nhánh của họ. Không cần clone lại.
+
+## Mốc kế tiếp của nhóm trưởng
+
+Auth/tài khoản → Rules ghi và index theo từng thao tác → bàn giao đọc/ghi thật → router liên gói. Mốc 1 đạt không có nghĩa toàn bộ nghiệp vụ đã sẵn sàng.
 
 ## Nhiệm vụ được giao: Gói C — Chủ xe & điều phối
 Nhánh đề xuất: codex/feature-driver

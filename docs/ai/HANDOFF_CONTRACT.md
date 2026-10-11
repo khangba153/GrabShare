@@ -1,7 +1,7 @@
 # Hợp đồng bàn giao giữa các gói — chốt bước 2, v1.2
 
 Nhóm trưởng đã đồng ý; A/B/C tự chọn, không cần nhập tên. Các khai báo ở package
-com.example.grabshare.contract đã tạo local và compile Debug thành công, chưa push; repository và Activity
+com.example.grabshare.contract đã compile Debug và push main tại 02af6bd; repository và Activity
 nghiệp vụ chưa được triển khai. Hợp đồng này không mở quyền ghi Firestore.
 
 ## 1. Mở màn theo ID
@@ -109,6 +109,6 @@ state/cross-document trong cùng transaction, không chỉ kiểm tra UID.
 - Một request_id mở đúng màn B; Complete truy ra trip từ request.
 - Mọi XML/function thuộc owner; thay Manifest/router qua leader.
 - Khai báo hợp đồng không có dữ liệu giả, không phải chức năng đã chạy.
-- Còn thiếu: Activity thật, implementation B, auth, Rules ghi/index, router, Run thực tế.
+- Còn thiếu: Activity thật, implementation B, auth, Rules ghi/index, router nghiệp vụ. Base đã push main 02af6bd; nhóm trưởng báo test bộ chọn đạt.
 
 Nguồn Activity Result API: https://developer.android.com/training/basics/intents/result

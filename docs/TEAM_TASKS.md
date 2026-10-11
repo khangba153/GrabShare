@@ -20,7 +20,7 @@ Các Java liệt kê dưới đây là FILE CẦN TẠO sau khi giao nhiệm v�
 
 Bước 3 đã chuẩn bị bộ chọn Debug local; RUN_SCREEN.md hướng dẫn mở riêng XML
 hoặc Activity đúng package khi class/Manifest đã có. Build Debug đã thành công;
-chưa Run thực tế hoặc push main.
+leader báo test bộ chọn đạt; base đã push main tại 02af6bd.
 
 Thành viên chuẩn bị XML/đọc tài liệu ngay; phần ghi bắt đầu sau khi nhóm trưởng
 Publish Rules cho thao tác đó. Không tự mở allow write: true trên database chung.
@@ -257,4 +257,4 @@ mức cơ bản, không mở rộng chat hoặc ngoài phạm vi.
 
 A/B/C tự chọn, không yêu cầu điền tên. Chữ ký Location/Favorite/SQLite đã chốt;
 còn bán kính tìm kiếm, cách chạy riêng màn bước 3, auth/Rules ghi và commit base.
-Hợp đồng mới compile Debug thành công, chưa push; chưa bàn giao base hoàn chỉnh.
+Hợp đồng đã compile và push main 02af6bd. Base UI độc lập đã bàn giao; Auth/Rules ghi/index vẫn thuộc mốc 2.
