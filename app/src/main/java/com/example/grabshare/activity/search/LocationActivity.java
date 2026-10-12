@@ -69,6 +69,8 @@ public class LocationActivity extends AppCompatActivity {
 
         if (savedInstanceState != null) {
             restoreState(savedInstanceState);
+        } else {
+            loadDefaultSuggestions();
         }
     }
 
@@ -122,12 +124,32 @@ public class LocationActivity extends AppCompatActivity {
     }
 
     /**
+     * Nạp danh sách các địa điểm gợi ý sẵn (Chủ yếu là các cơ sở UEH)
+     * để người dùng chọn ngay thuận tiện mà không bắt buộc gõ phím.
+     */
+    private void loadDefaultSuggestions() {
+        List<Place> defaultPlaces = new ArrayList<>();
+        defaultPlaces.add(new Place("UEH Cơ sở A - 59C Nguyễn Đình Chiểu, Phường 6, Quận 3, TP.HCM", 10.7830141, 106.6948927));
+        defaultPlaces.add(new Place("UEH Cơ sở B - 279 Nguyễn Tri Phương, Phường 5, Quận 10, TP.HCM", 10.7609491, 106.6679786));
+        defaultPlaces.add(new Place("UEH Cơ sở C - 91 Đường 3 Tháng 2, Phường 11, Quận 10, TP.HCM", 10.773238, 106.677568));
+        defaultPlaces.add(new Place("UEH Cơ sở N - Nguyễn Văn Linh, Phong Phú, Bình Chánh, TP.HCM", 10.705906, 106.639100));
+        defaultPlaces.add(new Place("UEH Cơ sở H - 1A Hoàng Diệu, Phường 10, Phú Nhuận, TP.HCM", 10.798991, 106.678210));
+        defaultPlaces.add(new Place("UEH Cơ sở V - 232/9 Võ Thị Sáu, Phường Võ Thị Sáu, Quận 3, TP.HCM", 10.7828045, 106.6856203));
+
+        adapter.setPlaces(defaultPlaces);
+        suggestionTitle.setText("Gợi ý nhanh (Các cơ sở UEH)");
+        suggestionTitle.setVisibility(View.VISIBLE);
+        locationList.setVisibility(View.VISIBLE);
+        statusText.setVisibility(View.GONE);
+    }
+
+    /**
      * Thực hiện tìm kiếm địa điểm từ API.
      */
     private void performSearch() {
         String query = searchInput.getText().toString().trim();
         if (TextUtils.isEmpty(query)) {
-            Toast.makeText(this, "Vui lòng nhập địa điểm cần tìm", Toast.LENGTH_SHORT).show();
+            loadDefaultSuggestions();
             return;
         }
 
@@ -143,6 +165,7 @@ public class LocationActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         statusText.setVisibility(View.GONE);
+                        suggestionTitle.setText("Kết quả tìm kiếm");
                         suggestionTitle.setVisibility(View.VISIBLE);
                         locationList.setVisibility(View.VISIBLE);
                         
