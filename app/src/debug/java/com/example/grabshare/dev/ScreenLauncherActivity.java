@@ -21,7 +21,6 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.example.grabshare.GrabShareUi;
-import com.example.grabshare.MainActivity;
 import com.example.grabshare.R;
 import com.example.grabshare.contract.NavigationKeys;
 
@@ -86,7 +85,7 @@ public class ScreenLauncherActivity extends AppCompatActivity {
             /** Mở bản xem trước toàn bộ XML bằng vuốt. */
             @Override
             public void onClick(View view) {
-                startActivity(new Intent(ScreenLauncherActivity.this, MainActivity.class));
+                startActivity(new Intent(ScreenLauncherActivity.this, GrabShareUi.class));
             }
         });
         filterScreens();
@@ -129,7 +128,7 @@ public class ScreenLauncherActivity extends AppCompatActivity {
     /** Mở preview hoặc Activity đã đăng ký; báo thiếu thay vì giả kết quả thật. */
     private void openScreen(ScreenCatalog screen) {
         if (!realMode.isChecked()) {
-            Intent preview = new Intent(this, MainActivity.class);
+            Intent preview = new Intent(this, GrabShareUi.class);
             preview.putExtra(GrabShareUi.EXTRA_PREVIEW_SCREEN, screen.preview);
             startActivity(preview);
             return;

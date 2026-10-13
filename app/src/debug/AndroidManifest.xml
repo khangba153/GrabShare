@@ -2,8 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <application>
+        <!-- Màn xem XML riêng dành cho công cụ Debug. -->
+        <activity
+            android:name=".GrabShareUi"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".MainActivity">
-            <!-- Chỉ đổi launcher trong Debug; MainActivity vẫn dùng xem XML. -->
+            <!-- Debug mặc định mở bộ chọn; MainActivity là router ứng dụng thật. -->
             <intent-filter tools:node="removeAll" />
         </activity>
         <activity
