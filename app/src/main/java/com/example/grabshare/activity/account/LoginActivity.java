@@ -37,6 +37,8 @@ import com.example.grabshare.repository.account.LoginProfileRepository;
 import android.content.Intent;
 import com.example.grabshare.activity.search.HomeActivity;
 
+import com.google.firebase.auth.FirebaseAuth;
+
 public class LoginActivity extends AppCompatActivity {
 
     private EditText emailInput;
@@ -292,22 +294,18 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    /** Kiểm tra phiên Firebase khi người dùng mở lại màn đăng nhập. */
+    /** Theo dõi phiên khi màn đăng nhập đang hiển thị. */
     @Override
     protected void onStart() {
         super.onStart();
+        FirebaseAuth.getInstance().addAuthStateListener(authStateListener);
+    }
 
-        if (submitting) {
-            return;
-        }
-
-        FirebaseUser currentUser = authRepository.getCurrentUser();
-
-        if (currentUser != null) {
-            checkLoginProfile(currentUser);
-        } else {
-            showStatus("Bạn chưa đăng nhập.");
-        }
+    /** Gỡ listener khi rời màn để tránh giữ Activity và nhận cập nhật trùng. */
+    @Override
+    protected void onStop() {
+        FirebaseAuth.getInstance().removeAuthStateListener(authStateListener);
+        super.onStop();
     }
 
     /** Đọc hồ sơ sau khi Firebase đã xác thực tài khoản. */
@@ -350,4 +348,25 @@ public class LoginActivity extends AppCompatActivity {
                     }
                 });
     }
+
+    //Bổ sung AuthStateListener để nhận thay đổi phiên
+    private final FirebaseAuth.AuthStateListener authStateListener =
+            new FirebaseAuth.AuthStateListener() {
+
+                /** Nhận phiên mới, kể cả khi xác thực hoàn tất sau khi xoay. */
+                @Override
+                public void onAuthStateChanged(@NonNull FirebaseAuth auth) {
+                    if (isFinishing() || isDestroyed() || submitting) {
+                        return;
+                    }
+
+                    FirebaseUser user = auth.getCurrentUser();
+
+                    if (user != null) {
+                        checkLoginProfile(user);
+                    } else {
+                        showStatus("Bạn chưa đăng nhập.");
+                    }
+                }
+            };
 }
