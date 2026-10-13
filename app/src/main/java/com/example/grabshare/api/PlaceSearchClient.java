@@ -50,47 +50,53 @@ public class PlaceSearchClient {
         executor.execute(new Runnable() {
             @Override
             public void run() {
-                try {
-                    String encodedQuery = URLEncoder.encode(query, "UTF-8");
-                    String urlString = "https://us1.locationiq.com/v1/search?key=" + LOCATIONIQ_API_KEY + "&format=json&limit=10&countrycodes=vn&q=" + encodedQuery;
-                    URL url = new URL(urlString);
-                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                    connection.setRequestMethod("GET");
-                    connection.setConnectTimeout(10000);
-                    connection.setReadTimeout(10000);
+                    HttpURLConnection connection = null;
+                    try {
+                        String encodedQuery = URLEncoder.encode(query, "UTF-8");
+                        String urlString = "https://us1.locationiq.com/v1/search?key=" + LOCATIONIQ_API_KEY + "&format=json&limit=10&countrycodes=vn&q=" + encodedQuery;
+                        URL url = new URL(urlString);
+                        connection = (HttpURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setConnectTimeout(10000);
+                        connection.setReadTimeout(10000);
 
-                    int responseCode = connection.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
-                        StringBuilder response = new StringBuilder();
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            response.append(line);
+                        int responseCode = connection.getResponseCode();
+                        if (responseCode == HttpURLConnection.HTTP_OK) {
+                            StringBuilder response = new StringBuilder();
+                            // Đảm bảo đóng reader cả khi có ngoại lệ xảy ra trong lúc đọc JSON
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    response.append(line);
+                                }
+                            }
+
+                            JSONArray jsonArray = new JSONArray(response.toString());
+                            List<Place> places = new ArrayList<>();
+                            for (int i = 0; i < jsonArray.length(); i++) {
+                                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                                String name = jsonObject.getString("display_name");
+                                double lat = jsonObject.getDouble("lat");
+                                double lon = jsonObject.getDouble("lon");
+                                places.add(new Place(name, lat, lon));
+                            }
+
+                            enrichUehCampuses(query, places);
+
+                            callback.onSuccess(places);
+                        } else if (responseCode == 429) {
+                            callback.onError(new Exception("Vượt quá giới hạn tìm kiếm (429). Vui lòng thử lại sau."));
+                        } else {
+                            callback.onError(new Exception("Mã lỗi HTTP: " + responseCode));
                         }
-                        reader.close();
-
-                        JSONArray jsonArray = new JSONArray(response.toString());
-                        List<Place> places = new ArrayList<>();
-                        for (int i = 0; i < jsonArray.length(); i++) {
-                            JSONObject jsonObject = jsonArray.getJSONObject(i);
-                            String name = jsonObject.getString("display_name");
-                            double lat = jsonObject.getDouble("lat");
-                            double lon = jsonObject.getDouble("lon");
-                            places.add(new Place(name, lat, lon));
+                    } catch (Exception e) {
+                        callback.onError(e);
+                    } finally {
+                        // Đảm bảo đóng kết nối để giải phóng tài nguyên trong mọi nhánh (thành công/lỗi)
+                        if (connection != null) {
+                            connection.disconnect();
                         }
-
-                        // Tối ưu hóa từ khóa UEH / Cơ sở đại học cho sinh viên
-                        enrichUehCampuses(query, places);
-
-                        callback.onSuccess(places);
-                    } else if (responseCode == 429) {
-                        callback.onError(new Exception("Vượt quá giới hạn tìm kiếm (429). Vui lòng thử lại sau."));
-                    } else {
-                        callback.onError(new Exception("Mã lỗi HTTP: " + responseCode));
                     }
-                } catch (Exception e) {
-                    callback.onError(e);
-                }
             }
         });
     }
