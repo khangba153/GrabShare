@@ -34,6 +34,9 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 import com.example.grabshare.repository.account.LoginProfileRepository;
 
+import android.content.Intent;
+import com.example.grabshare.activity.search.HomeActivity;
+
 public class LoginActivity extends AppCompatActivity {
 
     private EditText emailInput;
@@ -44,6 +47,13 @@ public class LoginActivity extends AppCompatActivity {
     private boolean submitting;
     private Button googleButton;
     private CancellationSignal googleCancellation;
+
+    /** Mở màn chính sau khi đăng nhập và kiểm tra có hai hồ sơ. */
+    private void openHome() {
+        Intent intent = new Intent(LoginActivity.this, HomeActivity.class);
+        startActivity(intent);
+        finish();
+    }
 
     /** Hiển thị form và nối nút đăng nhập với Firebase. */
     @Override
@@ -318,10 +328,8 @@ public class LoginActivity extends AppCompatActivity {
                         }
 
                         setSubmitting(false);
-
                         if (Boolean.TRUE.equals(hasProfile)) {
-                            showStatus("Đã đăng nhập với: " + user.getEmail()
-                                    + "\nĐã có hồ sơ trên Firestore.");
+                            openHome();
                         } else {
                             showStatus("Đã đăng nhập với: " + user.getEmail()
                                     + "\nChưa có đủ hồ sơ trên Firestore.");
