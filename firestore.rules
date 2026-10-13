@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Rules base: chỉ đọc dữ liệu seed, chưa mở quyền ghi nghiệp vụ.
+    // Rules dùng chung: đọc dữ liệu theo quyền và tạo chuyến hợp lệ.
     function signedIn() {
       return request.auth != null;
     }
@@ -23,7 +23,14 @@ service cloud.firestore {
 
     match /trips/{tripId} {
       allow read: if signedIn();
-      allow write: if false;
+
+      // Cho phép tạo chuyến chính chủ khi đủ hồ sơ xe và dữ liệu hợp lệ.
+      allow create: if signedIn()
+        && hasVehicleProfile()
+        && validTripCreate();
+
+      // Quyền sửa/hủy/hoàn thành sẽ bổ sung theo từng thao tác.
+      allow update, delete: if false;
     }
 
     match /requests/{requestId} {
@@ -53,6 +60,70 @@ service cloud.firestore {
     // Chặn mọi đường dẫn chưa được khai báo.
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    // Kiểm tra địa điểm có đúng cấu trúc và tọa độ hợp lệ.
+    function validPlace(place) {
+      return place is map
+        && place.keys().hasAll(['name', 'latitude', 'longitude'])
+        && place.keys().hasOnly(['name', 'latitude', 'longitude'])
+        && place.name is string
+        && place.name.size() > 0
+        && (place.latitude is int || place.latitude is float)
+        && (place.longitude is int || place.longitude is float)
+        && place.latitude >= -90
+        && place.latitude <= 90
+        && place.longitude >= -180
+        && place.longitude <= 180;
+    }
+
+    // Chủ xe phải có tên xe và biển số trong hồ sơ chính chủ.
+    function hasVehicleProfile() {
+      let userPath =
+        /databases/$(database)/documents/users/$(request.auth.uid);
+      let publicPath =
+        /databases/$(database)/documents/publicProfiles/$(request.auth.uid);
+
+      return exists(userPath)
+        && exists(publicPath)
+        && get(userPath).data.vehiclePlate is string
+        && get(userPath).data.vehiclePlate.size() > 0
+        && get(publicPath).data.vehicleName is string
+        && get(publicPath).data.vehicleName.size() > 0;
+    }
+
+    // Chuyến mới phải đúng schema và trạng thái ban đầu đã chốt.
+    function validTripCreate() {
+      let data = request.resource.data;
+      let fields = [
+        'driverId', 'origin', 'destination', 'departureAt',
+        'costVnd', 'note', 'status', 'availableSeats',
+        'acceptedRequestId', 'createdAt', 'updatedAt'
+      ];
+
+      return data.keys().hasAll(fields)
+        && data.keys().hasOnly(fields)
+        && data.driverId is string
+        && data.driverId == request.auth.uid
+        && validPlace(data.origin)
+        && validPlace(data.destination)
+        && (
+          data.origin.latitude != data.destination.latitude
+          || data.origin.longitude != data.destination.longitude
+        )
+        && data.departureAt is timestamp
+        && data.departureAt > request.time
+        && data.costVnd is int
+        && data.costVnd >= 0
+        && data.note is string
+        && data.status == 'OPEN'
+        && data.availableSeats is int
+        && data.availableSeats == 1
+        && data.acceptedRequestId == ''
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
     }
   }
 }
