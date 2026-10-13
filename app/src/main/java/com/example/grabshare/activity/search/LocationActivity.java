@@ -33,6 +33,8 @@ public class LocationActivity extends AppCompatActivity {
     private TextView statusText;
     private PlaceSearchClient searchClient;
     private PlaceAdapter adapter;
+    private int currentSearchRequestId = 0;
+    private View searchButton;
 
     /**
      * Khởi tạo giao diện và kết nối các thành phần.
@@ -60,7 +62,8 @@ public class LocationActivity extends AppCompatActivity {
             }
         });
 
-        findViewById(R.id.primary_action).setOnClickListener(new View.OnClickListener() {
+        searchButton = findViewById(R.id.primary_action);
+        searchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 performSearch();
@@ -99,12 +102,15 @@ public class LocationActivity extends AppCompatActivity {
         outState.putString("status_text", statusText.getText().toString());
         outState.putInt("suggestion_visibility", suggestionTitle.getVisibility());
         outState.putInt("list_visibility", locationList.getVisibility());
+        outState.putInt("search_request_id", currentSearchRequestId);
     }
 
     /**
      * Phục hồi trạng thái sau khi xoay.
      */
     private void restoreState(Bundle savedInstanceState) {
+        currentSearchRequestId = savedInstanceState.getInt("search_request_id", 0);
+        
         ArrayList<String> names = savedInstanceState.getStringArrayList("place_names");
         double[] lats = savedInstanceState.getDoubleArray("place_lats");
         double[] lons = savedInstanceState.getDoubleArray("place_lons");
@@ -162,6 +168,10 @@ public class LocationActivity extends AppCompatActivity {
             return;
         }
 
+        // Tăng ID và khóa nút tìm kiếm
+        final int requestId = ++currentSearchRequestId;
+        searchButton.setEnabled(false);
+
         statusText.setVisibility(View.VISIBLE);
         statusText.setText("Đang tìm kiếm...");
         suggestionTitle.setVisibility(View.GONE);
@@ -174,6 +184,9 @@ public class LocationActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         if (isFinishing() || isDestroyed()) return;
+                        if (requestId != currentSearchRequestId) return; // Bỏ qua kết quả cũ
+                        
+                        searchButton.setEnabled(true);
                         
                         statusText.setVisibility(View.GONE);
                         suggestionTitle.setText("Kết quả tìm kiếm");
@@ -196,6 +209,9 @@ public class LocationActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         if (isFinishing() || isDestroyed()) return;
+                        if (requestId != currentSearchRequestId) return; // Bỏ qua kết quả cũ
+                        
+                        searchButton.setEnabled(true);
                         
                         statusText.setVisibility(View.VISIBLE);
                         statusText.setText("Lỗi khi tìm kiếm: " + e.getMessage());
