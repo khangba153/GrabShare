@@ -25,6 +25,9 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 
+import com.example.grabshare.activity.account.LoginActivity;
+import com.google.firebase.auth.FirebaseAuth;
+
 /**
  * Activity Nhập điều kiện tìm chuyến.
  */
@@ -46,6 +49,22 @@ public class HomeActivity extends AppCompatActivity {
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+
+    /** Kiểm tra phiên khi mở hoặc quay lại màn Home. */
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        if (FirebaseAuth.getInstance().getCurrentUser() == null) {
+            Intent intent = new Intent(
+                    HomeActivity.this,
+                    LoginActivity.class
+            );
+
+            startActivity(intent);
+            finish();
+        }
+    }
 
     /**
      * Khởi tạo giao diện, map các view và thiết lập dữ liệu mặc định.
