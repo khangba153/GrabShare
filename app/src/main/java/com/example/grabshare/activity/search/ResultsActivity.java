@@ -76,10 +76,11 @@ public class ResultsActivity extends AppCompatActivity {
         rideList.setAdapter(adapter);
 
         setupListeners();
-        loadSearchCriteria();
         
         if (savedInstanceState != null) {
-            // Có thể phục hồi kết quả nếu cần, nhưng tạm thời gọi lại search để có real-time
+            restoreState(savedInstanceState);
+        } else {
+            loadSearchCriteria();
         }
         
         executeSearch();
@@ -122,16 +123,55 @@ public class ResultsActivity extends AppCompatActivity {
             
             searchDepartureTime = intent.getLongExtra("departure_time", System.currentTimeMillis());
             
-            SimpleDateFormat df = new SimpleDateFormat("dd/MM · HH:mm", Locale.getDefault());
-            searchSummary.setText(df.format(searchDepartureTime));
-
-            if (searchOrigin != null && searchOrigin.getName() != null) {
-                routeStart.setText(searchOrigin.getName());
-            }
-            if (searchDestination != null && searchDestination.getName() != null) {
-                routeEnd.setText(searchDestination.getName());
-            }
+            updateHeaderUI();
         }
+    }
+
+    private void updateHeaderUI() {
+        SimpleDateFormat df = new SimpleDateFormat("dd/MM · HH:mm", Locale.getDefault());
+        searchSummary.setText(df.format(searchDepartureTime));
+
+        if (searchOrigin != null && searchOrigin.getName() != null) {
+            routeStart.setText(searchOrigin.getName());
+        }
+        if (searchDestination != null && searchDestination.getName() != null) {
+            routeEnd.setText(searchDestination.getName());
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putLong("departure_time", searchDepartureTime);
+        if (searchOrigin != null) {
+            outState.putString("origin_name", searchOrigin.getName());
+            outState.putDouble("origin_lat", searchOrigin.getLatitude() != null ? searchOrigin.getLatitude() : 0);
+            outState.putDouble("origin_lng", searchOrigin.getLongitude() != null ? searchOrigin.getLongitude() : 0);
+        }
+        if (searchDestination != null) {
+            outState.putString("dest_name", searchDestination.getName());
+            outState.putDouble("dest_lat", searchDestination.getLatitude() != null ? searchDestination.getLatitude() : 0);
+            outState.putDouble("dest_lng", searchDestination.getLongitude() != null ? searchDestination.getLongitude() : 0);
+        }
+    }
+
+    private void restoreState(Bundle savedInstanceState) {
+        searchDepartureTime = savedInstanceState.getLong("departure_time", System.currentTimeMillis());
+        if (savedInstanceState.containsKey("origin_name")) {
+            searchOrigin = new Place(
+                    savedInstanceState.getString("origin_name"),
+                    savedInstanceState.getDouble("origin_lat"),
+                    savedInstanceState.getDouble("origin_lng")
+            );
+        }
+        if (savedInstanceState.containsKey("dest_name")) {
+            searchDestination = new Place(
+                    savedInstanceState.getString("dest_name"),
+                    savedInstanceState.getDouble("dest_lat"),
+                    savedInstanceState.getDouble("dest_lng")
+            );
+        }
+        updateHeaderUI();
     }
 
     /**
@@ -239,6 +279,7 @@ public class ResultsActivity extends AppCompatActivity {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+                    if (isFinishing() || isDestroyed()) return;
                     statusText.setVisibility(View.GONE);
                     rideList.setVisibility(View.VISIBLE);
                     adapter.setTrips(matchedTrips);
