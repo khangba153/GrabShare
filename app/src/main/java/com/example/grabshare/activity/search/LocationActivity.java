@@ -93,12 +93,12 @@ public class LocationActivity extends AppCompatActivity {
             outState.putStringArrayList("place_names", names);
             outState.putDoubleArray("place_lats", lats);
             outState.putDoubleArray("place_lons", lons);
-            
-            outState.putInt("status_visibility", statusText.getVisibility());
-            outState.putString("status_text", statusText.getText().toString());
-            outState.putInt("suggestion_visibility", suggestionTitle.getVisibility());
-            outState.putInt("list_visibility", locationList.getVisibility());
         }
+        
+        outState.putInt("status_visibility", statusText.getVisibility());
+        outState.putString("status_text", statusText.getText().toString());
+        outState.putInt("suggestion_visibility", suggestionTitle.getVisibility());
+        outState.putInt("list_visibility", locationList.getVisibility());
     }
 
     /**
@@ -115,9 +115,18 @@ public class LocationActivity extends AppCompatActivity {
                 restoredPlaces.add(new Place(names.get(i), lats[i], lons[i]));
             }
             adapter.setPlaces(restoredPlaces);
-            
+        } else {
+            // Nếu không có danh sách đã lưu (có thể vì chưa có kết quả), nạp gợi ý mặc định
+            loadDefaultSuggestions();
+        }
+
+        String savedStatus = savedInstanceState.getString("status_text", "");
+        if ("Đang tìm kiếm...".equals(savedStatus)) {
+            // Nếu tác vụ trước đó đang tìm kiếm thì tự động tìm lại
+            performSearch();
+        } else {
             statusText.setVisibility(savedInstanceState.getInt("status_visibility", View.GONE));
-            statusText.setText(savedInstanceState.getString("status_text", ""));
+            statusText.setText(savedStatus);
             suggestionTitle.setVisibility(savedInstanceState.getInt("suggestion_visibility", View.GONE));
             locationList.setVisibility(savedInstanceState.getInt("list_visibility", View.GONE));
         }
@@ -164,6 +173,8 @@ public class LocationActivity extends AppCompatActivity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        if (isFinishing() || isDestroyed()) return;
+                        
                         statusText.setVisibility(View.GONE);
                         suggestionTitle.setText("Kết quả tìm kiếm");
                         suggestionTitle.setVisibility(View.VISIBLE);
@@ -184,6 +195,8 @@ public class LocationActivity extends AppCompatActivity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        if (isFinishing() || isDestroyed()) return;
+                        
                         statusText.setVisibility(View.VISIBLE);
                         statusText.setText("Lỗi khi tìm kiếm: " + e.getMessage());
                     }

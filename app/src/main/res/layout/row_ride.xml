@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card" android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12dp">
     <include layout="@layout/view_driver" />
     <LinearLayout style="@style/Row">
         <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_clock" android:importantForAccessibility="no" />
