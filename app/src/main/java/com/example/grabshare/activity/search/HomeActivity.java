@@ -79,8 +79,8 @@ public class HomeActivity extends AppCompatActivity {
         tvDateValue = findViewById(R.id.pick_date_value);
         tvTimeValue = findViewById(R.id.pick_time_value);
         
-        mapStartLabel = findViewById(R.id.map_start);
-        mapEndLabel = findViewById(R.id.map_end);
+        mapStartLabel = findViewById(R.id.map_start_label);
+        mapEndLabel = findViewById(R.id.map_end_label);
 
         searchTime = Calendar.getInstance();
 

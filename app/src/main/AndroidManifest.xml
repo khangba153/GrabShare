@@ -45,6 +45,10 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity
+            android:name=".activity.search.TripDetailActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".activity.driver.DriverTripsActivity"
             android:exported="false" />
 

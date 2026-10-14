@@ -50,74 +50,120 @@ public class PlaceSearchClient {
         executor.execute(new Runnable() {
             @Override
             public void run() {
-                try {
-                    String encodedQuery = URLEncoder.encode(query, "UTF-8");
-                    String urlString = "https://us1.locationiq.com/v1/search?key=" + LOCATIONIQ_API_KEY + "&format=json&limit=10&countrycodes=vn&q=" + encodedQuery;
-                    URL url = new URL(urlString);
-                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                    connection.setRequestMethod("GET");
-                    connection.setConnectTimeout(10000);
-                    connection.setReadTimeout(10000);
+                    HttpURLConnection connection = null;
+                    try {
+                        String encodedQuery = URLEncoder.encode(query, "UTF-8");
+                        String urlString = "https://us1.locationiq.com/v1/search?key=" + LOCATIONIQ_API_KEY + "&format=json&limit=10&countrycodes=vn&q=" + encodedQuery;
+                        URL url = new URL(urlString);
+                        connection = (HttpURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setConnectTimeout(10000);
+                        connection.setReadTimeout(10000);
 
-                    int responseCode = connection.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
-                        StringBuilder response = new StringBuilder();
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            response.append(line);
+                        int responseCode = connection.getResponseCode();
+                        if (responseCode == HttpURLConnection.HTTP_OK) {
+                            StringBuilder response = new StringBuilder();
+                            // Đảm bảo đóng reader cả khi có ngoại lệ xảy ra trong lúc đọc JSON
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    response.append(line);
+                                }
+                            }
+
+                            JSONArray jsonArray = new JSONArray(response.toString());
+                            List<Place> places = new ArrayList<>();
+                            for (int i = 0; i < jsonArray.length(); i++) {
+                                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                                String name = jsonObject.getString("display_name");
+                                double lat = jsonObject.getDouble("lat");
+                                double lon = jsonObject.getDouble("lon");
+                                places.add(new Place(name, lat, lon));
+                            }
+
+                            enrichUehCampuses(query, places);
+
+                            callback.onSuccess(places);
+                        } else if (responseCode == 429) {
+                            callback.onError(new Exception("Vượt quá giới hạn tìm kiếm (429). Vui lòng thử lại sau."));
+                        } else {
+                            callback.onError(new Exception("Mã lỗi HTTP: " + responseCode));
                         }
-                        reader.close();
-
-                        JSONArray jsonArray = new JSONArray(response.toString());
-                        List<Place> places = new ArrayList<>();
-                        for (int i = 0; i < jsonArray.length(); i++) {
-                            JSONObject jsonObject = jsonArray.getJSONObject(i);
-                            String name = jsonObject.getString("display_name");
-                            double lat = jsonObject.getDouble("lat");
-                            double lon = jsonObject.getDouble("lon");
-                            places.add(new Place(name, lat, lon));
+                    } catch (Exception e) {
+                        callback.onError(e);
+                    } finally {
+                        // Đảm bảo đóng kết nối để giải phóng tài nguyên trong mọi nhánh (thành công/lỗi)
+                        if (connection != null) {
+                            connection.disconnect();
                         }
-
-                        // Tối ưu hóa từ khóa UEH / Cơ sở đại học cho sinh viên
-                        enrichUehCampuses(query, places);
-
-                        callback.onSuccess(places);
-                    } else {
-                        callback.onError(new Exception("Mã lỗi HTTP: " + responseCode));
                     }
-                } catch (Exception e) {
-                    callback.onError(e);
-                }
             }
         });
     }
 
     /**
-     * Bổ sung địa điểm chuẩn cho các cơ sở UEH khi người dùng gõ từ khóa viết tắt (UEH A, UEH B, UEH C, ...).
+     * Bổ sung địa điểm chuẩn cho các cơ sở UEH khi người dùng gõ từ khóa cụ thể.
+     * Tránh khớp nhầm các ký tự đơn lẻ (ví dụ: chữ "h" trong "hẻm").
      */
     private void enrichUehCampuses(String query, List<Place> places) {
         if (query == null) return;
-        String lower = query.toLowerCase().trim();
-        if (lower.contains("ueh") || lower.contains("kinh tế") || lower.contains("cơ sở")) {
-            if (lower.contains("b")) {
-                places.add(0, new Place("UEH Cơ sở B - 279 Nguyễn Tri Phương, Phường 5, Quận 10, TP.HCM", 10.7609491, 106.6679786));
+        
+        // Loại bỏ dấu câu cơ bản và chuyển thành chữ thường để so khớp
+        String normalizedQuery = query.toLowerCase()
+                .replace(".", " ").replace(",", " ").trim()
+                .replaceAll("\\s+", " ");
+        
+        // Phân tích từ khóa để nhận diện đúng cơ sở
+        boolean isA = normalizedQuery.contains("ueh a") || normalizedQuery.contains("co so a") || normalizedQuery.contains("cơ sở a");
+        boolean isB = normalizedQuery.contains("ueh b") || normalizedQuery.contains("co so b") || normalizedQuery.contains("cơ sở b");
+        boolean isC = normalizedQuery.contains("ueh c") || normalizedQuery.contains("co so c") || normalizedQuery.contains("cơ sở c");
+        boolean isN = normalizedQuery.contains("ueh n") || normalizedQuery.contains("co so n") || normalizedQuery.contains("cơ sở n") || normalizedQuery.contains("nguyen van linh") || normalizedQuery.contains("nguyễn văn linh");
+        boolean isH = normalizedQuery.contains("ueh h") || normalizedQuery.contains("co so h") || normalizedQuery.contains("cơ sở h") || normalizedQuery.contains("hoang dieu") || normalizedQuery.contains("hoàng diệu");
+        boolean isV = normalizedQuery.contains("ueh v") || normalizedQuery.contains("co so v") || normalizedQuery.contains("cơ sở v") || normalizedQuery.contains("vo thi sau") || normalizedQuery.contains("võ thị sáu");
+        
+        // Nếu người dùng chỉ gõ chung chung "ueh", ưu tiên đẩy cơ sở chính lên đầu thay vì đẩy toàn bộ
+        if (!isA && !isB && !isC && !isN && !isH && !isV) {
+            if (normalizedQuery.equals("ueh") || normalizedQuery.equals("kinh tế") || normalizedQuery.equals("kinh te")) {
+                isA = true;
+                isB = true;
             }
-            if (lower.contains("a")) {
-                places.add(0, new Place("UEH Cơ sở A - 59C Nguyễn Đình Chiểu, Phường 6, Quận 3, TP.HCM", 10.7830141, 106.6948927));
+        }
+
+        // Chèn vào kết quả (ưu tiên đưa lên đầu danh sách API trả về)
+        if (isV) {
+            insertIfNotExists(places, new Place("UEH Cơ sở V - 232/9 Võ Thị Sáu, Phường Võ Thị Sáu, Quận 3, TP.HCM", 10.7828045, 106.6856203));
+        }
+        if (isH) {
+            insertIfNotExists(places, new Place("UEH Cơ sở H - 1A Hoàng Diệu, Phường 10, Phú Nhuận, TP.HCM", 10.798991, 106.678210));
+        }
+        if (isN) {
+            insertIfNotExists(places, new Place("UEH Cơ sở N - Nguyễn Văn Linh, Phong Phú, Bình Chánh, TP.HCM", 10.705906, 106.639100));
+        }
+        if (isC) {
+            insertIfNotExists(places, new Place("UEH Cơ sở C - 91 Đường 3 Tháng 2, Phường 11, Quận 10, TP.HCM", 10.773238, 106.677568));
+        }
+        if (isB) {
+            insertIfNotExists(places, new Place("UEH Cơ sở B - 279 Nguyễn Tri Phương, Phường 5, Quận 10, TP.HCM", 10.7609491, 106.6679786));
+        }
+        if (isA) {
+            insertIfNotExists(places, new Place("UEH Cơ sở A - 59C Nguyễn Đình Chiểu, Phường 6, Quận 3, TP.HCM", 10.7830141, 106.6948927));
+        }
+    }
+    
+    /**
+     * Chèn địa điểm gợi ý vào danh sách, chống trùng lặp nếu API đã trả về kết quả tương tự.
+     */
+    private void insertIfNotExists(List<Place> places, Place uehPlace) {
+        boolean exists = false;
+        for (Place p : places) {
+            if (Math.abs(p.getLatitude() - uehPlace.getLatitude()) < 0.001 && 
+                Math.abs(p.getLongitude() - uehPlace.getLongitude()) < 0.001) {
+                exists = true;
+                break;
             }
-            if (lower.contains("c")) {
-                places.add(0, new Place("UEH Cơ sở C - 91 Đường 3 Tháng 2, Phường 11, Quận 10, TP.HCM", 10.773238, 106.677568));
-            }
-            if (lower.contains("n")) {
-                places.add(0, new Place("UEH Cơ sở N - Nguyễn Văn Linh, Phong Phú, Bình Chánh, TP.HCM", 10.705906, 106.639100));
-            }
-            if (lower.contains("h")) {
-                places.add(0, new Place("UEH Cơ sở H - 1A Hoàng Diệu, Phường 10, Phú Nhuận, TP.HCM", 10.798991, 106.678210));
-            }
-            if (lower.contains("v")) {
-                places.add(0, new Place("UEH Cơ sở V - 232/9 Võ Thị Sáu, Phường Võ Thị Sáu, Quận 3, TP.HCM", 10.7828045, 106.6856203));
-            }
+        }
+        if (!exists) {
+            places.add(0, uehPlace);
         }
     }
 
