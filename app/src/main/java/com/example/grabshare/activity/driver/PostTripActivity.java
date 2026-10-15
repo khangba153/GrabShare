@@ -1,8 +1,12 @@
-
 package com.example.grabshare.activity.driver;
 
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
+import android.content.Context;
+import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.CheckBox;
@@ -15,57 +19,87 @@ import android.widget.Toast;
 import android.widget.DatePicker;
 import android.widget.TimePicker;
 
+import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
+import com.example.grabshare.activity.search.LocationActivity;
+import com.example.grabshare.contract.LocationKeys;
+import com.example.grabshare.contract.NavigationKeys;
+import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.model.Place;
+import com.example.grabshare.repository.driver.DriverTripRepository;
+import com.google.firebase.Timestamp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 
 /**
- * Hiển thị và xử lý biểu mẫu đăng chuyến dành cho chủ xe.
- * <p>
- * Giai đoạn này chỉ xử lý giao diện và kiểm tra dữ liệu đầu vào.
- * Chưa ghi chuyến lên Firestore.
+ * Hiển thị biểu mẫu và điều phối luồng đăng chuyến của chủ xe. Dữ liệu Firestore được xử lý trong DriverTripRepository.
  */
 public class PostTripActivity extends AppCompatActivity {
 
+    private static final int LOCATION_TARGET_NONE = 0;
+    private static final int LOCATION_TARGET_ORIGIN = 1;
+    private static final int LOCATION_TARGET_DESTINATION = 2;
+
     private static final String STATE_HAS_SELECTED_DATE =
             "has_selected_departure_date";
-
     private static final String STATE_SELECTED_YEAR =
             "selected_departure_year";
-
     private static final String STATE_SELECTED_MONTH =
             "selected_departure_month";
-
     private static final String STATE_SELECTED_DAY =
             "selected_departure_day";
-
     private static final String STATE_HAS_SELECTED_TIME =
             "has_selected_departure_time";
-
     private static final String STATE_SELECTED_HOUR =
             "selected_departure_hour";
-
     private static final String STATE_SELECTED_MINUTE =
             "selected_departure_minute";
+    private static final String STATE_LOCATION_TARGET =
+            "selected_location_target";
+    private static final String STATE_TRIP_DOCUMENT_ID =
+            "pending_trip_document_id";
+    private static final String STATE_HAS_ORIGIN = "has_selected_origin";
+    private static final String STATE_ORIGIN_NAME = "selected_origin_name";
+    private static final String STATE_ORIGIN_LATITUDE = "selected_origin_latitude";
+    private static final String STATE_ORIGIN_LONGITUDE = "selected_origin_longitude";
+    private static final String STATE_HAS_DESTINATION = "has_selected_destination";
+    private static final String STATE_DESTINATION_NAME = "selected_destination_name";
+    private static final String STATE_DESTINATION_LATITUDE = "selected_destination_latitude";
+    private static final String STATE_DESTINATION_LONGITUDE = "selected_destination_longitude";
 
+    private LinearLayout originPlaceSelector;
+    private LinearLayout destinationPlaceSelector;
     private LinearLayout departureDateSelector;
     private LinearLayout departureTimeSelector;
 
     private ImageButton backButton;
-
     private TextView departureDateValue;
     private TextView departureTimeValue;
     private TextView originPlaceValue;
     private TextView destinationPlaceValue;
 
     private EditText contributionAmountInput;
-
+    private EditText noteInput;
     private CheckBox freeContributionCheckBox;
+    private AppCompatButton postTripButton;
+
+    private DriverTripRepository tripRepository;
+    private ActivityResultLauncher<Intent> locationPickerLauncher;
+
+    private Place selectedOriginPlace;
+    private Place selectedDestinationPlace;
 
     private boolean hasSelectedDepartureDate;
     private int selectedDepartureYear;
@@ -76,33 +110,48 @@ public class PostTripActivity extends AppCompatActivity {
     private int selectedDepartureHour;
     private int selectedDepartureMinute;
 
+    private int selectedLocationTarget = LOCATION_TARGET_NONE;
+    private String tripDocumentId;
+    private Long validatedContributionAmount;
+    private boolean isSubmitting;
+
     /**
-     * Khởi tạo giao diện và kết nối các thao tác của biểu mẫu.
-     *
-     * @param savedInstanceState trạng thái đã lưu trước khi giao diện được tạo lại
+     * Khởi tạo giao diện, khôi phục trạng thái và kết nối sự kiện của biểu mẫu.
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.screen_post);
 
         initializeViews();
-        restoreDepartureSelection(savedInstanceState);
+        initializeRepository();
+        registerLocationResultLauncher();
+        restoreFormState(savedInstanceState);
+
+        updateOriginPlaceDisplay();
+        updateDestinationPlaceDisplay();
         updateDepartureDateDisplay();
         updateDepartureTimeDisplay();
 
         connectBackButton();
+        connectOriginPlaceSelector();
+        connectDestinationPlaceSelector();
         connectDepartureDateSelector();
         connectDepartureTimeSelector();
         connectFreeContributionOption();
-        connectFormValidationButton();
+        connectPostTripButton();
+        connectSystemBackHandling();
+
+        // Không tự gửi lại khi Activity được tạo lại sau khi xoay màn hình.
+        setSubmitting(false);
     }
 
     /**
-     * Ánh xạ các thành phần giao diện từ tệp XML.
+     * Ánh xạ các thành phần giao diện từ screen_post.xml.
      */
     private void initializeViews() {
+        originPlaceSelector = findViewById(R.id.post_start);
+        destinationPlaceSelector = findViewById(R.id.post_end);
         departureDateSelector = findViewById(R.id.post_date);
         departureTimeSelector = findViewById(R.id.post_time);
 
@@ -110,25 +159,52 @@ public class PostTripActivity extends AppCompatActivity {
 
         departureDateValue = findViewById(R.id.post_date_value);
         departureTimeValue = findViewById(R.id.post_time_value);
-
         originPlaceValue = findViewById(R.id.post_start_value);
         destinationPlaceValue = findViewById(R.id.post_end_value);
 
         contributionAmountInput = findViewById(R.id.post_cost);
-        findViewById(R.id.post_note);
-
+        noteInput = findViewById(R.id.post_note);
         freeContributionCheckBox = findViewById(R.id.post_free);
+        postTripButton = findViewById(R.id.primary_action);
     }
 
     /**
-     * Khôi phục ngày và giờ đã chọn khi màn hình được tạo lại.
-     *
-     * @param savedInstanceState trạng thái đã lưu, có thể không tồn tại
+     * Tạo repository dùng chung Firebase Authentication và Firestore của ứng dụng.
      */
-    private void restoreDepartureSelection(Bundle savedInstanceState) {
+    private void initializeRepository() {
+        tripRepository = new DriverTripRepository(
+                FirebaseFirestore.getInstance(),
+                FirebaseAuth.getInstance()
+        );
+    }
+
+    /**
+     * Đăng ký Activity Result API trước khi Activity chuyển sang trạng thái STARTED. Mỗi lần tạo Activity đều đăng ký theo cùng một thứ tự.
+     */
+    private void registerLocationResultLauncher() {
+        locationPickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                new ActivityResultCallback<>() {
+                    /**
+                     * Nhận kết quả chọn địa điểm từ LocationActivity.
+                     */
+                    @Override
+                    public void onActivityResult(ActivityResult result) {
+                        handleLocationResult(result);
+                    }
+                }
+        );
+    }
+
+    /**
+     * Khôi phục ngày, giờ, địa điểm và ID thao tác tạo chuyến sau khi xoay màn hình. Nội dung EditText và trạng thái CheckBox được Android tự khôi phục theo ID view.
+     */
+    private void restoreFormState(Bundle savedInstanceState) {
         if (savedInstanceState == null) {
             hasSelectedDepartureDate = false;
             hasSelectedDepartureTime = false;
+            selectedLocationTarget = LOCATION_TARGET_NONE;
+            tripDocumentId = null;
             return;
         }
 
@@ -136,118 +212,312 @@ public class PostTripActivity extends AppCompatActivity {
                 STATE_HAS_SELECTED_DATE,
                 false
         );
-
-        selectedDepartureYear = savedInstanceState.getInt(
-                STATE_SELECTED_YEAR
-        );
-
-        selectedDepartureMonth = savedInstanceState.getInt(
-                STATE_SELECTED_MONTH
-        );
-
-        selectedDepartureDay = savedInstanceState.getInt(
-                STATE_SELECTED_DAY
-        );
+        selectedDepartureYear = savedInstanceState.getInt(STATE_SELECTED_YEAR);
+        selectedDepartureMonth = savedInstanceState.getInt(STATE_SELECTED_MONTH);
+        selectedDepartureDay = savedInstanceState.getInt(STATE_SELECTED_DAY);
 
         hasSelectedDepartureTime = savedInstanceState.getBoolean(
                 STATE_HAS_SELECTED_TIME,
                 false
         );
+        selectedDepartureHour = savedInstanceState.getInt(STATE_SELECTED_HOUR);
+        selectedDepartureMinute = savedInstanceState.getInt(STATE_SELECTED_MINUTE);
 
-        selectedDepartureHour = savedInstanceState.getInt(
-                STATE_SELECTED_HOUR
+        selectedLocationTarget = savedInstanceState.getInt(
+                STATE_LOCATION_TARGET,
+                LOCATION_TARGET_NONE
+        );
+        tripDocumentId = savedInstanceState.getString(STATE_TRIP_DOCUMENT_ID);
+
+        selectedOriginPlace = restorePlace(
+                savedInstanceState,
+                STATE_HAS_ORIGIN,
+                STATE_ORIGIN_NAME,
+                STATE_ORIGIN_LATITUDE,
+                STATE_ORIGIN_LONGITUDE
         );
 
-        selectedDepartureMinute = savedInstanceState.getInt(
-                STATE_SELECTED_MINUTE
+        selectedDestinationPlace = restorePlace(
+                savedInstanceState,
+                STATE_HAS_DESTINATION,
+                STATE_DESTINATION_NAME,
+                STATE_DESTINATION_LATITUDE,
+                STATE_DESTINATION_LONGITUDE
         );
+
+        // Callback đang chạy ở Activity cũ không tự khởi động lại thao tác trên Activity mới.
+        isSubmitting = false;
     }
 
     /**
-     * Lưu ngày và giờ đã chọn khi Android tạo lại màn hình.
-     *
-     * @param savedInstanceState nơi lưu trạng thái giao diện
+     * Lưu trạng thái form để các trường đã chọn không mất khi Android tạo lại Activity.
      */
     @Override
     protected void onSaveInstanceState(@NonNull Bundle savedInstanceState) {
-        super.onSaveInstanceState(savedInstanceState);
-
         savedInstanceState.putBoolean(
                 STATE_HAS_SELECTED_DATE,
                 hasSelectedDepartureDate
         );
-
-        savedInstanceState.putInt(
-                STATE_SELECTED_YEAR,
-                selectedDepartureYear
-        );
-
-        savedInstanceState.putInt(
-                STATE_SELECTED_MONTH,
-                selectedDepartureMonth
-        );
-
-        savedInstanceState.putInt(
-                STATE_SELECTED_DAY,
-                selectedDepartureDay
-        );
+        savedInstanceState.putInt(STATE_SELECTED_YEAR, selectedDepartureYear);
+        savedInstanceState.putInt(STATE_SELECTED_MONTH, selectedDepartureMonth);
+        savedInstanceState.putInt(STATE_SELECTED_DAY, selectedDepartureDay);
 
         savedInstanceState.putBoolean(
                 STATE_HAS_SELECTED_TIME,
                 hasSelectedDepartureTime
         );
+        savedInstanceState.putInt(STATE_SELECTED_HOUR, selectedDepartureHour);
+        savedInstanceState.putInt(STATE_SELECTED_MINUTE, selectedDepartureMinute);
 
-        savedInstanceState.putInt(
-                STATE_SELECTED_HOUR,
-                selectedDepartureHour
+        savedInstanceState.putInt(STATE_LOCATION_TARGET, selectedLocationTarget);
+        savedInstanceState.putString(STATE_TRIP_DOCUMENT_ID, tripDocumentId);
+
+        savePlace(
+                savedInstanceState,
+                selectedOriginPlace,
+                STATE_HAS_ORIGIN,
+                STATE_ORIGIN_NAME,
+                STATE_ORIGIN_LATITUDE,
+                STATE_ORIGIN_LONGITUDE
+        );
+        savePlace(
+                savedInstanceState,
+                selectedDestinationPlace,
+                STATE_HAS_DESTINATION,
+                STATE_DESTINATION_NAME,
+                STATE_DESTINATION_LATITUDE,
+                STATE_DESTINATION_LONGITUDE
         );
 
-        savedInstanceState.putInt(
-                STATE_SELECTED_MINUTE,
-                selectedDepartureMinute
-        );
+        super.onSaveInstanceState(savedInstanceState);
     }
 
     /**
-     * Đóng biểu mẫu và quay về màn hình trước đó.
+     * Lưu một địa điểm vào Bundle bằng các kiểu dữ liệu cơ bản, không truyền model Serializable.
+     */
+    private void savePlace(
+            Bundle state,
+            Place place,
+            String hasPlaceKey,
+            String nameKey,
+            String latitudeKey,
+            String longitudeKey
+    ) {
+        if (place == null) {
+            state.putBoolean(hasPlaceKey, false);
+            return;
+        }
+
+        state.putBoolean(hasPlaceKey, true);
+        state.putString(nameKey, place.getName());
+        state.putDouble(latitudeKey, place.getLatitude());
+        state.putDouble(longitudeKey, place.getLongitude());
+    }
+
+    /**
+     * Khôi phục địa điểm từ Bundle nếu trước đó đã có một lựa chọn hợp lệ.
+     */
+    private Place restorePlace(
+            Bundle state,
+            String hasPlaceKey,
+            String nameKey,
+            String latitudeKey,
+            String longitudeKey
+    ) {
+        if (!state.getBoolean(hasPlaceKey, false)) {
+            return null;
+        }
+
+        String name = state.getString(nameKey);
+        double latitude = state.getDouble(latitudeKey, Double.NaN);
+        double longitude = state.getDouble(longitudeKey, Double.NaN);
+        Place restoredPlace = new Place(name, latitude, longitude);
+
+        if (isValidPlace(restoredPlace)) {
+            return null;
+        }
+
+        return restoredPlace;
+    }
+
+    /**
+     * Kết nối nút quay lại; không cho rời form trong lúc gửi đang được xử lý.
      */
     private void connectBackButton() {
         backButton.setOnClickListener(new View.OnClickListener() {
-
             /**
-             * Đóng màn hình đăng chuyến khi người dùng nhấn nút quay lại.
-             *
-             * @param view thành phần giao diện được nhấn
+             * Quay lại màn hình trước nếu hiện không có thao tác ghi đang chờ.
              */
             @Override
             public void onClick(View view) {
+                if (isSubmitting) {
+                    showMessage("Đang đăng chuyến. Vui lòng đợi kết quả từ máy chủ.");
+                    return;
+                }
+
                 finish();
             }
         });
     }
 
     /**
-     * Kết nối bộ chọn ngày và chỉ cho phép chọn ngày hiện tại hoặc ngày tương lai.
+     * Chặn nút Back hệ thống trong lúc gửi để tránh rời màn hình khi chưa có kết quả.
      */
-    private void connectDepartureDateSelector() {
-        departureDateSelector.setOnClickListener(
-                new View.OnClickListener() {
-
+    private void connectSystemBackHandling() {
+        getOnBackPressedDispatcher().addCallback(
+                this,
+                new OnBackPressedCallback(true) {
                     /**
-                     * Mở hộp thoại chọn ngày khởi hành.
-                     *
-                     * @param view thành phần giao diện được nhấn
+                     * Xử lý Back hệ thống theo trạng thái gửi chuyến.
                      */
                     @Override
-                    public void onClick(View view) {
-                        showDepartureDatePicker();
+                    public void handleOnBackPressed() {
+                        if (isSubmitting) {
+                            showMessage(
+                                    "Đang đăng chuyến. Vui lòng đợi kết quả từ máy chủ."
+                            );
+                            return;
+                        }
+
+                        finish();
                     }
                 }
         );
     }
 
     /**
-     * Hiển thị hộp thoại chọn ngày khởi hành.
+     * Mở LocationActivity để người dùng chọn điểm đi.
+     */
+    private void connectOriginPlaceSelector() {
+        originPlaceSelector.setOnClickListener(new View.OnClickListener() {
+            /**
+             * Đánh dấu ô điểm đi rồi mở màn chọn địa điểm.
+             */
+            @Override
+            public void onClick(View view) {
+                openLocationPicker(LOCATION_TARGET_ORIGIN);
+            }
+        });
+    }
+
+    /**
+     * Mở LocationActivity để người dùng chọn điểm đến.
+     */
+    private void connectDestinationPlaceSelector() {
+        destinationPlaceSelector.setOnClickListener(new View.OnClickListener() {
+            /**
+             * Đánh dấu ô điểm đến rồi mở màn chọn địa điểm.
+             */
+            @Override
+            public void onClick(View view) {
+                openLocationPicker(LOCATION_TARGET_DESTINATION);
+            }
+        });
+    }
+
+    /**
+     * Lưu ô đang chọn trước khi mở Activity Result API.
+     */
+    private void openLocationPicker(int requestedTarget) {
+        if (isSubmitting) {
+            showMessage("Không thể đổi địa điểm trong lúc đang đăng chuyến.");
+            return;
+        }
+
+        selectedLocationTarget = requestedTarget;
+        Intent locationIntent = new Intent(this, LocationActivity.class);
+        locationPickerLauncher.launch(locationIntent);
+    }
+
+    /**
+     * Kiểm tra kết quả chọn địa điểm trước khi thay đổi dữ liệu của form. Back, hủy hoặc kết quả thiếu field sẽ không làm thay đổi lựa chọn hiện có.
+     */
+    private void handleLocationResult(ActivityResult result) {
+        int requestedTarget = selectedLocationTarget;
+        selectedLocationTarget = LOCATION_TARGET_NONE;
+
+        if (result == null
+                || result.getResultCode() != RESULT_OK
+                || result.getData() == null) {
+            return;
+        }
+
+        Intent resultIntent = result.getData();
+
+        if (!resultIntent.hasExtra(LocationKeys.PLACE_NAME)
+                || !resultIntent.hasExtra(LocationKeys.PLACE_LATITUDE)
+                || !resultIntent.hasExtra(LocationKeys.PLACE_LONGITUDE)) {
+            showMessage("Kết quả địa điểm không đầy đủ. Vui lòng chọn lại.");
+            return;
+        }
+
+        String placeName = resultIntent.getStringExtra(LocationKeys.PLACE_NAME);
+        double latitude = resultIntent.getDoubleExtra(
+                LocationKeys.PLACE_LATITUDE,
+                Double.NaN
+        );
+        double longitude = resultIntent.getDoubleExtra(
+                LocationKeys.PLACE_LONGITUDE,
+                Double.NaN
+        );
+
+        Place selectedPlace = new Place(placeName, latitude, longitude);
+
+        if (isValidPlace(selectedPlace)) {
+            showMessage("Địa điểm trả về không hợp lệ. Vui lòng chọn lại.");
+            return;
+        }
+
+        if (requestedTarget == LOCATION_TARGET_ORIGIN) {
+            selectedOriginPlace = selectedPlace;
+            updateOriginPlaceDisplay();
+        } else if (requestedTarget == LOCATION_TARGET_DESTINATION) {
+            selectedDestinationPlace = selectedPlace;
+            updateDestinationPlaceDisplay();
+        }
+    }
+
+    /**
+     * Hiển thị tên điểm đi hoặc gợi ý chọn điểm đi nếu chưa có lựa chọn.
+     */
+    private void updateOriginPlaceDisplay() {
+        if (selectedOriginPlace == null) {
+            originPlaceValue.setText("Chọn điểm đi");
+            return;
+        }
+
+        originPlaceValue.setText(selectedOriginPlace.getName());
+    }
+
+    /**
+     * Hiển thị tên điểm đến hoặc gợi ý chọn điểm đến nếu chưa có lựa chọn.
+     */
+    private void updateDestinationPlaceDisplay() {
+        if (selectedDestinationPlace == null) {
+            destinationPlaceValue.setText("Chọn điểm đến");
+            return;
+        }
+
+        destinationPlaceValue.setText(selectedDestinationPlace.getName());
+    }
+
+    /**
+     * Kết nối bộ chọn ngày khởi hành.
+     */
+    private void connectDepartureDateSelector() {
+        departureDateSelector.setOnClickListener(new View.OnClickListener() {
+            /**
+             * Mở hộp thoại chọn ngày khởi hành.
+             */
+            @Override
+            public void onClick(View view) {
+                showDepartureDatePicker();
+            }
+        });
+    }
+
+    /**
+     * Hiển thị hộp thoại chọn ngày; ngày sớm nhất là ngày hiện tại.
      */
     private void showDepartureDatePicker() {
         int initialYear;
@@ -268,14 +538,8 @@ public class PostTripActivity extends AppCompatActivity {
         DatePickerDialog datePickerDialog = new DatePickerDialog(
                 this,
                 new DatePickerDialog.OnDateSetListener() {
-
                     /**
-                     * Cập nhật ngày khởi hành theo ngày người dùng chọn.
-                     *
-                     * @param datePicker hộp chọn ngày
-                     * @param selectedYear năm được chọn
-                     * @param selectedMonth tháng được chọn, bắt đầu từ số không
-                     * @param selectedDay ngày trong tháng được chọn
+                     * Lưu ngày người dùng vừa chọn.
                      */
                     @Override
                     public void onDateSet(
@@ -285,11 +549,9 @@ public class PostTripActivity extends AppCompatActivity {
                             int selectedDay
                     ) {
                         hasSelectedDepartureDate = true;
-
                         selectedDepartureYear = selectedYear;
                         selectedDepartureMonth = selectedMonth;
                         selectedDepartureDay = selectedDay;
-
                         updateDepartureDateDisplay();
                     }
                 },
@@ -299,36 +561,19 @@ public class PostTripActivity extends AppCompatActivity {
         );
 
         Calendar minimumDepartureDate = Calendar.getInstance();
-
-        minimumDepartureDate.set(
-                Calendar.HOUR_OF_DAY,
-                0
-        );
-
-        minimumDepartureDate.set(
-                Calendar.MINUTE,
-                0
-        );
-
-        minimumDepartureDate.set(
-                Calendar.SECOND,
-                0
-        );
-
-        minimumDepartureDate.set(
-                Calendar.MILLISECOND,
-                0
-        );
+        minimumDepartureDate.set(Calendar.HOUR_OF_DAY, 0);
+        minimumDepartureDate.set(Calendar.MINUTE, 0);
+        minimumDepartureDate.set(Calendar.SECOND, 0);
+        minimumDepartureDate.set(Calendar.MILLISECOND, 0);
 
         datePickerDialog.getDatePicker().setMinDate(
                 minimumDepartureDate.getTimeInMillis()
         );
-
         datePickerDialog.show();
     }
 
     /**
-     * Hiển thị ngày khởi hành đã chọn theo định dạng ngày/tháng/năm.
+     * Hiển thị ngày đã chọn theo định dạng ngày/tháng/năm.
      */
     private void updateDepartureDateDisplay() {
         if (!hasSelectedDepartureDate) {
@@ -337,7 +582,6 @@ public class PostTripActivity extends AppCompatActivity {
         }
 
         Calendar selectedDateCalendar = Calendar.getInstance();
-
         selectedDateCalendar.set(
                 selectedDepartureYear,
                 selectedDepartureMonth,
@@ -346,7 +590,6 @@ public class PostTripActivity extends AppCompatActivity {
                 0,
                 0
         );
-
         selectedDateCalendar.set(Calendar.MILLISECOND, 0);
 
         SimpleDateFormat dateFormatter = new SimpleDateFormat(
@@ -363,20 +606,15 @@ public class PostTripActivity extends AppCompatActivity {
      * Kết nối bộ chọn giờ khởi hành.
      */
     private void connectDepartureTimeSelector() {
-        departureTimeSelector.setOnClickListener(
-                new View.OnClickListener() {
-
-                    /**
-                     * Mở hộp thoại chọn giờ khởi hành.
-                     *
-                     * @param view thành phần giao diện được nhấn
-                     */
-                    @Override
-                    public void onClick(View view) {
-                        showDepartureTimePicker();
-                    }
-                }
-        );
+        departureTimeSelector.setOnClickListener(new View.OnClickListener() {
+            /**
+             * Mở hộp thoại chọn giờ khởi hành.
+             */
+            @Override
+            public void onClick(View view) {
+                showDepartureTimePicker();
+            }
+        });
     }
 
     /**
@@ -398,13 +636,8 @@ public class PostTripActivity extends AppCompatActivity {
         TimePickerDialog timePickerDialog = new TimePickerDialog(
                 this,
                 new TimePickerDialog.OnTimeSetListener() {
-
                     /**
-                     * Cập nhật giờ khởi hành theo giờ người dùng chọn.
-                     *
-                     * @param timePicker hộp chọn giờ
-                     * @param selectedHour giờ được chọn
-                     * @param selectedMinute phút được chọn
+                     * Lưu giờ người dùng vừa chọn.
                      */
                     @Override
                     public void onTimeSet(
@@ -413,10 +646,8 @@ public class PostTripActivity extends AppCompatActivity {
                             int selectedMinute
                     ) {
                         hasSelectedDepartureTime = true;
-
                         selectedDepartureHour = selectedHour;
                         selectedDepartureMinute = selectedMinute;
-
                         updateDepartureTimeDisplay();
                     }
                 },
@@ -429,7 +660,7 @@ public class PostTripActivity extends AppCompatActivity {
     }
 
     /**
-     * Hiển thị giờ khởi hành theo định dạng 24 giờ.
+     * Hiển thị giờ đã chọn theo định dạng 24 giờ.
      */
     private void updateDepartureTimeDisplay() {
         if (!hasSelectedDepartureTime) {
@@ -448,17 +679,13 @@ public class PostTripActivity extends AppCompatActivity {
     }
 
     /**
-     * Xử lý lựa chọn miễn phí và đồng bộ trường chi phí.
+     * Đồng bộ trường chi phí khi người dùng chọn hoặc bỏ chọn miễn phí.
      */
     private void connectFreeContributionOption() {
         freeContributionCheckBox.setOnCheckedChangeListener(
                 new CompoundButton.OnCheckedChangeListener() {
-
                     /**
-                     * Cập nhật chi phí khi trạng thái miễn phí thay đổi.
-                     *
-                     * @param button thành phần lựa chọn miễn phí
-                     * @param isChecked cho biết người dùng đã chọn miễn phí hay chưa
+                     * Bật/tắt ô chi phí theo lựa chọn miễn phí.
                      */
                     @Override
                     public void onCheckedChanged(
@@ -469,7 +696,7 @@ public class PostTripActivity extends AppCompatActivity {
                             contributionAmountInput.setText("0");
                             contributionAmountInput.setEnabled(false);
                         } else {
-                            contributionAmountInput.setEnabled(true);
+                            contributionAmountInput.setEnabled(!isSubmitting);
                             contributionAmountInput.setText("");
                         }
                     }
@@ -485,105 +712,108 @@ public class PostTripActivity extends AppCompatActivity {
     }
 
     /**
-     * Kết nối nút kiểm tra biểu mẫu.
-     * <p>
-     * Nút này chỉ kiểm tra dữ liệu, chưa tạo chuyến trên Firestore.
+     * Kết nối nút đăng chuyến với luồng kiểm tra và ghi Firestore.
      */
-    private void connectFormValidationButton() {
-        androidx.appcompat.widget.AppCompatButton validationButton =
-                findViewById(R.id.primary_action);
-
-        validationButton.setOnClickListener(new View.OnClickListener() {
-
+    private void connectPostTripButton() {
+        postTripButton.setText("Đăng chuyến");
+        postTripButton.setOnClickListener(new View.OnClickListener() {
             /**
-             * Kiểm tra dữ liệu khi người dùng nhấn nút.
-             *
-             * @param view thành phần giao diện được nhấn
+             * Bắt đầu xác thực và gửi chuyến khi người dùng nhấn nút.
              */
             @Override
             public void onClick(View view) {
-                validateForm();
+                submitTrip();
             }
         });
     }
 
     /**
-     * Kiểm tra các trường cần thiết trước khi có thể đăng chuyến.
+     * Kiểm tra dữ liệu phía giao diện trước khi truy cập Firestore.
      */
-    private void validateForm() {
+    private boolean validateForm() {
+        if (!validateSelectedPlaces()) {
+            return false;
+        }
+
+        if (!validateDepartureDateTime()) {
+            return false;
+        }
+
+        return validateContributionAmount();
+    }
+
+    /**
+     * Kiểm tra điểm đi và điểm đến đã được chọn, có tọa độ hợp lệ và không trùng nhau.
+     */
+    private boolean validateSelectedPlaces() {
+        if (isValidPlace(selectedOriginPlace)) {
+            showMessage("Vui lòng chọn điểm đi từ danh sách địa điểm.");
+            return false;
+        }
+
+        if (isValidPlace(selectedDestinationPlace)) {
+            showMessage("Vui lòng chọn điểm đến từ danh sách địa điểm.");
+            return false;
+        }
+
+        if (sameCoordinates(selectedOriginPlace, selectedDestinationPlace)) {
+            showMessage("Điểm đi và điểm đến không được trùng nhau.");
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Kiểm tra ngày và giờ đã được chọn và thời điểm kết hợp nằm trong tương lai.
+     */
+    private boolean validateDepartureDateTime() {
         if (!hasSelectedDepartureDate) {
             showMessage("Vui lòng chọn ngày khởi hành.");
-            return;
+            return false;
         }
 
         if (!hasSelectedDepartureTime) {
             showMessage("Vui lòng chọn giờ khởi hành.");
-            return;
+            return false;
         }
 
         if (!isDepartureTimeInFuture()) {
             showMessage("Ngày và giờ khởi hành phải ở trong tương lai.");
-            return;
+            return false;
         }
 
-        String contributionAmountText =
-                contributionAmountInput.getText().toString().trim();
-
-        if (contributionAmountText.isEmpty()) {
-            showMessage("Vui lòng nhập chi phí hoặc chọn miễn phí.");
-            return;
-        }
-
-        long contributionAmount;
-
-        try {
-            contributionAmount = Long.parseLong(
-                    contributionAmountText
-            );
-        } catch (NumberFormatException exception) {
-            showMessage("Chi phí phải là một số nguyên hợp lệ.");
-            return;
-        }
-
-        if (contributionAmount < 0) {
-            showMessage("Chi phí không được là số âm.");
-            return;
-        }
-
-        String originPlaceName =
-                originPlaceValue.getText().toString().trim();
-
-        if (originPlaceName.isEmpty()
-                || originPlaceName.equals("Chọn điểm đi")) {
-            showMessage(
-                    "Vui lòng chọn điểm đi. Chức năng chọn địa điểm "
-                            + "đang chờ tích hợp."
-            );
-            return;
-        }
-
-        String destinationPlaceName =
-                destinationPlaceValue.getText().toString().trim();
-
-        if (destinationPlaceName.isEmpty()
-                || destinationPlaceName.equals("Chọn điểm đến")) {
-            showMessage(
-                    "Vui lòng chọn điểm đến. Chức năng chọn địa điểm "
-                            + "đang chờ tích hợp."
-            );
-            return;
-        }
-
-        showMessage(
-                "Thông tin đầu vào hợp lệ. Chức năng ghi chuyến "
-                        + "lên Firestore chưa được tích hợp."
-        );
+        return true;
     }
 
     /**
-     * Xác định ngày và giờ khởi hành đã chọn có nằm trong tương lai hay không.
-     *
-     * @return true nếu thời điểm khởi hành lớn hơn thời điểm hiện tại
+     * Đọc chi phí thành Long và từ chối dữ liệu rỗng, sai định dạng hoặc âm.
+     */
+    private boolean validateContributionAmount() {
+        String amountText = contributionAmountInput.getText().toString().trim();
+
+        if (amountText.isEmpty()) {
+            showMessage("Vui lòng nhập chi phí hoặc chọn miễn phí.");
+            return false;
+        }
+
+        try {
+            validatedContributionAmount = Long.parseLong(amountText);
+        } catch (NumberFormatException exception) {
+            showMessage("Chi phí phải là một số nguyên hợp lệ.");
+            return false;
+        }
+
+        if (validatedContributionAmount < 0L) {
+            showMessage("Chi phí không được là số âm.");
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Xác định thời điểm khởi hành đã chọn có lớn hơn thời điểm hiện tại hay không.
      */
     private boolean isDepartureTimeInFuture() {
         if (!hasSelectedDepartureDate || !hasSelectedDepartureTime) {
@@ -591,7 +821,6 @@ public class PostTripActivity extends AppCompatActivity {
         }
 
         Calendar selectedDepartureCalendar = Calendar.getInstance();
-
         selectedDepartureCalendar.set(
                 selectedDepartureYear,
                 selectedDepartureMonth,
@@ -600,21 +829,287 @@ public class PostTripActivity extends AppCompatActivity {
                 selectedDepartureMinute,
                 0
         );
-
-        selectedDepartureCalendar.set(
-                Calendar.MILLISECOND,
-                0
-        );
+        selectedDepartureCalendar.set(Calendar.MILLISECOND, 0);
 
         Calendar currentCalendar = Calendar.getInstance();
-
         return selectedDepartureCalendar.after(currentCalendar);
     }
 
     /**
+     * Khởi động luồng đăng chuyến, xác minh hồ sơ trước rồi mới yêu cầu transaction tạo document.
+     */
+    private void submitTrip() {
+        if (isSubmitting) {
+            return;
+        }
+
+        if (!validateForm()) {
+            return;
+        }
+
+        if (isNetworkAvailable()) {
+            showMessage("Không có kết nối mạng. Chuyến chưa được đăng; hãy kết nối rồi thử lại.");
+            return;
+        }
+
+        if (tripDocumentId == null || tripDocumentId.trim().isEmpty()) {
+            tripDocumentId = tripRepository.createTripDocumentId();
+        }
+
+        final String requestedTripId = tripDocumentId;
+        final Place requestedOrigin = selectedOriginPlace;
+        final Place requestedDestination = selectedDestinationPlace;
+        final Timestamp requestedDepartureAt = new Timestamp(
+                getSelectedDepartureCalendar().getTime()
+        );
+        final Long requestedCostVnd = validatedContributionAmount;
+        final String requestedNote = noteInput.getText().toString().trim();
+
+        setSubmitting(true);
+
+        tripRepository.checkVehicleProfile(
+                new RepositoryCallback<>() {
+                    /**
+                     * Tiếp tục tạo chuyến chỉ khi hồ sơ xe chính chủ đã đầy đủ.
+                     */
+                    @Override
+                    public void onSuccess(Boolean hasVehicleProfile) {
+                        if (isActivityUsable()) {
+                            return;
+                        }
+
+                        if (!Boolean.TRUE.equals(hasVehicleProfile)) {
+                            setSubmitting(false);
+                            showMessage(
+                                    "Hồ sơ xe chưa đủ tên xe hoặc biển số. "
+                                            + "Vui lòng hoàn thiện hồ sơ trước khi đăng chuyến."
+                            );
+                            return;
+                        }
+
+                        if (isNetworkAvailable()) {
+                            setSubmitting(false);
+                            showMessage(
+                                    "Mất kết nối mạng trước khi đăng. Chuyến chưa được tạo."
+                            );
+                            return;
+                        }
+
+                        createTripOnServer(
+                                requestedTripId,
+                                requestedOrigin,
+                                requestedDestination,
+                                requestedDepartureAt,
+                                requestedCostVnd,
+                                requestedNote
+                        );
+                    }
+
+                    /**
+                     * Giữ form và cho phép thử lại nếu không đọc được hồ sơ từ máy chủ.
+                     */
+                    @Override
+                    public void onError(Exception error) {
+                        if (isActivityUsable()) {
+                            return;
+                        }
+
+                        setSubmitting(false);
+                        showMessage(
+                                "Không thể xác minh hồ sơ xe. Hãy kiểm tra đăng nhập, "
+                                        + "kết nối mạng và quyền Firestore rồi thử lại."
+                        );
+                    }
+                }
+        );
+    }
+
+    /**
+     * Gọi repository tạo chuyến và chỉ điều hướng khi máy chủ xác nhận thành công.
+     */
+    private void createTripOnServer(
+            final String requestedTripId,
+            Place requestedOrigin,
+            Place requestedDestination,
+            Timestamp requestedDepartureAt,
+            Long requestedCostVnd,
+            String requestedNote
+    ) {
+        tripRepository.createTrip(
+                requestedTripId,
+                requestedOrigin,
+                requestedDestination,
+                requestedDepartureAt,
+                requestedCostVnd,
+                requestedNote,
+                new RepositoryCallback<>() {
+                    /**
+                     * Mở danh sách chuyến sau khi transaction được máy chủ xác nhận.
+                     */
+                    @Override
+                    public void onSuccess(Void ignored) {
+                        if (isActivityUsable()) {
+                            return;
+                        }
+
+                        setSubmitting(false);
+
+                        Intent driverTripsIntent = new Intent(
+                                PostTripActivity.this,
+                                DriverTripsActivity.class
+                        );
+                        driverTripsIntent.putExtra(
+                                NavigationKeys.TRIP_ID,
+                                requestedTripId
+                        );
+
+                        startActivity(driverTripsIntent);
+                        finish();
+                    }
+
+                    /**
+                     * Không báo thành công khi transaction bị lỗi hoặc bị Rules từ chối.
+                     */
+                    @Override
+                    public void onError(Exception error) {
+                        if (isActivityUsable()) {
+                            return;
+                        }
+
+                        setSubmitting(false);
+                        showMessage(
+                                "Không thể đăng chuyến lên máy chủ. "
+                                        + "Biểu mẫu vẫn được giữ; hãy kiểm tra dữ liệu, "
+                                        + "kết nối và quyền truy cập rồi thử lại."
+                        );
+                    }
+                }
+        );
+    }
+
+    /**
+     * Bật hoặc khóa các điều khiển trong thời gian xác minh/ghi để tránh gửi kép.
+     */
+    private void setSubmitting(boolean submitting) {
+        isSubmitting = submitting;
+
+        originPlaceSelector.setEnabled(!submitting);
+        originPlaceSelector.setClickable(!submitting);
+        destinationPlaceSelector.setEnabled(!submitting);
+        destinationPlaceSelector.setClickable(!submitting);
+        departureDateSelector.setEnabled(!submitting);
+        departureTimeSelector.setEnabled(!submitting);
+        freeContributionCheckBox.setEnabled(!submitting);
+        contributionAmountInput.setEnabled(
+                !submitting && !freeContributionCheckBox.isChecked()
+        );
+        noteInput.setEnabled(!submitting);
+        backButton.setEnabled(!submitting);
+        postTripButton.setEnabled(!submitting);
+
+        if (submitting) {
+            postTripButton.setText("Đang đăng chuyến...");
+        } else {
+            postTripButton.setText("Đăng chuyến");
+        }
+    }
+
+    /**
+     * Kiểm tra kết nối mạng hiện tại trước khi bắt đầu thao tác ghi. Transaction Firestore vẫn là lớp bảo vệ cuối nếu mạng bị mất ngay sau kiểm tra.
+     */
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager =
+                (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        if (connectivityManager == null) {
+            return true;
+        }
+
+        Network activeNetwork = connectivityManager.getActiveNetwork();
+
+        if (activeNetwork == null) {
+            return true;
+        }
+
+        NetworkCapabilities networkCapabilities =
+                connectivityManager.getNetworkCapabilities(activeNetwork);
+
+        if (networkCapabilities == null) {
+            return true;
+        }
+
+        return !networkCapabilities.hasCapability(
+                NetworkCapabilities.NET_CAPABILITY_INTERNET
+        ) || !networkCapabilities.hasCapability(
+                NetworkCapabilities.NET_CAPABILITY_VALIDATED
+        );
+    }
+
+    /**
+     * Kiểm tra địa điểm từ bộ chọn hoặc Bundle có tên và tọa độ nằm trong giới hạn hợp lệ.
+     */
+    private boolean isValidPlace(Place place) {
+        if (place == null
+                || place.getName() == null
+                || place.getName().trim().isEmpty()
+                || place.getLatitude() == null
+                || place.getLongitude() == null) {
+            return true;
+        }
+
+        double latitude = place.getLatitude();
+        double longitude = place.getLongitude();
+
+        if (Double.isNaN(latitude) || Double.isInfinite(latitude)
+                || Double.isNaN(longitude) || Double.isInfinite(longitude)) {
+            return true;
+        }
+
+        return !(latitude >= -90.0)
+                || !(latitude <= 90.0)
+                || !(longitude >= -180.0)
+                || !(longitude <= 180.0);
+    }
+
+    /**
+     * So sánh tọa độ để từ chối trường hợp điểm đi và điểm đến bị trùng nhau.
+     */
+    private boolean sameCoordinates(Place first, Place second) {
+        return Double.compare(
+                first.getLatitude(),
+                second.getLatitude()
+        ) == 0 && Double.compare(
+                first.getLongitude(),
+                second.getLongitude()
+        ) == 0;
+    }
+
+    /**
+     * Tạo Calendar từ ngày và giờ người dùng đã chọn.
+     */
+    private Calendar getSelectedDepartureCalendar() {
+        Calendar selectedDepartureCalendar = Calendar.getInstance();
+        selectedDepartureCalendar.set(
+                selectedDepartureYear,
+                selectedDepartureMonth,
+                selectedDepartureDay,
+                selectedDepartureHour,
+                selectedDepartureMinute,
+                0
+        );
+        selectedDepartureCalendar.set(Calendar.MILLISECOND, 0);
+        return selectedDepartureCalendar;
+    }
+
+    /**
+     * Kiểm tra Activity còn có thể nhận callback và điều hướng hay không. Callback của Activity cũ sau khi xoay màn hình sẽ không tự điều hướng.
+     */
+    private boolean isActivityUsable() {
+        return isFinishing() || isDestroyed() || isChangingConfigurations();
+    }
+
+    /**
      * Hiển thị thông báo ngắn cho người dùng.
-     *
-     * @param message nội dung thông báo cần hiển thị
      */
     private void showMessage(String message) {
         Toast.makeText(

@@ -26,6 +26,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
+
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.Source;
+
+import com.example.grabshare.model.Place;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Hiển thị danh sách chuyến do tài khoản hiện tại đăng.
  * <p>
@@ -50,6 +66,7 @@ public class DriverTripsActivity extends AppCompatActivity {
     private DriverTripAdapter tripAdapter;
     private DriverTripRepository tripRepository;
     private FirebaseAuth firebaseAuth;
+    private FirebaseFirestore firestore;
 
     private final List<Trip> allTrips = new ArrayList<>();
 
@@ -104,9 +121,10 @@ public class DriverTripsActivity extends AppCompatActivity {
      */
     private void initializeRepository() {
         firebaseAuth = FirebaseAuth.getInstance();
+        firestore = FirebaseFirestore.getInstance();
 
         tripRepository = new DriverTripRepository(
-                FirebaseFirestore.getInstance(),
+                firestore,
                 firebaseAuth
         );
     }
@@ -441,5 +459,316 @@ public class DriverTripsActivity extends AppCompatActivity {
                     }
                 }
         );
+    }
+    public static final String ERROR_VEHICLE_PROFILE_INCOMPLETE =
+            "VEHICLE_PROFILE_INCOMPLETE";
+
+    public static final String ERROR_TRIP_ID_CONFLICT =
+            "TRIP_ID_CONFLICT";
+
+    /** Tạo trước một ID chuyến để có thể giữ nguyên ID khi xoay màn hình. */
+    public String generateTripId() {
+        return firestore.collection("trips")
+                .document()
+                .getId();
+    }
+
+    /** Kiểm tra dữ liệu và tạo chuyến mới trên Firestore. */
+    public void createTrip(
+            final String tripId,
+            final Place origin,
+            final Place destination,
+            final Timestamp departureAt,
+            final long costVnd,
+            final String note,
+            final RepositoryCallback<String> callback
+    ) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+
+        if (currentUser == null
+                || currentUser.getUid().trim().isEmpty()) {
+            callback.onError(
+                    new IllegalStateException(
+                            "Bạn cần đăng nhập để đăng chuyến."
+                    )
+            );
+            return;
+        }
+
+        if (tripId == null || tripId.trim().isEmpty()
+                || !isValidPlace(origin)
+                || !isValidPlace(destination)
+                || departureAt == null
+                || costVnd < 0
+                || departureAt.toDate().before(new Date())) {
+            callback.onError(
+                    new IllegalArgumentException(
+                            "Thông tin chuyến không hợp lệ."
+                    )
+            );
+            return;
+        }
+
+        if (Double.compare(
+                origin.getLatitude(),
+                destination.getLatitude()) == 0
+                && Double.compare(
+                origin.getLongitude(),
+                destination.getLongitude()) == 0) {
+            callback.onError(
+                    new IllegalArgumentException(
+                            "Điểm đi và điểm đến phải khác nhau."
+                    )
+            );
+            return;
+        }
+
+        final String uid = currentUser.getUid();
+
+        Task<DocumentSnapshot> userTask = firestore
+                .collection("users")
+                .document(uid)
+                .get(Source.SERVER);
+
+        Task<DocumentSnapshot> publicProfileTask = firestore
+                .collection("publicProfiles")
+                .document(uid)
+                .get(Source.SERVER);
+
+        Tasks.<DocumentSnapshot>whenAllSuccess(
+                userTask,
+                publicProfileTask
+        ).addOnCompleteListener(
+                new OnCompleteListener<>() {
+                    /** Xác nhận hồ sơ xe trước khi ghi chuyến. */
+                    @Override
+                    public void onComplete(
+                            @NonNull Task<List<DocumentSnapshot>> task
+                    ) {
+                        if (!task.isSuccessful()
+                                || task.getResult() == null
+                                || task.getResult().size() != 2) {
+                            Exception error = task.getException();
+
+                            if (error == null) {
+                                error = new IllegalStateException(
+                                        "Không đọc được hồ sơ xe."
+                                );
+                            }
+
+                            callback.onError(error);
+                            return;
+                        }
+
+                        DocumentSnapshot userDocument =
+                                task.getResult().get(0);
+                        DocumentSnapshot publicDocument =
+                                task.getResult().get(1);
+
+                        String vehiclePlate =
+                                userDocument.getString("vehiclePlate");
+                        String vehicleName =
+                                publicDocument.getString("vehicleName");
+
+                        if (!userDocument.exists()
+                                || !publicDocument.exists()
+                                || vehiclePlate == null
+                                || vehiclePlate.trim().isEmpty()
+                                || vehicleName == null
+                                || vehicleName.trim().isEmpty()) {
+                            callback.onError(
+                                    new IllegalStateException(
+                                            ERROR_VEHICLE_PROFILE_INCOMPLETE
+                                    )
+                            );
+                            return;
+                        }
+
+                        DocumentReference tripReference = firestore
+                                .collection("trips")
+                                .document(tripId);
+
+                        createOrConfirmTrip(
+                                tripReference,
+                                uid,
+                                origin,
+                                destination,
+                                departureAt,
+                                costVnd,
+                                note == null ? "" : note.trim(),
+                                callback
+                        );
+                    }
+                }
+        );
+    }
+
+    /** Kiểm tra địa điểm có tên và tọa độ hợp lệ. */
+    private boolean isValidPlace(Place place) {
+        if (place == null
+                || place.getName() == null
+                || place.getName().trim().isEmpty()
+                || place.getLatitude() == null
+                || place.getLongitude() == null) {
+            return false;
+        }
+
+        double latitude = place.getLatitude();
+        double longitude = place.getLongitude();
+
+        return Double.isFinite(latitude)
+                && Double.isFinite(longitude)
+                && latitude >= -90
+                && latitude <= 90
+                && longitude >= -180
+                && longitude <= 180;
+    }
+
+    /** Tránh tạo document thứ hai khi cùng một lần đăng được thử lại. */
+    private void createOrConfirmTrip(
+            final DocumentReference tripReference,
+            final String uid,
+            final Place origin,
+            final Place destination,
+            final Timestamp departureAt,
+            final long costVnd,
+            final String note,
+            final RepositoryCallback<String> callback
+    ) {
+        tripReference.get(Source.SERVER)
+                .addOnCompleteListener(
+                        new OnCompleteListener<>() {
+                            @Override
+                            public void onComplete(
+                                    @NonNull Task<DocumentSnapshot> task
+                            ) {
+                                if (!task.isSuccessful()
+                                        || task.getResult() == null) {
+                                    Exception error = task.getException();
+
+                                    if (error == null) {
+                                        error = new IllegalStateException(
+                                                "Không kiểm tra được chuyến."
+                                        );
+                                    }
+
+                                    callback.onError(error);
+                                    return;
+                                }
+
+                                DocumentSnapshot existing = task.getResult();
+
+                                if (existing.exists()) {
+                                    if (uid.equals(
+                                            existing.getString("driverId"))) {
+                                        callback.onSuccess(
+                                                tripReference.getId()
+                                        );
+                                    } else {
+                                        callback.onError(
+                                                new IllegalStateException(
+                                                        ERROR_TRIP_ID_CONFLICT
+                                                )
+                                        );
+                                    }
+                                    return;
+                                }
+
+                                writeTripDocument(
+                                        tripReference,
+                                        uid,
+                                        origin,
+                                        destination,
+                                        departureAt,
+                                        costVnd,
+                                        note,
+                                        callback
+                                );
+                            }
+                        }
+                );
+    }
+
+    /** Ghi đúng schema chuyến mới và dùng timestamp do máy chủ tạo. */
+    private void writeTripDocument(
+            final DocumentReference tripReference,
+            final String uid,
+            final Place origin,
+            final Place destination,
+            final Timestamp departureAt,
+            final long costVnd,
+            final String note,
+            final RepositoryCallback<String> callback
+    ) {
+        Map<String, Object> tripData = new HashMap<>();
+
+        tripData.put("driverId", uid);
+        tripData.put("origin", origin);
+        tripData.put("destination", destination);
+        tripData.put("departureAt", departureAt);
+        tripData.put("costVnd", costVnd);
+        tripData.put("note", note);
+        tripData.put("status", "OPEN");
+        tripData.put("availableSeats", 1L);
+        tripData.put("acceptedRequestId", "");
+        tripData.put("createdAt", FieldValue.serverTimestamp());
+        tripData.put("updatedAt", FieldValue.serverTimestamp());
+
+        tripReference.set(tripData)
+                .addOnCompleteListener(
+                        new OnCompleteListener<>() {
+                            @Override
+                            public void onComplete(
+                                    @NonNull Task<Void> task
+                            ) {
+                                if (task.isSuccessful()) {
+                                    callback.onSuccess(
+                                            tripReference.getId()
+                                    );
+                                    return;
+                                }
+
+                                final Exception writeError =
+                                        task.getException();
+
+                                /*
+                                 * Nếu phản hồi ghi bị gián đoạn sau khi máy chủ
+                                 * đã nhận document, xác minh lại cùng ID trước
+                                 * khi báo thất bại.
+                                 */
+                                tripReference.get(Source.SERVER)
+                                        .addOnCompleteListener(
+                                                new OnCompleteListener<>() {
+                                                    @Override
+                                                    public void onComplete(
+                                                            @NonNull Task<DocumentSnapshot> verifyTask
+                                                    ) {
+                                                        if (verifyTask.isSuccessful()
+                                                                && verifyTask.getResult() != null
+                                                                && verifyTask.getResult().exists()
+                                                                && uid.equals(
+                                                                verifyTask.getResult()
+                                                                        .getString("driverId"))) {
+                                                            callback.onSuccess(
+                                                                    tripReference.getId()
+                                                            );
+                                                            return;
+                                                        }
+
+                                                        Exception error = writeError;
+
+                                                        if (error == null) {
+                                                            error = new IllegalStateException(
+                                                                    "Không tạo được chuyến."
+                                                            );
+                                                        }
+
+                                                        callback.onError(error);
+                                                    }
+                                                }
+                                        );
+                            }
+                        }
+                );
     }
 }
