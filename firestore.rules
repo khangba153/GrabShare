@@ -11,14 +11,86 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
-    match /users/{userId} {
+        match /users/{userId} {
+      // Hồ sơ riêng chỉ chứa email, biển số và thời gian.
+      function validPrivateProfileCreate() {
+        let data = request.resource.data;
+        let publicData = getAfter(
+          /databases/$(database)/documents/publicProfiles/$(userId)
+        ).data;
+
+        return data.keys().hasAll([
+            'email', 'vehiclePlate', 'createdAt', 'updatedAt'
+          ])
+          && data.keys().hasOnly([
+            'email', 'vehiclePlate', 'createdAt', 'updatedAt'
+          ])
+          && data.email is string
+          && data.email == request.auth.token.email
+          && data.vehiclePlate is string
+          && data.vehiclePlate.size() <= 20
+          && data.createdAt is timestamp
+          && data.updatedAt is timestamp
+          && data.createdAt == request.time
+          && data.updatedAt == request.time
+          && publicData.displayName is string
+          && publicData.displayName.size() > 0
+          && publicData.vehicleName is string
+          && (
+            (data.vehiclePlate.size() == 0
+              && publicData.vehicleName.size() == 0)
+            || (data.vehiclePlate.size() > 0
+              && publicData.vehicleName.size() > 0)
+          );
+      }
+
       allow get: if isOwner(userId);
-      allow list, write: if false;
+
+      allow create: if isOwner(userId)
+        && validPrivateProfileCreate();
+
+      allow list, update, delete: if false;
     }
 
     match /publicProfiles/{userId} {
+      // Hồ sơ công khai không chứa email hoặc biển số.
+      function validPublicProfileCreate() {
+        let data = request.resource.data;
+        let privateData = getAfter(
+          /databases/$(database)/documents/users/$(userId)
+        ).data;
+
+        return data.keys().hasAll([
+            'displayName', 'vehicleName', 'createdAt', 'updatedAt'
+          ])
+          && data.keys().hasOnly([
+            'displayName', 'vehicleName', 'createdAt', 'updatedAt'
+          ])
+          && data.displayName is string
+          && data.displayName.size() > 0
+          && data.displayName.size() <= 80
+          && data.vehicleName is string
+          && data.vehicleName.size() <= 80
+          && data.createdAt is timestamp
+          && data.updatedAt is timestamp
+          && data.createdAt == request.time
+          && data.updatedAt == request.time
+          && privateData.email == request.auth.token.email
+          && privateData.vehiclePlate is string
+          && (
+            (data.vehicleName.size() == 0
+              && privateData.vehiclePlate.size() == 0)
+            || (data.vehicleName.size() > 0
+              && privateData.vehiclePlate.size() > 0)
+          );
+      }
+
       allow read: if signedIn();
-      allow write: if false;
+
+      allow create: if isOwner(userId)
+        && validPublicProfileCreate();
+
+      allow update, delete: if false;
     }
 
     match /trips/{tripId} {
