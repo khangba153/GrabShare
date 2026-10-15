@@ -40,10 +40,53 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /favorites/{favoriteId} {
-      allow read: if signedIn()
+        match /favorites/{favoriteId} {
+      // Dữ liệu yêu thích phải đúng schema và thuộc người đăng nhập.
+      function validFavoriteCreate() {
+        let data = request.resource.data;
+
+        return data.keys().hasAll(['userId', 'tripId', 'createdAt'])
+          && data.keys().hasOnly(['userId', 'tripId', 'createdAt'])
+          && data.userId == request.auth.uid
+          && data.tripId is string
+          && data.tripId.size() > 0
+          && data.tripId.matches('[^/]+')
+          && favoriteId == request.auth.uid + '_' + data.tripId
+          && exists(
+            /databases/$(database)/documents/trips/$(data.tripId)
+          )
+          && data.createdAt is timestamp
+          && data.createdAt == request.time;
+      }
+
+      // Đọc bản ghi chính chủ; cho phép kiểm tra ID chính chủ chưa tồn tại.
+      allow get: if signedIn()
+        && (
+          (
+            exists(
+              /databases/$(database)/documents/favorites/$(favoriteId)
+            )
+            && resource.data.userId == request.auth.uid
+          )
+          || (
+            !exists(
+              /databases/$(database)/documents/favorites/$(favoriteId)
+            )
+            && favoriteId.matches(request.auth.uid + '_[^/]+')
+          )
+        );
+
+      // Query danh sách phải lọc userId bằng UID đang đăng nhập.
+      allow list: if signedIn()
         && resource.data.userId == request.auth.uid;
-      allow write: if false;
+
+      allow create: if signedIn() && validFavoriteCreate();
+
+      allow delete: if signedIn()
+        && resource.data.userId == request.auth.uid;
+
+      // Không sửa chủ sở hữu, chuyến hoặc thời gian của bản ghi đã tạo.
+      allow update: if false;
     }
 
     match /ratings/{ratingId} {
