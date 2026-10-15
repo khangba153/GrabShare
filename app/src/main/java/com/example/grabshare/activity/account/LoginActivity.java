@@ -44,6 +44,7 @@ public class LoginActivity extends AppCompatActivity {
     private EditText emailInput;
     private EditText passwordInput;
     private Button loginButton;
+    private Button registerButton;
     private TextView loginStatus;
     private AuthRepository authRepository;
     private boolean submitting;
@@ -70,6 +71,24 @@ public class LoginActivity extends AppCompatActivity {
         authRepository = new AuthRepository();
 
         googleButton = findViewById(R.id.login_google);
+
+        registerButton = findViewById(R.id.go_register);
+
+        registerButton.setOnClickListener(new View.OnClickListener() {
+            /** Mở đăng ký mới hoặc bổ sung hồ sơ cho phiên hiện tại. */
+            @Override
+            public void onClick(View view) {
+                if (submitting) {
+                    return;
+                }
+
+                passwordInput.setText("");
+
+                Intent intent = new Intent(
+                        LoginActivity.this, RegisterActivity.class);
+                startActivity(intent);
+            }
+        });
 
         googleButton.setOnClickListener(new View.OnClickListener() {
             /** Mở chọn tài khoản khi người dùng yêu cầu đăng nhập Google. */
@@ -168,6 +187,7 @@ public class LoginActivity extends AppCompatActivity {
         passwordInput.setEnabled(!value);
         loginButton.setEnabled(!value);
         googleButton.setEnabled(!value);
+        registerButton.setEnabled(!value);
         loginButton.setText(value ? "Đang đăng nhập..." : "Đăng nhập");
     }
 
@@ -329,8 +349,11 @@ public class LoginActivity extends AppCompatActivity {
                         if (Boolean.TRUE.equals(hasProfile)) {
                             openHome();
                         } else {
-                            showStatus("Đã đăng nhập với: " + user.getEmail()
-                                    + "\nChưa có đủ hồ sơ trên Firestore.");
+                            registerButton.setText("Hoàn thiện hồ sơ");
+
+                            showStatus(
+                                    "Bạn đã đăng nhập nhưng chưa có đủ hồ sơ. "
+                                            + "Bấm Hoàn thiện hồ sơ để tiếp tục.");
                         }
                     }
 
