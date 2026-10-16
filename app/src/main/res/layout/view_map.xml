@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="180dp" android:layout_marginBottom="16dp" android:background="@drawable/bg_lavender" android:clipToOutline="true">
-    <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/map_route" android:contentDescription="Minh họa tuyến đường đi cùng" />
-    <TextView android:id="@+id/map_start_label" style="@style/Badge" android:text="Công viên Lê Văn Tám" android:textColor="@color/ink" android:background="@drawable/bg_card" android:layout_gravity="top|start" android:layout_margin="10dp" android:maxWidth="200dp" android:maxLines="2" android:ellipsize="end"/>
-    <TextView android:id="@+id/map_end_label" style="@style/Badge" android:text="Khu dân cư An Phú" android:textColor="@color/ink" android:background="@drawable/bg_card" android:layout_gravity="bottom|end" android:layout_margin="10dp" android:maxWidth="200dp" android:maxLines="2" android:ellipsize="end"/>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="300dp"
+    android:layout_marginBottom="16dp"
+    android:background="@drawable/bg_lavender"
+    android:clipToOutline="true">
+
+    <!-- Bản đồ thực tế dùng OSMDroid -->
+    <org.osmdroid.views.MapView
+        android:id="@+id/map_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="Bản đồ tương tác" />
+
 </FrameLayout>

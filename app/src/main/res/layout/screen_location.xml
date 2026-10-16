@@ -120,7 +120,7 @@
         android:paddingTop="4dp"
         android:paddingBottom="12dp"
         android:background="@color/background"
-        android:visibility="visible">
+        android:visibility="gone">
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/primary_action"

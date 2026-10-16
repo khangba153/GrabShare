@@ -2,6 +2,8 @@ package com.example.grabshare.activity.search;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -22,6 +24,8 @@ import com.example.grabshare.model.Place;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Activity tìm kiếm và chọn địa điểm.
@@ -34,6 +38,9 @@ public class LocationActivity extends AppCompatActivity {
     private PlaceSearchClient searchClient;
     private PlaceAdapter adapter;
     private int currentSearchRequestId = 0;
+    
+    private Timer searchTimer;
+    private final long SEARCH_DELAY_MS = 1000; // Đợi 1 giây sau khi ngừng gõ mới tìm kiếm
     private View searchButton;
 
     /**
@@ -70,10 +77,38 @@ public class LocationActivity extends AppCompatActivity {
             }
         });
 
+        searchInput.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                if (searchTimer != null) {
+                    searchTimer.cancel();
+                }
+                
+                searchTimer = new Timer();
+                searchTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                performSearch();
+                            }
+                        });
+                    }
+                }, SEARCH_DELAY_MS);
+            }
+        });
+
         if (savedInstanceState != null) {
             restoreState(savedInstanceState);
-        } else {
-            loadDefaultSuggestions();
         }
     }
 
@@ -121,14 +156,10 @@ public class LocationActivity extends AppCompatActivity {
                 restoredPlaces.add(new Place(names.get(i), lats[i], lons[i]));
             }
             adapter.setPlaces(restoredPlaces);
-        } else {
-            // Nếu không có danh sách đã lưu (có thể vì chưa có kết quả), nạp gợi ý mặc định
-            loadDefaultSuggestions();
         }
 
         String savedStatus = savedInstanceState.getString("status_text", "");
         if ("Đang tìm kiếm...".equals(savedStatus)) {
-            // Nếu tác vụ trước đó đang tìm kiếm thì tự động tìm lại
             performSearch();
         } else {
             statusText.setVisibility(savedInstanceState.getInt("status_visibility", View.GONE));
@@ -139,32 +170,15 @@ public class LocationActivity extends AppCompatActivity {
     }
 
     /**
-     * Nạp danh sách các địa điểm gợi ý sẵn (Chủ yếu là các cơ sở UEH)
-     * để người dùng chọn ngay thuận tiện mà không bắt buộc gõ phím.
-     */
-    private void loadDefaultSuggestions() {
-        List<Place> defaultPlaces = new ArrayList<>();
-        defaultPlaces.add(new Place("UEH Cơ sở A - 59C Nguyễn Đình Chiểu, Phường 6, Quận 3, TP.HCM", 10.7830141, 106.6948927));
-        defaultPlaces.add(new Place("UEH Cơ sở B - 279 Nguyễn Tri Phương, Phường 5, Quận 10, TP.HCM", 10.7609491, 106.6679786));
-        defaultPlaces.add(new Place("UEH Cơ sở C - 91 Đường 3 Tháng 2, Phường 11, Quận 10, TP.HCM", 10.773238, 106.677568));
-        defaultPlaces.add(new Place("UEH Cơ sở N - Nguyễn Văn Linh, Phong Phú, Bình Chánh, TP.HCM", 10.705906, 106.639100));
-        defaultPlaces.add(new Place("UEH Cơ sở H - 1A Hoàng Diệu, Phường 10, Phú Nhuận, TP.HCM", 10.798991, 106.678210));
-        defaultPlaces.add(new Place("UEH Cơ sở V - 232/9 Võ Thị Sáu, Phường Võ Thị Sáu, Quận 3, TP.HCM", 10.7828045, 106.6856203));
-
-        adapter.setPlaces(defaultPlaces);
-        suggestionTitle.setText("Gợi ý nhanh (Các cơ sở UEH)");
-        suggestionTitle.setVisibility(View.VISIBLE);
-        locationList.setVisibility(View.VISIBLE);
-        statusText.setVisibility(View.GONE);
-    }
-
-    /**
      * Thực hiện tìm kiếm địa điểm từ API.
      */
     private void performSearch() {
         String query = searchInput.getText().toString().trim();
         if (TextUtils.isEmpty(query)) {
-            loadDefaultSuggestions();
+            adapter.setPlaces(new ArrayList<Place>());
+            statusText.setVisibility(View.GONE);
+            suggestionTitle.setVisibility(View.GONE);
+            locationList.setVisibility(View.GONE);
             return;
         }
 
