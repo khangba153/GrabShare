@@ -10,6 +10,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.grabshare.R;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.model.TripRequest;
 import com.example.grabshare.repository.passenger.PassengerTripsRepository.PassengerRideItem;
@@ -47,12 +48,8 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
     @NonNull
     @Override
     public RideViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        int layoutId = context.getResources().getIdentifier("row_ride", "layout", context.getPackageName());
-        if (layoutId == 0) {
-            layoutId = context.getResources().getIdentifier("item_trip", "layout", context.getPackageName());
-        }
-        View view = LayoutInflater.from(context).inflate(layoutId != 0 ? layoutId : android.R.layout.simple_list_item_2, parent, false);
-        return new RideViewHolder(view, context.getPackageName());
+        View view = LayoutInflater.from(context).inflate(R.layout.row_ride, parent, false);
+        return new RideViewHolder(view);
     }
 
     @Override
@@ -68,24 +65,19 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
 
     public static class RideViewHolder extends RecyclerView.ViewHolder {
 
-        private final TextView tvOrigin;
+        private final TextView tvPickup;
         private final TextView tvDestination;
         private final TextView tvDepartureTime;
-        private final TextView tvCost;
+        private final TextView tvPrice;
         private final TextView tvStatus;
 
-        public RideViewHolder(@NonNull View itemView, String packageName) {
+        public RideViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvOrigin = (TextView) findViewByIdName(itemView, "tv_origin", packageName);
-            tvDestination = (TextView) findViewByIdName(itemView, "tv_destination", packageName);
-            tvDepartureTime = (TextView) findViewByIdName(itemView, "tv_departure_time", packageName);
-            tvCost = (TextView) findViewByIdName(itemView, "tv_cost", packageName);
-            tvStatus = (TextView) findViewByIdName(itemView, "tv_status", packageName);
-        }
-
-        private View findViewByIdName(View parent, String idName, String packageName) {
-            int id = parent.getResources().getIdentifier(idName, "id", packageName);
-            return id != 0 ? parent.findViewById(id) : null;
+            tvPickup = itemView.findViewById(R.id.ride_pickup);
+            tvDestination = itemView.findViewById(R.id.ride_destination);
+            tvDepartureTime = itemView.findViewById(R.id.ride_time);
+            tvPrice = itemView.findViewById(R.id.ride_price);
+            tvStatus = itemView.findViewById(R.id.ride_status);
         }
 
         public void bind(final PassengerRideItem item, final OnRideClickListener listener) {
@@ -93,10 +85,10 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
             Trip trip = item.getTrip();
 
             if (trip == null) {
-                if (tvOrigin != null) tvOrigin.setText("Điểm đi: Không xác định");
+                if (tvPickup != null) tvPickup.setText("Điểm đi: Không xác định");
                 if (tvDestination != null) tvDestination.setText("Điểm đến: Không xác định");
                 if (tvDepartureTime != null) tvDepartureTime.setText("Thời gian: --/--");
-                if (tvCost != null) tvCost.setText("0 VNĐ");
+                if (tvPrice != null) tvPrice.setText("0 VNĐ");
                 if (tvStatus != null) tvStatus.setText("Không khả dụng");
                 itemView.setAlpha(0.5f);
                 itemView.setOnClickListener(null);
@@ -105,25 +97,25 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
 
             itemView.setAlpha(1.0f);
 
-            if (tvOrigin != null) {
-                tvOrigin.setText(trip.getOrigin() != null ? trip.getOrigin().getName() : "Điểm đi chưa rõ");
+            if (tvPickup != null) {
+                tvPickup.setText(trip.getOrigin() != null ? "Điểm đi: " + trip.getOrigin().getName() : "Điểm đi chưa rõ");
             }
 
             if (tvDestination != null) {
-                tvDestination.setText(trip.getDestination() != null ? trip.getDestination().getName() : "Điểm đến chưa rõ");
+                tvDestination.setText(trip.getDestination() != null ? "Điểm đến: " + trip.getDestination().getName() : "Điểm đến chưa rõ");
             }
 
             if (tvDepartureTime != null) {
                 if (trip.getDepartureAt() != null) {
                     CharSequence timeFormatted = DateFormat.format("HH:mm - dd/MM/yyyy", trip.getDepartureAt().toDate());
-                    tvDepartureTime.setText(timeFormatted);
+                    tvDepartureTime.setText("Khởi hành: " + timeFormatted);
                 } else {
                     tvDepartureTime.setText("Không rõ thời gian");
                 }
             }
 
-            if (tvCost != null) {
-                tvCost.setText(String.format("%,d VNĐ", trip.getCostVnd()));
+            if (tvPrice != null) {
+                tvPrice.setText(String.format("%,d VNĐ", trip.getCostVnd()));
             }
 
             String effectiveStatus = resolveEffectiveStatus(request, trip);
@@ -141,19 +133,40 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
             });
         }
 
-        private String resolveEffectiveStatus(TripRequest request, Trip trip) {
-            if ("CANCELLED".equalsIgnoreCase(trip.getStatus())) {
+        /**
+         * Quy tắc ghép trạng thái chuẩn theo hợp đồng review:
+         * 1. Request REJECTED hoặc CANCELLED giữ trạng thái của chính request (dù trip có COMPLETED hay CANCELLED).
+         * 2. Trip CANCELLED ưu tiên hiển thị CANCELLED cho các request khác.
+         * 3. Request ACCEPTED + Trip COMPLETED -> COMPLETED (Hoàn thành).
+         * 4. Request ACCEPTED + Trip FULL/OPEN -> ACCEPTED (Sắp đi).
+         */
+        public static String resolveEffectiveStatus(TripRequest request, Trip trip) {
+            if (request == null) {
+                return "UNKNOWN";
+            }
+            String reqStatus = request.getStatus() != null ? request.getStatus().toUpperCase() : "UNKNOWN";
+
+            if ("REJECTED".equals(reqStatus) || "CANCELLED".equals(reqStatus)) {
+                return reqStatus;
+            }
+
+            if (trip != null && "CANCELLED".equalsIgnoreCase(trip.getStatus())) {
                 return "CANCELLED";
             }
-            if (request != null && request.getStatus() != null) {
-                return request.getStatus().toUpperCase();
+
+            if ("ACCEPTED".equals(reqStatus)) {
+                if (trip != null && "COMPLETED".equalsIgnoreCase(trip.getStatus())) {
+                    return "COMPLETED";
+                }
+                return "ACCEPTED";
             }
-            return "UNKNOWN";
+
+            return reqStatus;
         }
 
         private String getVietnameseStatusText(String status) {
             if ("PENDING".equals(status)) return "Chờ xác nhận";
-            if ("ACCEPTED".equals(status)) return "Đã nhận (Sắp đi)";
+            if ("ACCEPTED".equals(status)) return "Sắp đi";
             if ("REJECTED".equals(status)) return "Bị từ chối";
             if ("COMPLETED".equals(status)) return "Hoàn thành";
             if ("CANCELLED".equals(status)) return "Đã hủy";

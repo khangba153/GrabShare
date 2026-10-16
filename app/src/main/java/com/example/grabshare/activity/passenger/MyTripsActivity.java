@@ -8,11 +8,14 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.grabshare.R;
+import com.example.grabshare.activity.account.LoginActivity;
+import com.example.grabshare.activity.driver.DriverTripsActivity;
+import com.example.grabshare.activity.search.HomeActivity;
 import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -46,74 +49,32 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        int layoutResId = getResources().getIdentifier("screen_my_trips", "layout", getPackageName());
-        if (layoutResId != 0) {
-            setContentView(layoutResId);
-        }
+        setContentView(R.layout.screen_my_trips);
 
         initViews();
         initRepository();
         setupRecyclerView();
 
-        // Xử lý lấy ID người dùng linh hoạt (Auth, Intent Extra hoặc Demo Fallback)
-        resolveCurrentUserId();
-
-        if (btnRetry != null) {
-            btnRetry.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    startListeningTrips();
-                }
-            });
-        }
-    }
-
-    /**
-     * Xác định UID người dùng: từ Firebase Auth, Intent Extra của Dev Launcher hoặc UID mặc định.
-     */
-    private void resolveCurrentUserId() {
+        // Kiểm tra phiên đăng nhập bằng FirebaseAuth.getInstance().getCurrentUser()
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser != null && currentUser.getUid() != null && !currentUser.getUid().trim().isEmpty()) {
-            currentUserId = currentUser.getUid();
+        if (currentUser == null || currentUser.getUid() == null || currentUser.getUid().trim().isEmpty()) {
+            Toast.makeText(this, "Vui lòng đăng nhập để xem chuyến đi.", Toast.LENGTH_SHORT).show();
+            Intent loginIntent = new Intent(this, LoginActivity.class);
+            startActivity(loginIntent);
+            finish();
             return;
         }
+        currentUserId = currentUser.getUid();
 
-        // Lấy từ Intent Extras do công cụ Dev Launcher truyền qua
-        if (getIntent() != null && getIntent().getExtras() != null) {
-            Bundle extras = getIntent().getExtras();
-            if (extras.containsKey("USER_ID")) {
-                currentUserId = extras.getString("USER_ID");
-            } else if (extras.containsKey("userId")) {
-                currentUserId = extras.getString("userId");
-            } else if (extras.containsKey("user_id")) {
-                currentUserId = extras.getString("user_id");
-            } else if (extras.containsKey("uid")) {
-                currentUserId = extras.getString("uid");
-            } else if (extras.containsKey("USER_UID")) {
-                currentUserId = extras.getString("USER_UID");
-            }
-        }
-
-        // Fallback mặc định cho Dev Launcher tool khi chưa đăng nhập Firebase
-        if (currentUserId == null || currentUserId.trim().isEmpty()) {
-            currentUserId = "user-demo-1";
-        }
-    }
-
-    private View findViewByName(String idName) {
-        int id = getResources().getIdentifier(idName, "id", getPackageName());
-        return id != 0 ? findViewById(id) : null;
+        setupListeners();
     }
 
     private void initViews() {
-        recyclerView = (RecyclerView) findViewByName("recycler_my_trips");
-        if (recyclerView == null) recyclerView = (RecyclerView) findViewByName("recycler_view");
-
-        progressBar = (ProgressBar) findViewByName("progress_bar");
-        tvEmptyState = (TextView) findViewByName("tv_empty_state");
-        layoutError = findViewByName("layout_error");
-        btnRetry = (Button) findViewByName("btn_retry");
+        recyclerView = findViewById(R.id.recycler_my_trips);
+        progressBar = findViewById(R.id.progress_bar);
+        tvEmptyState = findViewById(R.id.tv_empty_state);
+        layoutError = findViewById(R.id.layout_error);
+        btnRetry = findViewById(R.id.btn_retry);
     }
 
     private void initRepository() {
@@ -128,10 +89,58 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         }
     }
 
+    private void setupListeners() {
+        if (btnRetry != null) {
+            btnRetry.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startListeningTrips();
+                }
+            });
+        }
+
+        View roleDriver = findViewById(R.id.role_driver);
+        if (roleDriver != null) {
+            roleDriver.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(MyTripsActivity.this, DriverTripsActivity.class);
+                    startActivity(intent);
+                    finish();
+                }
+            });
+        }
+
+        View navHome = findViewById(R.id.nav_home);
+        if (navHome != null) {
+            navHome.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(MyTripsActivity.this, HomeActivity.class);
+                    startActivity(intent);
+                    finish();
+                }
+            });
+        }
+
+        View navAccount = findViewById(R.id.nav_account);
+        if (navAccount != null) {
+            navAccount.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(MyTripsActivity.this, LoginActivity.class);
+                    startActivity(intent);
+                }
+            });
+        }
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
-        startListeningTrips();
+        if (currentUserId != null && !currentUserId.trim().isEmpty()) {
+            startListeningTrips();
+        }
     }
 
     @Override
@@ -182,39 +191,29 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         }
 
         String requestId = request.getId();
-        String effectiveStatus = resolveStatus(request, trip);
+        String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
 
-        String targetActivityClass = null;
+        Intent intent = null;
         if ("PENDING".equalsIgnoreCase(effectiveStatus)) {
-            targetActivityClass = "com.example.grabshare.activity.passenger.PendingActivity";
+            intent = new Intent(this, PendingActivity.class);
         } else if ("REJECTED".equalsIgnoreCase(effectiveStatus)) {
-            targetActivityClass = "com.example.grabshare.activity.passenger.RejectedActivity";
+            intent = new Intent(this, RejectedActivity.class);
         } else if ("ACCEPTED".equalsIgnoreCase(effectiveStatus) || "FULL".equalsIgnoreCase(effectiveStatus)) {
-            targetActivityClass = "com.example.grabshare.activity.passenger.UpcomingActivity";
+            intent = new Intent(this, UpcomingActivity.class);
         } else if ("COMPLETED".equalsIgnoreCase(effectiveStatus)) {
-            targetActivityClass = "com.example.grabshare.activity.passenger.CompleteActivity";
+            intent = new Intent(this, CompleteActivity.class);
         } else if ("CANCELLED".equalsIgnoreCase(effectiveStatus)) {
             Toast.makeText(this, "Chuyến đi này đã bị hủy.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (targetActivityClass != null) {
-            Intent intent = new Intent();
-            intent.setClassName(this, targetActivityClass);
+        if (intent != null) {
             intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
-            try {
-                startActivity(intent);
-            } catch (Exception e) {
-                Toast.makeText(this, "Màn hình chưa được khởi tạo.", Toast.LENGTH_SHORT).show();
+            if (request.getTripId() != null) {
+                intent.putExtra(NavigationKeys.TRIP_ID, request.getTripId());
             }
+            startActivity(intent);
         }
-    }
-
-    private String resolveStatus(TripRequest request, Trip trip) {
-        if ("CANCELLED".equalsIgnoreCase(trip.getStatus())) {
-            return "CANCELLED";
-        }
-        return request.getStatus();
     }
 
     private void showLoadingState() {
