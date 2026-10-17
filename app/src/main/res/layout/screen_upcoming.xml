@@ -4,9 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/background"
-    android:descendantFocusability="blocksDescendants"
-    android:importantForAccessibility="noHideDescendants">
+    android:background="@color/background">
 
     <FrameLayout
         android:id="@+id/header"
@@ -22,8 +20,8 @@
             android:src="@drawable/ic_back"
             android:contentDescription="Quay lại"
             android:visibility="visible"
-            android:clickable="false"
-            android:focusable="false" />
+            android:clickable="true"
+            android:focusable="true" />
 
         <TextView
             android:id="@+id/header_title"
@@ -75,10 +73,12 @@
 
             <include layout="@layout/view_trip_summary" />
 
+            <!-- Bỏ nút chat giả theo checklist "Không để nút chat không có chức năng" -->
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/trip_chat"
                 style="@style/ButtonSecondary"
                 android:text="Nhắn tin"
+                android:visibility="gone"
                 android:clickable="false"
                 android:focusable="false" />
 
@@ -86,8 +86,9 @@
                 android:id="@+id/trip_call"
                 style="@style/ButtonSecondary"
                 android:text="Gọi điện"
-                android:clickable="false"
-                android:focusable="false" />
+                android:visibility="visible"
+                android:clickable="true"
+                android:focusable="true" />
 
             <TextView
                 style="@style/Hint"
@@ -110,16 +111,16 @@
             android:id="@+id/primary_action"
             style="@style/ButtonPrimary"
             android:text="Hoàn thành chuyến"
-            android:clickable="false"
-            android:focusable="false" />
+            android:clickable="true"
+            android:focusable="true" />
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/secondary_action"
             style="@style/ButtonSecondary"
             android:text="Hủy tham gia"
             android:visibility="visible"
-            android:clickable="false"
-            android:focusable="false" />
+            android:clickable="true"
+            android:focusable="true" />
     </LinearLayout>
 
     <LinearLayout
