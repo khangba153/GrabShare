@@ -35,7 +35,7 @@
                 <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="12dp" android:background="@color/border" />
                 <include layout="@layout/view_search_schedule" />
             </LinearLayout>
-            <include layout="@layout/view_map" />
+            <include layout="@layout/view_home_map" />
             <TextView style="@style/Hint" android:text="Chi phí rõ ràng trước khi gửi yêu cầu." />
         </LinearLayout>
     </ScrollView>
