@@ -79,6 +79,74 @@ public class AuthRepository {
                 });
     }
 
+    /** Tạo tài khoản email mới; hồ sơ Firestore được xử lý ở bước tiếp theo. */
+    public void signUp(
+            String email,
+            String password,
+            final RepositoryCallback<FirebaseUser> callback) {
+
+        if (auth.getCurrentUser() != null) {
+            callback.onError(new IllegalStateException(
+                    "Bạn đang đăng nhập. Hãy hoàn thiện hồ sơ hiện tại "
+                            + "hoặc đăng xuất trước khi tạo tài khoản mới."));
+            return;
+        }
+
+        if (email == null
+                || !android.util.Patterns.EMAIL_ADDRESS
+                .matcher(email.trim()).matches()) {
+            callback.onError(new IllegalArgumentException(
+                    "Vui lòng nhập email hợp lệ."));
+            return;
+        }
+
+        if (password == null || password.isEmpty()) {
+            callback.onError(new IllegalArgumentException(
+                    "Vui lòng nhập mật khẩu."));
+            return;
+        }
+
+        auth.createUserWithEmailAndPassword(email.trim(), password)
+                .addOnCompleteListener(
+                        new OnCompleteListener<AuthResult>() {
+
+                            /** Trả tài khoản vừa tạo hoặc lỗi thực tế từ Firebase. */
+                            @Override
+                            public void onComplete(
+                                    @NonNull Task<AuthResult> task) {
+
+                                if (!task.isSuccessful()) {
+                                    Exception error = task.getException();
+
+                                    if (error == null) {
+                                        error = new IllegalStateException(
+                                                "Không tạo được tài khoản.");
+                                    }
+
+                                    callback.onError(error);
+                                    return;
+                                }
+
+                                AuthResult result = task.getResult();
+                                FirebaseUser createdUser =
+                                        result == null ? null : result.getUser();
+                                FirebaseUser currentUser = auth.getCurrentUser();
+
+                                if (createdUser == null
+                                        || currentUser == null
+                                        || !createdUser.getUid()
+                                        .equals(currentUser.getUid())) {
+                                    callback.onError(new IllegalStateException(
+                                            "Phiên đăng nhập đã thay đổi "
+                                                    + "sau khi tạo tài khoản."));
+                                    return;
+                                }
+
+                                callback.onSuccess(createdUser);
+                            }
+                        });
+    }
+
     /** Lấy tài khoản hiện tại; trả null nếu chưa đăng nhập. */
     public FirebaseUser getCurrentUser() {
         return auth.getCurrentUser();

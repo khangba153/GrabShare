@@ -31,7 +31,10 @@
                 android:id="@+id/login_google"
                 style="@style/ButtonSecondary"
                 android:text="Đăng nhập với Google" />
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/go_register" style="@style/ButtonSecondary" android:text="Chưa có tài khoản? Đăng ký" android:clickable="false" android:focusable="false" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/go_register"
+                style="@style/ButtonSecondary"
+                android:text="Chưa có tài khoản? Đăng ký" />
         </LinearLayout>
     </ScrollView>
     <LinearLayout android:id="@+id/action_area" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="4dp" android:paddingBottom="12dp" android:background="@color/background" android:visibility="gone">

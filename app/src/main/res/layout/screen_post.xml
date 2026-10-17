@@ -2,8 +2,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:orientation="vertical">
 
     <!-- Phần tiêu đề của màn hình -->
     <FrameLayout
@@ -16,8 +16,8 @@
             android:id="@+id/header_back"
             style="@style/IconButton"
             android:layout_gravity="center_vertical|start"
-            android:src="@drawable/ic_back"
             android:contentDescription="Quay lại"
+            android:src="@drawable/ic_back"
             android:visibility="visible" />
 
         <TextView
@@ -33,10 +33,10 @@
             android:id="@+id/header_action"
             style="@style/IconButton"
             android:layout_gravity="center_vertical|end"
-            android:src="@drawable/ic_bell"
-            android:contentDescription="Thông báo"
             android:clickable="false"
-            android:focusable="false" />
+            android:contentDescription="Thông báo"
+            android:focusable="false"
+            android:src="@drawable/ic_bell" />
     </FrameLayout>
 
     <!-- Nội dung biểu mẫu có thể cuộn -->
@@ -44,8 +44,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true"
-        android:clipToPadding="false">
+        android:clipToPadding="false"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -69,21 +69,22 @@
                 <LinearLayout
                     android:id="@+id/post_start"
                     style="@style/Picker"
-                    android:clickable="false"
-                    android:focusable="false">
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
 
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_pin"
-                        android:importantForAccessibility="no" />
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_pin" />
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="12dp">
+                        android:orientation="vertical">
 
                         <TextView
                             style="@style/Caption"
@@ -94,7 +95,6 @@
                             style="@style/BodyBold"
                             android:text="Chọn điểm đi" />
                     </LinearLayout>
-
                 </LinearLayout>
 
                 <View
@@ -106,21 +106,22 @@
                 <LinearLayout
                     android:id="@+id/post_end"
                     style="@style/Picker"
-                    android:clickable="false"
-                    android:focusable="false">
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
 
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_pin"
-                        android:importantForAccessibility="no" />
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_pin" />
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="12dp">
+                        android:orientation="vertical">
 
                         <TextView
                             style="@style/Caption"
@@ -131,7 +132,6 @@
                             style="@style/BodyBold"
                             android:text="Chọn điểm đến" />
                     </LinearLayout>
-
                 </LinearLayout>
 
                 <View
@@ -144,22 +144,22 @@
                 <LinearLayout
                     android:id="@+id/post_date"
                     style="@style/Picker"
-                    android:foreground="?attr/selectableItemBackground"
                     android:clickable="true"
-                    android:focusable="true">
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
 
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_calendar"
-                        android:importantForAccessibility="no" />
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_calendar" />
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="12dp">
+                        android:orientation="vertical">
 
                         <TextView
                             style="@style/Caption"
@@ -174,30 +174,30 @@
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_chevron"
-                        android:importantForAccessibility="no" />
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron" />
                 </LinearLayout>
 
                 <!-- Trường chọn giờ khởi hành -->
                 <LinearLayout
                     android:id="@+id/post_time"
                     style="@style/Picker"
-                    android:foreground="?attr/selectableItemBackground"
                     android:clickable="true"
-                    android:focusable="true">
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
 
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_clock"
-                        android:importantForAccessibility="no" />
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_clock" />
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="12dp">
+                        android:orientation="vertical">
 
                         <TextView
                             style="@style/Caption"
@@ -212,8 +212,8 @@
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_chevron"
-                        android:importantForAccessibility="no" />
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -240,11 +240,11 @@
                     style="@style/Input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:hint="Nhập số tiền"
+                    android:importantForAutofill="no"
                     android:inputType="number"
                     android:singleLine="true"
-                    android:hint="Nhập số tiền"
-                    android:text=""
-                    android:importantForAutofill="no" />
+                    android:text="" />
 
                 <CheckBox
                     android:id="@+id/post_free"
@@ -268,13 +268,12 @@
                     style="@style/Input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minHeight="100dp"
                     android:gravity="top|start"
-                    android:inputType="textCapSentences|textMultiLine"
                     android:hint="Nhập thông tin bổ sung cho chuyến đi"
-                    android:text=""
-                    android:importantForAutofill="no" />
-
+                    android:importantForAutofill="no"
+                    android:inputType="textCapSentences|textMultiLine"
+                    android:minHeight="100dp"
+                    android:text="" />
             </LinearLayout>
 
             <TextView
@@ -284,7 +283,6 @@
                 android:layout_marginHorizontal="4dp"
                 android:layout_marginTop="4dp"
                 android:text="Thông tin xe sẽ được lấy từ hồ sơ của chủ xe." />
-
         </LinearLayout>
     </ScrollView>
 
@@ -293,17 +291,15 @@
         android:id="@+id/action_area"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@color/background"
         android:orientation="vertical"
         android:paddingHorizontal="20dp"
         android:paddingTop="4dp"
-        android:paddingBottom="12dp"
-        android:background="@color/background">
+        android:paddingBottom="12dp">
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/primary_action"
             style="@style/ButtonPrimary"
-            android:text="Kiểm tra thông tin chuyến" />
-
+            android:text="Đăng chuyến" />
     </LinearLayout>
-
 </LinearLayout>
