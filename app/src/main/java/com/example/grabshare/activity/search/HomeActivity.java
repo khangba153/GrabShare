@@ -37,6 +37,8 @@ import org.osmdroid.views.overlay.Marker;
 import com.example.grabshare.activity.account.LoginActivity;
 import com.google.firebase.auth.FirebaseAuth;
 
+import com.example.grabshare.activity.passenger.MyTripsActivity;
+
 /**
  * Activity Nhập điều kiện tìm chuyến.
  */
@@ -219,14 +221,20 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
 
-        // Tabs Bottom Nav
-        findViewById(R.id.nav_trips).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Sẽ chuyển sang MyTrips của Thuận
-                Toast.makeText(HomeActivity.this, "Chuyển sang Chuyến của tôi", Toast.LENGTH_SHORT).show();
-            }
-        });
+        findViewById(R.id.nav_trips).setOnClickListener(
+                new View.OnClickListener() {
+
+                    /** Mở danh sách chuyến đi nhờ của tài khoản hiện tại. */
+                    @Override
+                    public void onClick(View view) {
+                        Intent intent = new Intent(
+                                HomeActivity.this,
+                                MyTripsActivity.class);
+
+                        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                        startActivity(intent);
+                    }
+                });
 
         findViewById(R.id.nav_account).setOnClickListener(new View.OnClickListener() {
             @Override

@@ -116,7 +116,15 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             navHome.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Intent intent = new Intent(MyTripsActivity.this, HomeActivity.class);
+                    // Quay về Home đang có để giữ form và tránh tạo màn trùng.
+                    Intent intent = new Intent(
+                            MyTripsActivity.this,
+                            HomeActivity.class);
+
+                    intent.addFlags(
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
                     startActivity(intent);
                     finish();
                 }
@@ -128,8 +136,11 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             navAccount.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Intent intent = new Intent(MyTripsActivity.this, LoginActivity.class);
-                    startActivity(intent);
+                    Toast.makeText(
+                            MyTripsActivity.this,
+                            "Màn Tài khoản đang được hoàn thiện.",
+                            Toast.LENGTH_SHORT
+                    ).show();
                 }
             });
         }
