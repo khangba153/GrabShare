@@ -30,6 +30,8 @@ import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.List;
 
+import com.example.grabshare.activity.account.AccountActivity;
+
 /**
  * Activity hiển thị danh sách tất cả chuyến đi nhờ của Hành khách (Tab MyTrips).
  */
@@ -136,11 +138,15 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             navAccount.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Toast.makeText(
+                    Intent intent = new Intent(
                             MyTripsActivity.this,
-                            "Màn Tài khoản đang được hoàn thiện.",
-                            Toast.LENGTH_SHORT
-                    ).show();
+                            AccountActivity.class);
+
+                    intent.addFlags(
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+                    startActivity(intent);
                 }
             });
         }

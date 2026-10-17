@@ -39,6 +39,8 @@ import com.google.firebase.auth.FirebaseAuth;
 
 import com.example.grabshare.activity.passenger.MyTripsActivity;
 
+import com.example.grabshare.activity.account.AccountActivity;
+
 /**
  * Activity Nhập điều kiện tìm chuyến.
  */
@@ -240,7 +242,11 @@ public class HomeActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 // Sẽ chuyển sang Account của Leader
-                Toast.makeText(HomeActivity.this, "Chuyển sang Tài khoản", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(
+                        HomeActivity.this,
+                        AccountActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
             }
         });
     }
