@@ -65,29 +65,26 @@ public class AcceptedActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_accepted);
 
+        initRepositories();
+        initViews();
+        setupListeners();
+
         // Đọc requestId từ Intent Extra theo NavigationKeys.REQUEST_ID
         if (getIntent() != null) {
             requestId = getIntent().getStringExtra(NavigationKeys.REQUEST_ID);
         }
 
-        if (requestId == null || requestId.trim().isEmpty()) {
-            Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
         // Kiểm tra phiên đăng nhập
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null || currentUser.getUid() == null || currentUser.getUid().trim().isEmpty()) {
-            Toast.makeText(this, "Vui lòng đăng nhập để xem thông tin.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
+        if (currentUser != null) {
+            currentUserId = currentUser.getUid();
         }
-        currentUserId = currentUser.getUid();
 
-        initRepositories();
-        initViews();
-        setupListeners();
+        if (requestId == null || requestId.trim().isEmpty()) {
+            Toast.makeText(this, "Thiếu request_id. Vui lòng nhập request_id trong công cụ bộ chọn.", Toast.LENGTH_LONG).show();
+            if (statusTitle != null) statusTitle.setText("Thiếu mã request_id");
+            if (statusDescription != null) statusDescription.setText("Nhập request_id từ Firestore trong công cụ bộ chọn để xem thông tin thật.");
+        }
     }
 
     private void initRepositories() {
@@ -184,6 +181,10 @@ public class AcceptedActivity extends AppCompatActivity {
     }
 
     private void startListeningRequest() {
+        if (requestId == null || requestId.trim().isEmpty()) {
+            return;
+        }
+
         if (singleRequestListener != null) {
             singleRequestListener.remove();
         }

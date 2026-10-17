@@ -2,17 +2,21 @@ package com.example.grabshare.repository.passenger;
 
 import com.example.grabshare.contract.FavoriteStore;
 import com.example.grabshare.contract.RepositoryCallback;
-import com.example.grabshare.model.Favorite;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.Transaction;
 
-import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Triển khai FavoriteStore quản lý danh sách chuyến đi yêu thích trên Firestore.
+ * Đảm bảo sử dụng serverTimestamp và giao dịch Firestore Transaction nguyên tử để chặn queue offline.
  */
 public class FavoriteRepository implements FavoriteStore {
 
@@ -67,7 +71,8 @@ public class FavoriteRepository implements FavoriteStore {
 
     /**
      * Thêm chuyến đi vào danh sách yêu thích của người dùng.
-     * Tạo document với ID = userId_tripId để đảm bảo idempotent.
+     * Sử dụng Transaction để yêu cầu kết nối server, dùng FieldValue.serverTimestamp() và chặn queue offline.
+     * Idempotent: Nếu đã tồn tại thì không reset createdAt của favorite đã có.
      * @param userId ID người dùng.
      * @param tripId ID chuyến đi.
      * @param callback Nhận kết quả Void trên UI Thread.
@@ -81,35 +86,43 @@ public class FavoriteRepository implements FavoriteStore {
             return;
         }
 
-        String favoriteDocId = userId + "_" + tripId;
-        Favorite favorite = new Favorite();
-        favorite.setUserId(userId);
-        favorite.setTripId(tripId);
-        favorite.setCreatedAt(new Timestamp(new Date()));
+        final String favoriteDocId = userId + "_" + tripId;
+        final DocumentReference favoriteRef = firestore.collection("favorites").document(favoriteDocId);
 
-        firestore.collection("favorites")
-                .document(favoriteDocId)
-                .set(favorite)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        if (callback != null) {
-                            callback.onSuccess(null);
-                        }
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(Exception e) {
-                        if (callback != null) {
-                            callback.onError(e);
-                        }
-                    }
-                });
+        firestore.runTransaction(new Transaction.Function<Void>() {
+            @Override
+            public Void apply(Transaction transaction) throws FirebaseFirestoreException {
+                DocumentSnapshot snapshot = transaction.get(favoriteRef);
+                // Nếu chưa tồn tại thì tạo mới với createdAt bằng FieldValue.serverTimestamp()
+                if (!snapshot.exists()) {
+                    Map<String, Object> favoriteData = new HashMap<>();
+                    favoriteData.put("userId", userId);
+                    favoriteData.put("tripId", tripId);
+                    favoriteData.put("createdAt", FieldValue.serverTimestamp());
+                    transaction.set(favoriteRef, favoriteData);
+                }
+                return null;
+            }
+        }).addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void unused) {
+                if (callback != null) {
+                    callback.onSuccess(null);
+                }
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(Exception e) {
+                if (callback != null) {
+                    callback.onError(e);
+                }
+            }
+        });
     }
 
     /**
      * Xóa chuyến đi khỏi danh sách yêu thích của người dùng.
+     * Sử dụng Transaction để yêu cầu kết nối server và chặn queue offline.
      * @param userId ID người dùng.
      * @param tripId ID chuyến đi.
      * @param callback Nhận kết quả Void trên UI Thread.
@@ -123,25 +136,32 @@ public class FavoriteRepository implements FavoriteStore {
             return;
         }
 
-        String favoriteDocId = userId + "_" + tripId;
-        firestore.collection("favorites")
-                .document(favoriteDocId)
-                .delete()
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        if (callback != null) {
-                            callback.onSuccess(null);
-                        }
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(Exception e) {
-                        if (callback != null) {
-                            callback.onError(e);
-                        }
-                    }
-                });
+        final String favoriteDocId = userId + "_" + tripId;
+        final DocumentReference favoriteRef = firestore.collection("favorites").document(favoriteDocId);
+
+        firestore.runTransaction(new Transaction.Function<Void>() {
+            @Override
+            public Void apply(Transaction transaction) throws FirebaseFirestoreException {
+                DocumentSnapshot snapshot = transaction.get(favoriteRef);
+                if (snapshot.exists()) {
+                    transaction.delete(favoriteRef);
+                }
+                return null;
+            }
+        }).addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void unused) {
+                if (callback != null) {
+                    callback.onSuccess(null);
+                }
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(Exception e) {
+                if (callback != null) {
+                    callback.onError(e);
+                }
+            }
+        });
     }
 }
