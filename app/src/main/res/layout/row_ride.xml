@@ -1,70 +1,115 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    style="@style/Card"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="12dp"
-    android:clickable="true"
-    android:focusable="true"
-    android:foreground="?attr/selectableItemBackground">
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="6dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp">
 
-    <include layout="@layout/view_driver" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <LinearLayout style="@style/Row">
-
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_clock" />
-
-        <TextView
-            android:id="@+id/ride_time"
-            style="@style/Body"
-            android:layout_width="0dp"
+        <!-- Driver Info (used by TripAdapter) -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="17:30" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
 
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_user" />
+            <ImageView
+                android:id="@+id/driver_avatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/avatar_1"
+                android:contentDescription="Driver Avatar" />
 
-        <TextView
-            android:id="@+id/ride_seats"
-            style="@style/Caption"
-            android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/driver_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#111827"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/driver_meta"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#6B7280"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/ride_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#2563EB"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Time & Seats Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="6dp"
-            android:text="1 chỗ" />
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
 
-        <TextView
-            android:id="@+id/ride_price"
-            style="@style/Badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_price"
-            android:text="15.000đ"
-            android:textColor="@color/ink" />
-    </LinearLayout>
+            <TextView
+                android:id="@+id/ride_time"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#374151"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
-    <LinearLayout style="@style/Row">
+            <TextView
+                android:id="@+id/ride_seats"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#6B7280"
+                android:textSize="13sp" />
+        </LinearLayout>
 
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_pin" />
-
+        <!-- Pickup & Destination -->
         <TextView
             android:id="@+id/ride_pickup"
-            style="@style/Caption"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Đón tại cổng công viên" />
+            android:textColor="#1F2937"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/ride_destination"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#1F2937"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Price -->
+        <TextView
+            android:id="@+id/ride_price"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#16A34A"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
     </LinearLayout>
-</LinearLayout>
+</androidx.cardview.widget.CardView>

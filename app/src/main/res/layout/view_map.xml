@@ -1,16 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="300dp"
-    android:layout_marginBottom="16dp"
-    android:background="@drawable/bg_lavender"
-    android:clipToOutline="true">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Card"
+    android:orientation="vertical">
 
-    <!-- Bản đồ thực tế dùng OSMDroid -->
-    <org.osmdroid.views.MapView
-        android:id="@+id/map_view"
+    <!-- Activity cập nhật hai nhãn bằng dữ liệu chuyến đọc từ Firestore. -->
+    <TextView
+        style="@style/Subtitle"
+        android:text="Điểm đi và điểm đến" />
+
+    <TextView
+        style="@style/Caption"
+        android:text="Điểm đi" />
+
+    <TextView
+        android:id="@+id/map_start_label"
+        style="@style/Body"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="Bản đồ tương tác" />
+        android:layout_height="wrap_content"
+        android:text="Chưa có thông tin điểm đi"
+        android:layout_marginBottom="12dp" />
 
-</FrameLayout>
+    <TextView
+        style="@style/Caption"
+        android:text="Điểm đến" />
+
+    <TextView
+        android:id="@+id/map_end_label"
+        style="@style/Body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Chưa có thông tin điểm đến" />
+
+</LinearLayout>
