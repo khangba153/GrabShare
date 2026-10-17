@@ -334,6 +334,7 @@ public class HomeActivity extends AppCompatActivity {
      * Cập nhật văn bản hiển thị cho ô chọn Điểm đi và Điểm đến trên UI.
      */
     private void updateUI() {
+        // LUÔN LUÔN xóa toàn bộ ghim và đường vẽ cũ đi trước khi bắt đầu vẽ lại
         mapView.getOverlays().clear();
         
         GeoPoint startPoint = null;
@@ -371,7 +372,7 @@ public class HomeActivity extends AppCompatActivity {
                     Math.min(startPoint.getLatitude(), endPoint.getLatitude()),
                     Math.min(startPoint.getLongitude(), endPoint.getLongitude())
             ), true);
-            
+
             fetchAndDrawRoute(startPoint, endPoint);
         } else if (startPoint != null) {
             mapView.getController().animateTo(startPoint);
@@ -391,12 +392,25 @@ public class HomeActivity extends AppCompatActivity {
             public void run() {
                 java.net.HttpURLConnection conn = null;
                 try {
-                    // Thêm tham số avoid=borders để hạn chế tối đa việc vượt biên giới quốc gia,
-                    // tránh thuật toán định tuyến tự động tìm đường tắt qua Lào/Campuchia cho các chuyến dài.
-                    String urlString = String.format(Locale.US,
-                            "https://api.geoapify.com/v1/routing?waypoints=%f,%f|%f,%f&mode=drive&avoid=borders&apiKey=3ae0ba5bcf8843df8024203662e3d702",
-                            start.getLatitude(), start.getLongitude(),
-                            end.getLatitude(), end.getLongitude());
+                    // Kiểm tra xem chuyến đi có xuyên Việt (Bắc - Nam vượt qua eo miền Trung) hay không
+                    // Vĩ độ của Đà Nẵng khoảng 16.0
+                    boolean isNorthToSouth = (start.getLatitude() > 17.5 && end.getLatitude() < 14.5) ||
+                                             (end.getLatitude() > 17.5 && start.getLatitude() < 14.5);
+
+                    String urlString;
+                    if (isNorthToSouth) {
+                        // Chèn thêm waypoint ở Quốc lộ 1A (Đà Nẵng: 16.0044, 108.2022) để ép đường đi ôm theo hình chữ S, né cắt Lào/Campuchia
+                        urlString = String.format(Locale.US,
+                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C16.0044,108.2022%%7C%f,%f&mode=drive&apiKey=3ae0ba5bcf8843df8024203662e3d702",
+                                start.getLatitude(), start.getLongitude(),
+                                end.getLatitude(), end.getLongitude());
+                    } else {
+                        // Các chuyến nội tỉnh hoặc khoảng cách gần thì giữ nguyên 2 điểm
+                        urlString = String.format(Locale.US,
+                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C%f,%f&mode=drive&apiKey=3ae0ba5bcf8843df8024203662e3d702",
+                                start.getLatitude(), start.getLongitude(),
+                                end.getLatitude(), end.getLongitude());
+                    }
 
                     java.net.URL url = new java.net.URL(urlString);
                     conn = (java.net.HttpURLConnection) url.openConnection();
@@ -419,24 +433,44 @@ public class HomeActivity extends AppCompatActivity {
                         if (features.length() > 0) {
                             org.json.JSONObject feature = features.getJSONObject(0);
                             org.json.JSONObject geometry = feature.getJSONObject("geometry");
-                            org.json.JSONArray coordinatesList = geometry.getJSONArray("coordinates");
+                            String geomType = geometry.optString("type", "");
                             
-                            // Geoapify trả về mảng tọa độ nằm trong 1 mảng nhỏ hơn (do là MultiLineString hoặc LineString tùy cấu trúc)
-                            org.json.JSONArray coordinates = coordinatesList.getJSONArray(0);
-
                             final java.util.List<GeoPoint> geoPoints = new java.util.ArrayList<>();
-                            for (int i = 0; i < coordinates.length(); i++) {
-                                org.json.JSONArray coord = coordinates.getJSONArray(i);
-                                // GeoJSON của Geoapify trả về [lon, lat]
-                                double lon = coord.getDouble(0);
-                                double lat = coord.getDouble(1);
-                                geoPoints.add(new GeoPoint(lat, lon));
+                            
+                            // Xử lý chuẩn cả 2 định dạng LineString và MultiLineString từ Geoapify
+                            if ("LineString".equalsIgnoreCase(geomType)) {
+                                org.json.JSONArray coords = geometry.getJSONArray("coordinates");
+                                for (int i = 0; i < coords.length(); i++) {
+                                    org.json.JSONArray pt = coords.getJSONArray(i);
+                                    double lon = pt.getDouble(0);
+                                    double lat = pt.getDouble(1);
+                                    geoPoints.add(new GeoPoint(lat, lon));
+                                }
+                            } else if ("MultiLineString".equalsIgnoreCase(geomType)) {
+                                org.json.JSONArray lines = geometry.getJSONArray("coordinates");
+                                for (int i = 0; i < lines.length(); i++) {
+                                    org.json.JSONArray segment = lines.getJSONArray(i);
+                                    for (int j = 0; j < segment.length(); j++) {
+                                        org.json.JSONArray pt = segment.getJSONArray(j);
+                                        double lon = pt.getDouble(0);
+                                        double lat = pt.getDouble(1);
+                                        geoPoints.add(new GeoPoint(lat, lon));
+                                    }
+                                }
                             }
 
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
                                     if (isFinishing() || isDestroyed()) return;
+                                    
+                                    // Chốt hạ: Duyệt một vòng xóa lại mọi đường Polyline ngầm bị delay mạng dội về trễ
+                                    for (int i = mapView.getOverlays().size() - 1; i >= 0; i--) {
+                                        if (mapView.getOverlays().get(i) instanceof org.osmdroid.views.overlay.Polyline) {
+                                            mapView.getOverlays().remove(i);
+                                        }
+                                    }
+
                                     org.osmdroid.views.overlay.Polyline line = new org.osmdroid.views.overlay.Polyline();
                                     line.setPoints(geoPoints);
                                     // Set màu xanh nét dày
@@ -444,13 +478,13 @@ public class HomeActivity extends AppCompatActivity {
                                     line.getOutlinePaint().setStrokeWidth(12f);
                                     // Chèn đường đi xuống dưới các Marker để không che ghim
                                     mapView.getOverlays().add(0, line); 
-                                    mapView.invalidate();
+                                    mapView.postInvalidate(); // Ép load lại ngay lập tức
                                 }
                             });
                         }
                     }
                 } catch (Exception e) {
-                    // Xử lý lỗi không log trực tiếp gây crash ứng dụng, im lặng bỏ qua việc vẽ nếu rớt mạng
+                    // Lỗi mạng hoặc JSON
                 } finally {
                     if (conn != null) {
                         conn.disconnect();
