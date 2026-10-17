@@ -352,6 +352,202 @@ public class DriverTripRepository {
                         }
                 );
     }
+    /**
+     * Đọc một chuyến từ máy chủ và chỉ cho mở màn hình sửa nếu người hiện tại
+     * là chủ chuyến, chuyến đang OPEN và chưa đến giờ khởi hành.
+     */
+    public void loadTripForEdit(
+            final String tripId,
+            final RepositoryCallback<Trip> callback
+    ) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        if (currentUser == null || currentUser.getUid().trim().isEmpty()) {
+            callback.onError(new IllegalStateException("Bạn cần đăng nhập để sửa chuyến."));
+            return;
+        }
+        if (tripId == null || tripId.trim().isEmpty()) {
+            callback.onError(new IllegalArgumentException("ID chuyến không hợp lệ."));
+            return;
+        }
+
+        final String currentDriverId = currentUser.getUid();
+        firestore.collection("trips")
+                .document(tripId)
+                .get(Source.SERVER)
+                .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
+                    @Override
+                    public void onSuccess(DocumentSnapshot snapshot) {
+                        if (!snapshot.exists()) {
+                            callback.onError(new IllegalStateException("Chuyến không tồn tại hoặc đã bị xóa."));
+                            return;
+                        }
+
+                        String ownerId = snapshot.getString("driverId");
+                        if (!currentDriverId.equals(ownerId)) {
+                            callback.onError(new IllegalStateException("Bạn không có quyền sửa chuyến của người khác."));
+                            return;
+                        }
+
+                        String status = snapshot.getString("status");
+                        if ("FULL".equals(status)) {
+                            callback.onError(new IllegalStateException("Chuyến đã FULL nên không thể sửa tuyến, giờ hoặc chi phí."));
+                            return;
+                        }
+                        if (!"OPEN".equals(status)) {
+                            callback.onError(new IllegalStateException("Chỉ chuyến OPEN mới được chỉnh sửa."));
+                            return;
+                        }
+
+                        Timestamp departureAt = snapshot.getTimestamp("departureAt");
+                        if (departureAt == null
+                                || departureAt.toDate().getTime() <= System.currentTimeMillis()) {
+                            callback.onError(new IllegalStateException("Chuyến đã quá giờ khởi hành, không thể chỉnh sửa."));
+                            return;
+                        }
+
+                        Trip trip;
+                        try {
+                            trip = snapshot.toObject(Trip.class);
+                        } catch (RuntimeException exception) {
+                            callback.onError(exception);
+                            return;
+                        }
+                        if (trip == null) {
+                            callback.onError(new IllegalStateException("Không thể đọc dữ liệu chuyến."));
+                            return;
+                        }
+                        trip.setId(snapshot.getId());
+                        callback.onSuccess(trip);
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        callback.onError(exception);
+                    }
+                });
+    }
+
+    /**
+     * Cập nhật đúng các trường được phép. Transaction đọc lại chuyến trước khi ghi,
+     * vì trạng thái có thể đổi từ OPEN sang FULL trong lúc người dùng đang sửa form.
+     */
+    public void updateTrip(
+            final String tripId,
+            final Place origin,
+            final Place destination,
+            final Timestamp departureAt,
+            final Long costVnd,
+            final String note,
+            final RepositoryCallback<Void> callback
+    ) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        if (currentUser == null || currentUser.getUid().trim().isEmpty()) {
+            callback.onError(new IllegalStateException("Bạn cần đăng nhập để sửa chuyến."));
+            return;
+        }
+        if (tripId == null || tripId.trim().isEmpty()) {
+            callback.onError(new IllegalArgumentException("ID chuyến không hợp lệ."));
+            return;
+        }
+        // Trong repository hiện tại, isValidPlace(...) trả true khi Place không hợp lệ.
+        if (isValidPlace(origin) || isValidPlace(destination)) {
+            callback.onError(new IllegalArgumentException(
+                    "Điểm đi và điểm đến phải được chọn từ danh sách địa điểm hợp lệ."
+            ));
+            return;
+        }
+        if (sameCoordinates(origin, destination)) {
+            callback.onError(new IllegalArgumentException(
+                    "Điểm đi và điểm đến không được trùng tọa độ."
+            ));
+            return;
+        }
+        if (departureAt == null
+                || departureAt.toDate().getTime() <= System.currentTimeMillis()) {
+            callback.onError(new IllegalArgumentException(
+                    "Ngày và giờ khởi hành phải ở trong tương lai."
+            ));
+            return;
+        }
+        if (costVnd == null || costVnd < 0L) {
+            callback.onError(new IllegalArgumentException(
+                    "Chi phí phải là số nguyên không âm."
+            ));
+            return;
+        }
+
+        final String currentDriverId = currentUser.getUid();
+        final String safeNote = note == null ? "" : note.trim();
+        final DocumentReference tripReference = firestore.collection("trips").document(tripId);
+
+        firestore.runTransaction(new Transaction.Function<Void>() {
+            @Override
+            public Void apply(@NonNull Transaction transaction)
+                    throws FirebaseFirestoreException {
+                DocumentSnapshot snapshot = transaction.get(tripReference);
+
+                if (!snapshot.exists()) {
+                    throw new FirebaseFirestoreException(
+                            "Chuyến không tồn tại hoặc đã bị xóa.",
+                            FirebaseFirestoreException.Code.NOT_FOUND
+                    );
+                }
+
+                String ownerId = snapshot.getString("driverId");
+                if (!currentDriverId.equals(ownerId)) {
+                    throw new FirebaseFirestoreException(
+                            "Bạn không có quyền sửa chuyến của người khác.",
+                            FirebaseFirestoreException.Code.PERMISSION_DENIED
+                    );
+                }
+
+                String status = snapshot.getString("status");
+                if ("FULL".equals(status)) {
+                    throw new FirebaseFirestoreException(
+                            "Chuyến đã FULL nên không thể sửa tuyến, giờ hoặc chi phí.",
+                            FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                    );
+                }
+                if (!"OPEN".equals(status)) {
+                    throw new FirebaseFirestoreException(
+                            "Chuyến không còn ở trạng thái OPEN nên không thể sửa.",
+                            FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                    );
+                }
+
+                Timestamp oldDepartureAt = snapshot.getTimestamp("departureAt");
+                if (oldDepartureAt == null
+                        || oldDepartureAt.toDate().getTime() <= System.currentTimeMillis()) {
+                    throw new FirebaseFirestoreException(
+                            "Chuyến đã quá giờ khởi hành, không thể chỉnh sửa.",
+                            FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                    );
+                }
+
+                // Không dùng set() với cả model Trip: chỉ ghi đúng 6 field trong hợp đồng task.
+                Map<String, Object> updates = new HashMap<>();
+                updates.put("origin", buildPlaceData(origin));
+                updates.put("destination", buildPlaceData(destination));
+                updates.put("departureAt", departureAt);
+                updates.put("costVnd", costVnd);
+                updates.put("note", safeNote);
+                updates.put("updatedAt", FieldValue.serverTimestamp());
+                transaction.update(tripReference, updates);
+                return null;
+            }
+        }).addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void ignored) {
+                callback.onSuccess(null);
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                callback.onError(exception);
+            }
+        });
+    }
 
     /**
      * Tạo map có đúng schema Place mà Firestore Rules yêu cầu.
