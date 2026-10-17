@@ -46,4 +46,5 @@ dependencies {
     implementation(libs.credentials)
     implementation(libs.credentials.google)
     implementation(libs.google.id)
+    implementation(libs.osmdroid.android)
 }

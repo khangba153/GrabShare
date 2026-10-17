@@ -10,6 +10,9 @@ import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
+import android.view.MotionEvent;
+import android.widget.ScrollView;
+
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -25,6 +28,12 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 
+import org.osmdroid.config.Configuration;
+import org.osmdroid.tileprovider.tilesource.XYTileSource;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.Marker;
+
 import com.example.grabshare.activity.account.LoginActivity;
 import com.google.firebase.auth.FirebaseAuth;
 
@@ -37,8 +46,8 @@ public class HomeActivity extends AppCompatActivity {
     private TextView tvDestinationValue;
     private TextView tvDateValue;
     private TextView tvTimeValue;
-    private TextView mapStartLabel;
-    private TextView mapEndLabel;
+    private MapView mapView;
+    private ScrollView mainScrollView;
 
     private Place origin;
     private Place destination;
@@ -79,8 +88,49 @@ public class HomeActivity extends AppCompatActivity {
         tvDateValue = findViewById(R.id.pick_date_value);
         tvTimeValue = findViewById(R.id.pick_time_value);
         
-        mapStartLabel = findViewById(R.id.map_start_label);
-        mapEndLabel = findViewById(R.id.map_end_label);
+        mapView = findViewById(R.id.map_view);
+        mainScrollView = findViewById(R.id.main_scroll_view);
+
+        // Khởi tạo osmdroid map (Cấu hình User-Agent để đáp ứng chính sách)
+        android.content.SharedPreferences prefs = android.preference.PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        Configuration.getInstance().load(getApplicationContext(), prefs);
+        Configuration.getInstance().setUserAgentValue(getPackageName());
+
+        // Sử dụng Geoapify OSM-Carto thay cho MAPNIK mặc định của OSM để không bị lỗi Access Blocked
+        mapView.setTileSource(new XYTileSource(
+                "Geoapify-OSMCarto",
+                0, 20, 256, ".png",
+                new String[]{"https://maps.geoapify.com/v1/tile/osm-carto/"}
+        ) {
+            @Override
+            public String getTileURLString(long pMapTileIndex) {
+                return getBaseUrl() + org.osmdroid.util.MapTileIndex.getZoom(pMapTileIndex) + "/"
+                        + org.osmdroid.util.MapTileIndex.getX(pMapTileIndex) + "/"
+                        + org.osmdroid.util.MapTileIndex.getY(pMapTileIndex) + ".png?apiKey=3bd4e00744474c3890053d1bc896e77b";
+            }
+        });
+        mapView.setMultiTouchControls(true);
+        // Map center mặc định (Ví dụ: TP.HCM)
+        mapView.getController().setZoom(13.0);
+        mapView.getController().setCenter(new GeoPoint(10.762622, 106.660172));
+        
+        // Ngăn chặn ScrollView cha cướp sự kiện chạm khi người dùng đang vuốt bản đồ
+        mapView.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                    case MotionEvent.ACTION_MOVE:
+                        mainScrollView.requestDisallowInterceptTouchEvent(true);
+                        break;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        mainScrollView.requestDisallowInterceptTouchEvent(false);
+                        break;
+                }
+                return false;
+            }
+        });
 
         searchTime = Calendar.getInstance();
 
@@ -284,23 +334,164 @@ public class HomeActivity extends AppCompatActivity {
      * Cập nhật văn bản hiển thị cho ô chọn Điểm đi và Điểm đến trên UI.
      */
     private void updateUI() {
+        // LUÔN LUÔN xóa toàn bộ ghim và đường vẽ cũ đi trước khi bắt đầu vẽ lại
+        mapView.getOverlays().clear();
+        
+        GeoPoint startPoint = null;
+        GeoPoint endPoint = null;
+
         if (origin != null) {
             tvOriginValue.setText(origin.getName());
-            mapStartLabel.setText(origin.getName());
-            mapStartLabel.setVisibility(View.VISIBLE);
+            
+            startPoint = new GeoPoint(origin.getLatitude(), origin.getLongitude());
+            Marker startMarker = new Marker(mapView);
+            startMarker.setPosition(startPoint);
+            startMarker.setTitle(origin.getName());
+            mapView.getOverlays().add(startMarker);
         } else {
             tvOriginValue.setText("Chọn điểm đi");
-            mapStartLabel.setVisibility(View.INVISIBLE);
         }
 
         if (destination != null) {
             tvDestinationValue.setText(destination.getName());
-            mapEndLabel.setText(destination.getName());
-            mapEndLabel.setVisibility(View.VISIBLE);
+            
+            endPoint = new GeoPoint(destination.getLatitude(), destination.getLongitude());
+            Marker endMarker = new Marker(mapView);
+            endMarker.setPosition(endPoint);
+            endMarker.setTitle(destination.getName());
+            mapView.getOverlays().add(endMarker);
         } else {
             tvDestinationValue.setText("Chọn điểm đến");
-            mapEndLabel.setVisibility(View.INVISIBLE);
         }
+        
+        if (startPoint != null && endPoint != null) {
+            // Zoom để thấy cả 2 điểm
+            mapView.zoomToBoundingBox(new org.osmdroid.util.BoundingBox(
+                    Math.max(startPoint.getLatitude(), endPoint.getLatitude()),
+                    Math.max(startPoint.getLongitude(), endPoint.getLongitude()),
+                    Math.min(startPoint.getLatitude(), endPoint.getLatitude()),
+                    Math.min(startPoint.getLongitude(), endPoint.getLongitude())
+            ), true);
+
+            fetchAndDrawRoute(startPoint, endPoint);
+        } else if (startPoint != null) {
+            mapView.getController().animateTo(startPoint);
+        } else if (endPoint != null) {
+            mapView.getController().animateTo(endPoint);
+        }
+        
+        mapView.invalidate();
+    }
+
+    /**
+     * Gọi Geoapify Routing API để lấy dữ liệu tuyến đường (GeoJSON) và vẽ Polyline trên bản đồ.
+     */
+    private void fetchAndDrawRoute(final GeoPoint start, final GeoPoint end) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                java.net.HttpURLConnection conn = null;
+                try {
+                    // Kiểm tra xem chuyến đi có xuyên Việt (Bắc - Nam vượt qua eo miền Trung) hay không
+                    // Vĩ độ của Đà Nẵng khoảng 16.0
+                    boolean isNorthToSouth = (start.getLatitude() > 17.5 && end.getLatitude() < 14.5) ||
+                                             (end.getLatitude() > 17.5 && start.getLatitude() < 14.5);
+
+                    String urlString;
+                    if (isNorthToSouth) {
+                        // Chèn thêm waypoint ở Quốc lộ 1A (Đà Nẵng: 16.0044, 108.2022) để ép đường đi ôm theo hình chữ S, né cắt Lào/Campuchia
+                        urlString = String.format(Locale.US,
+                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C16.0044,108.2022%%7C%f,%f&mode=drive&apiKey=3ae0ba5bcf8843df8024203662e3d702",
+                                start.getLatitude(), start.getLongitude(),
+                                end.getLatitude(), end.getLongitude());
+                    } else {
+                        // Các chuyến nội tỉnh hoặc khoảng cách gần thì giữ nguyên 2 điểm
+                        urlString = String.format(Locale.US,
+                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C%f,%f&mode=drive&apiKey=3ae0ba5bcf8843df8024203662e3d702",
+                                start.getLatitude(), start.getLongitude(),
+                                end.getLatitude(), end.getLongitude());
+                    }
+
+                    java.net.URL url = new java.net.URL(urlString);
+                    conn = (java.net.HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setConnectTimeout(10000);
+                    conn.setReadTimeout(10000);
+
+                    if (conn.getResponseCode() == java.net.HttpURLConnection.HTTP_OK) {
+                        java.io.BufferedReader reader = new java.io.BufferedReader(
+                                new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            sb.append(line);
+                        }
+                        reader.close();
+
+                        org.json.JSONObject jsonResponse = new org.json.JSONObject(sb.toString());
+                        org.json.JSONArray features = jsonResponse.getJSONArray("features");
+                        if (features.length() > 0) {
+                            org.json.JSONObject feature = features.getJSONObject(0);
+                            org.json.JSONObject geometry = feature.getJSONObject("geometry");
+                            String geomType = geometry.optString("type", "");
+                            
+                            final java.util.List<GeoPoint> geoPoints = new java.util.ArrayList<>();
+                            
+                            // Xử lý chuẩn cả 2 định dạng LineString và MultiLineString từ Geoapify
+                            if ("LineString".equalsIgnoreCase(geomType)) {
+                                org.json.JSONArray coords = geometry.getJSONArray("coordinates");
+                                for (int i = 0; i < coords.length(); i++) {
+                                    org.json.JSONArray pt = coords.getJSONArray(i);
+                                    double lon = pt.getDouble(0);
+                                    double lat = pt.getDouble(1);
+                                    geoPoints.add(new GeoPoint(lat, lon));
+                                }
+                            } else if ("MultiLineString".equalsIgnoreCase(geomType)) {
+                                org.json.JSONArray lines = geometry.getJSONArray("coordinates");
+                                for (int i = 0; i < lines.length(); i++) {
+                                    org.json.JSONArray segment = lines.getJSONArray(i);
+                                    for (int j = 0; j < segment.length(); j++) {
+                                        org.json.JSONArray pt = segment.getJSONArray(j);
+                                        double lon = pt.getDouble(0);
+                                        double lat = pt.getDouble(1);
+                                        geoPoints.add(new GeoPoint(lat, lon));
+                                    }
+                                }
+                            }
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (isFinishing() || isDestroyed()) return;
+                                    
+                                    // Chốt hạ: Duyệt một vòng xóa lại mọi đường Polyline ngầm bị delay mạng dội về trễ
+                                    for (int i = mapView.getOverlays().size() - 1; i >= 0; i--) {
+                                        if (mapView.getOverlays().get(i) instanceof org.osmdroid.views.overlay.Polyline) {
+                                            mapView.getOverlays().remove(i);
+                                        }
+                                    }
+
+                                    org.osmdroid.views.overlay.Polyline line = new org.osmdroid.views.overlay.Polyline();
+                                    line.setPoints(geoPoints);
+                                    // Set màu xanh nét dày
+                                    line.getOutlinePaint().setColor(android.graphics.Color.parseColor("#4A80F5")); 
+                                    line.getOutlinePaint().setStrokeWidth(12f);
+                                    // Chèn đường đi xuống dưới các Marker để không che ghim
+                                    mapView.getOverlays().add(0, line); 
+                                    mapView.postInvalidate(); // Ép load lại ngay lập tức
+                                }
+                            });
+                        }
+                    }
+                } catch (Exception e) {
+                    // Lỗi mạng hoặc JSON
+                } finally {
+                    if (conn != null) {
+                        conn.disconnect();
+                    }
+                }
+            }
+        }).start();
     }
 
     /**
@@ -332,6 +523,24 @@ public class HomeActivity extends AppCompatActivity {
             outState.putDouble("dest_lat", destination.getLatitude() != null ? destination.getLatitude() : 0.0);
             outState.putDouble("dest_lng", destination.getLongitude() != null ? destination.getLongitude() : 0.0);
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mapView.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mapView.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mapView.onDetach();
     }
 
     /**
