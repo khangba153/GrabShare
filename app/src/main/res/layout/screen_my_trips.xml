@@ -19,7 +19,8 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_my_trips"
@@ -70,4 +71,90 @@
         </LinearLayout>
 
     </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/white"
+        android:elevation="6dp">
+
+        <LinearLayout
+            android:id="@+id/nav_home"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_pin"
+                android:tint="@color/muted"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                style="@style/Caption"
+                android:text="Tìm chuyến"
+                android:textColor="@color/muted"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nav_trips"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:importantForAccessibility="yes"
+            android:contentDescription="Chuyến của tôi, đang chọn">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_calendar"
+                android:tint="@color/primary"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                style="@style/Caption"
+                android:text="Chuyến của tôi"
+                android:textColor="@color/primary"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nav_account"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_user"
+                android:tint="@color/muted"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                style="@style/Caption"
+                android:text="Tài khoản"
+                android:textColor="@color/muted"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>
