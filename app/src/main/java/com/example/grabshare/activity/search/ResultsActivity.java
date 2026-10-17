@@ -20,6 +20,8 @@ import com.example.grabshare.model.Place;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.repository.search.TripSearchRepository;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -178,6 +180,13 @@ public class ResultsActivity extends AppCompatActivity {
      * Thực hiện truy vấn và lọc dữ liệu
      */
     private void executeSearch() {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(this, "Vui lòng đăng nhập để tìm chuyến!", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         statusText.setVisibility(View.VISIBLE);
         statusText.setText("Đang tìm kiếm chuyến xe...");
         rideList.setVisibility(View.GONE);
@@ -201,8 +210,12 @@ public class ResultsActivity extends AppCompatActivity {
      * Lọc chuyến xe theo khoảng cách và loại bỏ chuyến của chính mình
      */
     private void filterTrips(List<Trip> trips) {
-        // Giả lập lấy UID hiện tại (Vì Leader giữ Auth, tạm dùng biến rỗng, sau này đổi thành Auth.getCurrentUser().getUid())
-        String currentUid = ""; // Tạm để trống chờ ghép Auth
+        // Fix: Lấy FirebaseAuth.currentUser thật; dùng UID thật khi loại chuyến chính mình
+        String currentUid = "";
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            currentUid = currentUser.getUid();
+        }
 
         final List<Trip> validTrips = new ArrayList<>();
         
