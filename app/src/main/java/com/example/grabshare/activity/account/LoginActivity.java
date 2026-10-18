@@ -74,6 +74,23 @@ public class LoginActivity extends AppCompatActivity {
 
         registerButton = findViewById(R.id.go_register);
 
+        findViewById(R.id.forgot_password).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        if (submitting) {
+                            return;
+                        }
+
+                        passwordInput.setText("");
+
+                        Intent intent = new Intent(
+                                LoginActivity.this,
+                                ResetPasswordActivity.class);
+                        startActivity(intent);
+                    }
+                });
+
         registerButton.setOnClickListener(new View.OnClickListener() {
             /** Mở đăng ký mới hoặc bổ sung hồ sơ cho phiên hiện tại. */
             @Override
@@ -188,6 +205,7 @@ public class LoginActivity extends AppCompatActivity {
         loginButton.setEnabled(!value);
         googleButton.setEnabled(!value);
         registerButton.setEnabled(!value);
+        findViewById(R.id.forgot_password).setEnabled(!value);
         loginButton.setText(value ? "Đang đăng nhập..." : "Đăng nhập");
     }
 

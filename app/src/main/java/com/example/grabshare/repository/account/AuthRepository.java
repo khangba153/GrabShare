@@ -156,4 +156,38 @@ public class AuthRepository {
     public void signOut() {
         auth.signOut();
     }
+
+    /** Gửi email khôi phục mật khẩu qua Firebase Authentication. */
+    public void sendPasswordResetEmail(
+            String email,
+            final RepositoryCallback<Void> callback) {
+
+        if (email == null
+                || !android.util.Patterns.EMAIL_ADDRESS
+                .matcher(email.trim()).matches()) {
+            callback.onError(new IllegalArgumentException(
+                    "Vui lòng nhập email hợp lệ."));
+            return;
+        }
+
+        auth.sendPasswordResetEmail(email.trim())
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if (task.isSuccessful()) {
+                            callback.onSuccess(null);
+                            return;
+                        }
+
+                        Exception error = task.getException();
+
+                        if (error == null) {
+                            error = new IllegalStateException(
+                                    "Không gửi được yêu cầu khôi phục mật khẩu.");
+                        }
+
+                        callback.onError(error);
+                    }
+                });
+    }
 }
