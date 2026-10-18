@@ -15,7 +15,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
-
+import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Place;
@@ -78,20 +78,20 @@ public class PendingActivity extends AppCompatActivity {
             requestId = getIntent().getStringExtra(NavigationKeys.REQUEST_ID);
         }
 
-        if (requestId == null || requestId.trim().isEmpty()) {
-            Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        // Kiểm tra phiên đăng nhập
+        // Kiểm tra Auth trước khi thực hiện bất kỳ thao tác hay khởi tạo listener nào
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null || currentUser.getUid() == null || currentUser.getUid().trim().isEmpty()) {
+        if (currentUser == null || currentUser.getUid().trim().isEmpty()) {
             Toast.makeText(this, "Vui lòng đăng nhập để xem thông tin.", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
         currentUserId = currentUser.getUid();
+
+        if (requestId == null || requestId.trim().isEmpty()) {
+            Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
 
         initRepositories();
         initViews();
@@ -112,7 +112,6 @@ public class PendingActivity extends AppCompatActivity {
         primaryAction = findViewById(R.id.primary_action);
         secondaryAction = findViewById(R.id.secondary_action);
 
-        // Đảm bảo nút phản hồi tương tác
         if (headerBack != null) {
             headerBack.setClickable(true);
             headerBack.setFocusable(true);
@@ -172,7 +171,6 @@ public class PendingActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // Hủy listener đúng vòng đời Android để tránh nhân listener khi xoay màn hình (Checklist 3)
         if (singleRequestListener != null) {
             singleRequestListener.remove();
             singleRequestListener = null;
@@ -180,6 +178,10 @@ public class PendingActivity extends AppCompatActivity {
     }
 
     private void startListeningRequest() {
+        if (requestId == null || requestId.trim().isEmpty()) {
+            return;
+        }
+
         if (singleRequestListener != null) {
             singleRequestListener.remove();
         }
@@ -195,7 +197,7 @@ public class PendingActivity extends AppCompatActivity {
 
                 TripRequest request = details.getRequest();
 
-                // Kiểm tra quyền truy cập: không rò dữ liệu request của người khác (Checklist 2)
+                // Kiểm tra quyền truy cập chính chủ
                 if (!currentUserId.equals(request.getPassengerId())) {
                     Toast.makeText(PendingActivity.this, "Bạn không có quyền truy cập yêu cầu này.", Toast.LENGTH_SHORT).show();
                     finish();
@@ -203,46 +205,50 @@ public class PendingActivity extends AppCompatActivity {
                 }
 
                 Trip trip = details.getTrip();
-                String requestStatus = request.getStatus();
-                String tripStatus = (trip != null) ? trip.getStatus() : "";
+                String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
 
                 // Ưu tiên kiểm tra chuyến đi đã bị hủy bởi chủ xe
-                if ("CANCELLED".equalsIgnoreCase(tripStatus)) {
+                if ("CANCELLED".equalsIgnoreCase(effectiveStatus)) {
                     if (statusTitle != null) statusTitle.setText("Chuyến đi đã bị hủy");
-                    if (statusDescription != null) statusDescription.setText("Chủ xe đã hủy chuyến đi này.");
+                    if (statusDescription != null) statusDescription.setText("Chủ xe hoặc bạn đã hủy chuyến đi này.");
                     if (primaryAction != null) primaryAction.setEnabled(false);
                     bindDetailsToViews(details);
                     return;
                 }
 
-                // Xử lý chuyển đổi trạng thái khi chủ xe chấp nhận / từ chối (Checklist 1 & 4)
-                if ("ACCEPTED".equalsIgnoreCase(requestStatus)) {
+                // Chuyển đổi trạng thái khi chủ xe chấp nhận / từ chối
+                if ("ACCEPTED".equalsIgnoreCase(effectiveStatus)) {
                     if (!hasNavigated) {
                         hasNavigated = true;
                         Toast.makeText(PendingActivity.this, "Chủ xe đã chấp nhận yêu cầu của bạn!", Toast.LENGTH_SHORT).show();
                         Intent intent = new Intent(PendingActivity.this, AcceptedActivity.class);
                         intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
                         startActivity(intent);
-                        finish(); // Back không lặp PendingActivity trên back stack (Checklist 5)
+                        finish();
                     }
                     return;
-                } else if ("REJECTED".equalsIgnoreCase(requestStatus)) {
+                } else if ("REJECTED".equalsIgnoreCase(effectiveStatus)) {
                     if (!hasNavigated) {
                         hasNavigated = true;
                         Toast.makeText(PendingActivity.this, "Chủ xe đã từ chối yêu cầu.", Toast.LENGTH_SHORT).show();
                         Intent intent = new Intent(PendingActivity.this, RejectedActivity.class);
                         intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
                         startActivity(intent);
-                        finish(); // Back không lặp PendingActivity trên back stack (Checklist 5)
+                        finish();
                     }
                     return;
-                } else if ("CANCELLED".equalsIgnoreCase(requestStatus)) {
-                    Toast.makeText(PendingActivity.this, "Yêu cầu đi nhờ đã bị hủy.", Toast.LENGTH_SHORT).show();
-                    finish();
+                } else if ("COMPLETED".equalsIgnoreCase(effectiveStatus)) {
+                    if (!hasNavigated) {
+                        hasNavigated = true;
+                        Intent intent = new Intent(PendingActivity.this, UpcomingActivity.class);
+                        intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                        startActivity(intent);
+                        finish();
+                    }
                     return;
                 }
 
-                // Nếu vẫn ở PENDING, cập nhật dữ liệu hiển thị trên giao diện hiện tại
+                // Nếu vẫn ở PENDING, cập nhật dữ liệu hiển thị
                 bindDetailsToViews(details);
             }
 
@@ -263,15 +269,17 @@ public class PendingActivity extends AppCompatActivity {
 
         if (profile != null) {
             if (driverName != null) {
-                driverName.setText(profile.getDisplayName() != null ? profile.getDisplayName() : "Chủ xe");
+                driverName.setText(profile.getDisplayName() != null && !profile.getDisplayName().trim().isEmpty()
+                        ? profile.getDisplayName().trim() : "Chủ xe");
             }
             if (driverMeta != null) {
-                String vehicle = (profile.getVehicleName() != null && !profile.getVehicleName().isEmpty()) ? profile.getVehicleName() : "Xe máy";
-                driverMeta.setText("★ 5.0 · " + vehicle);
+                String vehicle = (profile.getVehicleName() != null && !profile.getVehicleName().trim().isEmpty())
+                        ? profile.getVehicleName().trim() : "Xe máy";
+                driverMeta.setText(vehicle);
             }
         } else {
             if (driverName != null) driverName.setText("Chủ xe");
-            if (driverMeta != null) driverMeta.setText("★ 5.0 · Xe máy");
+            if (driverMeta != null) driverMeta.setText("Xe máy");
         }
 
         if (trip != null) {

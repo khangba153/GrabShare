@@ -11,6 +11,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Place;
@@ -59,32 +60,36 @@ public class AcceptedActivity extends AppCompatActivity {
 
     private String requestId;
     private String currentUserId;
+    private boolean hasNavigated = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_accepted);
 
-        initRepositories();
-        initViews();
-        setupListeners();
-
         // Đọc requestId từ Intent Extra theo NavigationKeys.REQUEST_ID
         if (getIntent() != null) {
             requestId = getIntent().getStringExtra(NavigationKeys.REQUEST_ID);
         }
 
-        // Kiểm tra phiên đăng nhập
+        // Kiểm tra Auth trước khi thực hiện bất kỳ thao tác hay khởi tạo listener nào
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser != null) {
-            currentUserId = currentUser.getUid();
+        if (currentUser == null || currentUser.getUid() == null || currentUser.getUid().trim().isEmpty()) {
+            Toast.makeText(this, "Vui lòng đăng nhập để xem thông tin.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
         }
+        currentUserId = currentUser.getUid();
 
         if (requestId == null || requestId.trim().isEmpty()) {
-            Toast.makeText(this, "Thiếu request_id. Vui lòng nhập request_id trong công cụ bộ chọn.", Toast.LENGTH_LONG).show();
-            if (statusTitle != null) statusTitle.setText("Thiếu mã request_id");
-            if (statusDescription != null) statusDescription.setText("Nhập request_id từ Firestore trong công cụ bộ chọn để xem thông tin thật.");
+            Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
         }
+
+        initRepositories();
+        initViews();
+        setupListeners();
     }
 
     private void initRepositories() {
@@ -173,7 +178,6 @@ public class AcceptedActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // Hủy listener đúng vòng đời Android (Checklist 3)
         if (singleRequestListener != null) {
             singleRequestListener.remove();
             singleRequestListener = null;
@@ -200,7 +204,7 @@ public class AcceptedActivity extends AppCompatActivity {
 
                 TripRequest request = details.getRequest();
 
-                // Kiểm tra quyền truy cập: không rò dữ liệu request của người khác (Checklist 2)
+                // Kiểm tra quyền truy cập chính chủ
                 if (!currentUserId.equals(request.getPassengerId())) {
                     Toast.makeText(AcceptedActivity.this, "Bạn không có quyền truy cập yêu cầu này.", Toast.LENGTH_SHORT).show();
                     finish();
@@ -208,15 +212,53 @@ public class AcceptedActivity extends AppCompatActivity {
                 }
 
                 Trip trip = details.getTrip();
-                String tripStatus = (trip != null) ? trip.getStatus() : "";
+                String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
 
-                if ("CANCELLED".equalsIgnoreCase(tripStatus)) {
+                // State resolver chuyển hướng điều hướng chính xác
+                if ("PENDING".equalsIgnoreCase(effectiveStatus)) {
+                    if (!hasNavigated) {
+                        hasNavigated = true;
+                        Intent intent = new Intent(AcceptedActivity.this, PendingActivity.class);
+                        intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                        startActivity(intent);
+                        finish();
+                    }
+                    return;
+                } else if ("REJECTED".equalsIgnoreCase(effectiveStatus)) {
+                    if (!hasNavigated) {
+                        hasNavigated = true;
+                        Intent intent = new Intent(AcceptedActivity.this, RejectedActivity.class);
+                        intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                        startActivity(intent);
+                        finish();
+                    }
+                    return;
+                } else if ("COMPLETED".equalsIgnoreCase(effectiveStatus)) {
+                    if (!hasNavigated) {
+                        hasNavigated = true;
+                        Intent intent = new Intent(AcceptedActivity.this, UpcomingActivity.class);
+                        intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                        startActivity(intent);
+                        finish();
+                    }
+                    return;
+                } else if ("CANCELLED".equalsIgnoreCase(effectiveStatus)) {
                     if (statusTitle != null) statusTitle.setText("Chuyến đi đã bị hủy");
-                    if (statusDescription != null) statusDescription.setText("Chủ xe đã hủy chuyến đi này.");
+                    if (statusDescription != null) statusDescription.setText("Chuyến đi hoặc yêu cầu này đã bị hủy.");
+                    if (primaryAction != null) {
+                        primaryAction.setText("Quay về Chuyến của tôi");
+                        primaryAction.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                finish();
+                            }
+                        });
+                    }
                     bindDetailsToViews(details);
                     return;
                 }
 
+                // Nếu đúng trạng thái ACCEPTED
                 bindDetailsToViews(details);
             }
 
@@ -237,22 +279,24 @@ public class AcceptedActivity extends AppCompatActivity {
 
         if (profile != null) {
             if (driverName != null) {
-                driverName.setText(profile.getDisplayName() != null ? profile.getDisplayName() : "Chủ xe");
+                driverName.setText(profile.getDisplayName() != null && !profile.getDisplayName().trim().isEmpty()
+                        ? profile.getDisplayName().trim() : "Chủ xe");
             }
             if (driverMeta != null) {
-                String vehicle = (profile.getVehicleName() != null && !profile.getVehicleName().isEmpty()) ? profile.getVehicleName() : "Xe máy";
-                driverMeta.setText("★ 5.0 · " + vehicle);
+                String vehicle = (profile.getVehicleName() != null && !profile.getVehicleName().trim().isEmpty())
+                        ? profile.getVehicleName().trim() : "Xe máy";
+                driverMeta.setText(vehicle);
             }
         } else {
             if (driverName != null) driverName.setText("Chủ xe");
-            if (driverMeta != null) driverMeta.setText("★ 5.0 · Xe máy");
+            if (driverMeta != null) driverMeta.setText("Xe máy");
         }
 
         if (trip != null) {
             if (tripTime != null && trip.getDepartureAt() != null) {
                 String formattedTime = formatTimestamp(trip.getDepartureAt());
                 tripTime.setText(formattedTime);
-                if (statusDescription != null) {
+                if (statusDescription != null && !"CANCELLED".equalsIgnoreCase(trip.getStatus())) {
                     statusDescription.setText("Hẹn bạn tại điểm đón lúc " + formatTimeOnly(trip.getDepartureAt()) + ".");
                 }
             }

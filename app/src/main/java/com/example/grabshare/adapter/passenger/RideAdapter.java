@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
+import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.model.TripRequest;
 import com.example.grabshare.repository.passenger.PassengerTripsRepository.PassengerRideItem;
@@ -65,6 +66,9 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
 
     public static class RideViewHolder extends RecyclerView.ViewHolder {
 
+        private final TextView tvDriverName;
+        private final TextView tvDriverMeta;
+        private final TextView tvRideSeats;
         private final TextView tvPickup;
         private final TextView tvDestination;
         private final TextView tvDepartureTime;
@@ -73,6 +77,9 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
 
         public RideViewHolder(@NonNull View itemView) {
             super(itemView);
+            tvDriverName = itemView.findViewById(R.id.driver_name);
+            tvDriverMeta = itemView.findViewById(R.id.driver_meta);
+            tvRideSeats = itemView.findViewById(R.id.ride_seats);
             tvPickup = itemView.findViewById(R.id.ride_pickup);
             tvDestination = itemView.findViewById(R.id.ride_destination);
             tvDepartureTime = itemView.findViewById(R.id.ride_time);
@@ -83,8 +90,12 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
         public void bind(final PassengerRideItem item, final OnRideClickListener listener) {
             TripRequest request = item.getRequest();
             Trip trip = item.getTrip();
+            PublicProfile profile = item.getDriverProfile();
 
             if (trip == null) {
+                if (tvDriverName != null) tvDriverName.setText("Chưa rõ chủ xe");
+                if (tvDriverMeta != null) tvDriverMeta.setText("");
+                if (tvRideSeats != null) tvRideSeats.setText("");
                 if (tvPickup != null) tvPickup.setText("Điểm đi: Không xác định");
                 if (tvDestination != null) tvDestination.setText("Điểm đến: Không xác định");
                 if (tvDepartureTime != null) tvDepartureTime.setText("Thời gian: --/--");
@@ -96,6 +107,32 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
             }
 
             itemView.setAlpha(1.0f);
+
+            // Bind thông tin chủ xe công khai
+            if (tvDriverName != null) {
+                if (profile != null && profile.getDisplayName() != null && !profile.getDisplayName().trim().isEmpty()) {
+                    tvDriverName.setText(profile.getDisplayName().trim());
+                } else {
+                    tvDriverName.setText("Chủ xe");
+                }
+            }
+
+            if (tvDriverMeta != null) {
+                if (profile != null && profile.getVehicleName() != null && !profile.getVehicleName().trim().isEmpty()) {
+                    tvDriverMeta.setText(profile.getVehicleName().trim());
+                } else {
+                    tvDriverMeta.setText("Xe máy");
+                }
+            }
+
+            // Bind số chỗ trống
+            if (tvRideSeats != null) {
+                if (trip.getAvailableSeats() != null) {
+                    tvRideSeats.setText(trip.getAvailableSeats() + " chỗ trống");
+                } else {
+                    tvRideSeats.setText("");
+                }
+            }
 
             if (tvPickup != null) {
                 tvPickup.setText(trip.getOrigin() != null ? "Điểm đi: " + trip.getOrigin().getName() : "Điểm đi chưa rõ");

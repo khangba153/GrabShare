@@ -105,7 +105,7 @@ public class FavoritesActivity extends AppCompatActivity {
             navAccount.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Intent intent = new Intent(FavoritesActivity.this, LoginActivity.class);
+                    Intent intent = new Intent(FavoritesActivity.this, com.example.grabshare.activity.account.AccountActivity.class);
                     startActivity(intent);
                 }
             });
