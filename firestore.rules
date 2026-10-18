@@ -1,244 +1,388 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Rules dùng chung: đọc dữ liệu theo quyền và tạo chuyến hợp lệ.
-    function signedIn() {
-      return request.auth != null;
+    // Ban du thao day du theo DATA_CONTRACT.md. Chi Publish sau Emulator.
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function id(value) {
+      return value is string && value.size() > 0 && value.matches('[^/]+');
+    }
+    function text(value, maximum) {
+      return value is string && value.size() <= maximum;
+    }
+    function nonblank(value, maximum) {
+      return text(value, maximum) && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
+    }
+    function exact(data, fields) {
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields);
+    }
+    function place(value) {
+      return value is map
+        && exact(value, ['name', 'latitude', 'longitude'])
+        && nonblank(value.name, 200)
+        && value.latitude is number && value.longitude is number
+        && value.latitude >= -90 && value.latitude <= 90
+        && value.longitude >= -180 && value.longitude <= 180;
+    }
+    function differentPlaces(a, b) {
+      return a.latitude != b.latitude || a.longitude != b.longitude;
+    }
+    function tripPath(tripId) {
+      return /databases/$(database)/documents/trips/$(tripId);
+    }
+    function reqPath(requestId) {
+      return /databases/$(database)/documents/requests/$(requestId);
+    }
+    function noticePath(eventId) {
+      return /databases/$(database)/documents/notifications/$(eventId);
+    }
+    function privatePath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+    function publicPath(uid) {
+      return /databases/$(database)/documents/publicProfiles/$(uid);
     }
 
-    // Kiểm tra UID của tài khoản đang đăng nhập.
-    function isOwner(userId) {
-      return signedIn() && request.auth.uid == userId;
+    // Ho so rieng/cong khai co the tao bo sung khi mot ben con thieu.
+    function privateProfile(data) {
+      return exact(data, ['email', 'vehiclePlate', 'createdAt', 'updatedAt'])
+        && data.email is string && data.email == request.auth.token.email
+        && text(data.vehiclePlate, 20)
+        && (data.vehiclePlate == '' || nonblank(data.vehiclePlate, 20))
+        && data.createdAt is timestamp && data.updatedAt is timestamp
+        && data.updatedAt == request.time;
     }
-
-        match /users/{userId} {
-      // Hồ sơ riêng chỉ chứa email, biển số và thời gian.
-      function validPrivateProfileCreate() {
-        let data = request.resource.data;
-        let publicData = getAfter(
-          /databases/$(database)/documents/publicProfiles/$(userId)
-        ).data;
-
-        return data.keys().hasAll([
-            'email', 'vehiclePlate', 'createdAt', 'updatedAt'
-          ])
-          && data.keys().hasOnly([
-            'email', 'vehiclePlate', 'createdAt', 'updatedAt'
-          ])
-          && data.email is string
-          && data.email == request.auth.token.email
-          && data.vehiclePlate is string
-          && data.vehiclePlate.size() <= 20
-          && data.createdAt is timestamp
-          && data.updatedAt is timestamp
-          && data.createdAt == request.time
-          && data.updatedAt == request.time
-          && publicData.displayName is string
-          && publicData.displayName.size() > 0
-          && publicData.vehicleName is string
-          && (
-            (data.vehiclePlate.size() == 0
-              && publicData.vehicleName.size() == 0)
-            || (data.vehiclePlate.size() > 0
-              && publicData.vehicleName.size() > 0)
-          );
-      }
-
-      allow get: if isOwner(userId);
-
-      allow create: if isOwner(userId)
-        && validPrivateProfileCreate();
-
-      allow list, update, delete: if false;
+    function publicProfile(data) {
+      return exact(data, ['displayName', 'vehicleName', 'createdAt', 'updatedAt'])
+        && nonblank(data.displayName, 80) && text(data.vehicleName, 80)
+        && (data.vehicleName == '' || nonblank(data.vehicleName, 80))
+        && data.createdAt is timestamp && data.updatedAt is timestamp
+        && data.updatedAt == request.time;
     }
-
-    match /publicProfiles/{userId} {
-      // Hồ sơ công khai không chứa email hoặc biển số.
-      function validPublicProfileCreate() {
-        let data = request.resource.data;
-        let privateData = getAfter(
-          /databases/$(database)/documents/users/$(userId)
-        ).data;
-
-        return data.keys().hasAll([
-            'displayName', 'vehicleName', 'createdAt', 'updatedAt'
-          ])
-          && data.keys().hasOnly([
-            'displayName', 'vehicleName', 'createdAt', 'updatedAt'
-          ])
-          && data.displayName is string
-          && data.displayName.size() > 0
-          && data.displayName.size() <= 80
-          && data.vehicleName is string
-          && data.vehicleName.size() <= 80
-          && data.createdAt is timestamp
-          && data.updatedAt is timestamp
-          && data.createdAt == request.time
-          && data.updatedAt == request.time
-          && privateData.email == request.auth.token.email
-          && privateData.vehiclePlate is string
-          && (
-            (data.vehicleName.size() == 0
-              && privateData.vehiclePlate.size() == 0)
-            || (data.vehicleName.size() > 0
-              && privateData.vehiclePlate.size() > 0)
-          );
-      }
-
+    function vehiclePair(plate, vehicle) {
+      return (plate == '' && vehicle == '')
+        || (nonblank(plate, 20) && nonblank(vehicle, 80));
+    }
+    match /users/{uid} {
+      allow get: if owner(uid);
+      allow create: if owner(uid) && privateProfile(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && nonblank(getAfter(publicPath(uid)).data.displayName, 80)
+        && vehiclePair(request.resource.data.vehiclePlate,
+          getAfter(publicPath(uid)).data.vehicleName);
+      allow update: if owner(uid) && privateProfile(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['vehiclePlate', 'updatedAt'])
+        && vehiclePair(request.resource.data.vehiclePlate,
+          getAfter(publicPath(uid)).data.vehicleName);
+      allow list, delete: if false;
+    }
+    match /publicProfiles/{uid} {
       allow read: if signedIn();
-
-      allow create: if isOwner(userId)
-        && validPublicProfileCreate();
-
-      allow update, delete: if false;
+      allow create: if owner(uid) && publicProfile(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && getAfter(privatePath(uid)).data.email == request.auth.token.email
+        && vehiclePair(getAfter(privatePath(uid)).data.vehiclePlate,
+          request.resource.data.vehicleName);
+      allow update: if owner(uid) && publicProfile(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['displayName', 'vehicleName', 'updatedAt'])
+        && vehiclePair(getAfter(privatePath(uid)).data.vehiclePlate,
+          request.resource.data.vehicleName);
+      allow delete: if false;
     }
 
-    match /trips/{tripId} {
+    function openTrip(t) {
+      return t.status == 'OPEN' && t.availableSeats == 1
+        && t.acceptedRequestId == '';
+    }
+    function fullTrip(t) {
+      return t.status == 'FULL' && t.availableSeats == 0
+        && id(t.acceptedRequestId);
+    }
+    function tripData(t) {
+      return exact(t, ['driverId', 'origin', 'destination', 'departureAt',
+          'costVnd', 'note', 'status', 'availableSeats', 'acceptedRequestId',
+          'createdAt', 'updatedAt'])
+        && id(t.driverId) && place(t.origin) && place(t.destination)
+        && differentPlaces(t.origin, t.destination)
+        && t.departureAt is timestamp && t.costVnd is int && t.costVnd >= 0
+        && text(t.note, 500) && t.availableSeats is int
+        && t.acceptedRequestId is string
+        && t.createdAt is timestamp && t.updatedAt is timestamp
+        && t.updatedAt == request.time
+        && (openTrip(t) || fullTrip(t)
+          || (t.status == 'COMPLETED' && t.availableSeats == 0
+            && id(t.acceptedRequestId))
+          || (t.status == 'CANCELLED' && t.availableSeats == 0
+            && (t.acceptedRequestId == '' || id(t.acceptedRequestId))));
+    }
+    function vehicleProfile() {
+      return nonblank(get(privatePath(request.auth.uid)).data.vehiclePlate, 20)
+        && nonblank(get(publicPath(request.auth.uid)).data.vehicleName, 80);
+    }
+
+    // Bat buoc thong bao MOI xuat hien cung transaction/batch voi su kien.
+    // Rules create cua notification tu kiem tra schema va chuyen trang thai.
+    function notice(eventId, type, tripId, requestId, actorId, recipientId) {
+      let p = noticePath(eventId);
+      let n = getAfter(p).data;
+      return !exists(p) && n.type == type && n.tripId == tripId
+        && n.requestId == requestId && n.actorId == actorId
+        && n.recipientId == recipientId && n.isRead == false
+        && n.createdAt == request.time;
+    }
+    function requestNotice(rid, type, r, actorId, recipientId) {
+      return notice(rid + '_' + type, type, r.tripId, rid, actorId, recipientId);
+    }
+    function tripNotice(tid, type, t) {
+      let r = get(reqPath(t.acceptedRequestId)).data;
+      return r.tripId == tid && r.driverId == t.driverId
+        && r.status == 'ACCEPTED'
+        && t.acceptedRequestId == tid + '_' + r.passengerId
+        && notice(tid + '_' + r.passengerId + '_' + type,
+          type, tid, t.acceptedRequestId, t.driverId, r.passengerId);
+    }
+    function editTrip(old, data) {
+      return owner(old.driverId) && openTrip(old) && openTrip(data)
+        && old.departureAt > request.time && data.departureAt > request.time
+        && data.diff(old).affectedKeys().hasOnly([
+          'origin', 'destination', 'departureAt', 'costVnd', 'note', 'updatedAt'
+        ]);
+    }
+    function acceptTrip(tid, old, data) {
+      let rid = data.acceptedRequestId;
+      let before = get(reqPath(rid)).data;
+      let after = getAfter(reqPath(rid)).data;
+      return owner(old.driverId) && openTrip(old) && fullTrip(data)
+        && old.departureAt > request.time
+        && rid == tid + '_' + before.passengerId
+        && before.tripId == tid && before.driverId == old.driverId
+        && before.passengerId != old.driverId
+        && before.status == 'PENDING' && after.status == 'ACCEPTED'
+        && requestNotice(rid, 'REQUEST_ACCEPTED', before,
+          old.driverId, before.passengerId);
+    }
+    function reopenTrip(tid, old, data) {
+      let rid = old.acceptedRequestId;
+      let before = get(reqPath(rid)).data;
+      let after = getAfter(reqPath(rid)).data;
+      return fullTrip(old) && openTrip(data) && old.departureAt > request.time
+        && owner(before.passengerId)
+        && rid == tid + '_' + before.passengerId
+        && before.tripId == tid && before.driverId == old.driverId
+        && before.status == 'ACCEPTED' && after.status == 'CANCELLED'
+        && requestNotice(rid, 'REQUEST_CANCELLED', before,
+          before.passengerId, old.driverId);
+    }
+    function cancelTrip(tid, old, data) {
+      return owner(old.driverId) && old.departureAt > request.time
+        && data.status == 'CANCELLED' && data.availableSeats == 0
+        && data.acceptedRequestId == old.acceptedRequestId
+        && (openTrip(old)
+          || (fullTrip(old) && tripNotice(tid, 'TRIP_CANCELLED', old)));
+    }
+    function completeTrip(tid, old, data) {
+      return owner(old.driverId) && fullTrip(old)
+        && old.departureAt <= request.time
+        && data.status == 'COMPLETED' && data.availableSeats == 0
+        && data.acceptedRequestId == old.acceptedRequestId
+        && tripNotice(tid, 'TRIP_COMPLETED', old);
+    }
+    match /trips/{tid} {
       allow read: if signedIn();
-
-      // Cho phép tạo chuyến chính chủ khi đủ hồ sơ xe và dữ liệu hợp lệ.
-      allow create: if signedIn()
-        && hasVehicleProfile()
-        && validTripCreate();
-
-      // Quyền sửa/hủy/hoàn thành sẽ bổ sung theo từng thao tác.
-      allow update, delete: if false;
+      allow create: if signedIn() && tripData(request.resource.data)
+        && request.resource.data.driverId == request.auth.uid
+        && vehicleProfile() && openTrip(request.resource.data)
+        && request.resource.data.departureAt > request.time
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && tripData(request.resource.data)
+        && (editTrip(resource.data, request.resource.data)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'availableSeats', 'acceptedRequestId', 'updatedAt'
+            ]) && (
+              (resource.data.status == 'OPEN' && request.resource.data.status == 'FULL'
+                && acceptTrip(tid, resource.data, request.resource.data))
+              || (resource.data.status == 'FULL' && request.resource.data.status == 'OPEN'
+                && reopenTrip(tid, resource.data, request.resource.data))
+              || (request.resource.data.status == 'CANCELLED'
+                && cancelTrip(tid, resource.data, request.resource.data))
+              || (request.resource.data.status == 'COMPLETED'
+                && completeTrip(tid, resource.data, request.resource.data))
+            )));
+      allow delete: if false;
     }
 
-    match /requests/{requestId} {
-      allow read: if signedIn()
-        && (resource.data.passengerId == request.auth.uid
-          || resource.data.driverId == request.auth.uid);
-      allow write: if false;
+    function requestData(r, rid) {
+      return exact(r, ['tripId', 'passengerId', 'driverId', 'pickup', 'message',
+          'status', 'createdAt', 'updatedAt'])
+        && id(r.tripId) && id(r.passengerId) && id(r.driverId)
+        && r.passengerId != r.driverId
+        && rid == r.tripId + '_' + r.passengerId
+        && place(r.pickup) && text(r.message, 500)
+        && r.status in ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED']
+        && r.createdAt is timestamp && r.updatedAt is timestamp
+        && r.updatedAt == request.time;
+    }
+    function createRequest(rid, r) {
+      let t = get(tripPath(r.tripId)).data;
+      return owner(r.passengerId) && r.driverId == t.driverId
+        && r.status == 'PENDING' && r.createdAt == request.time
+        && openTrip(t) && t.departureAt > request.time
+        && getAfter(tripPath(r.tripId)).data == t
+        && requestNotice(rid, 'REQUEST_SENT', r, r.passengerId, r.driverId);
+    }
+    function acceptRequest(rid, old, data, t, next) {
+      return owner(old.driverId) && old.status == 'PENDING'
+        && data.status == 'ACCEPTED' && openTrip(t)
+        && fullTrip(next) && next.acceptedRequestId == rid
+        && requestNotice(rid, 'REQUEST_ACCEPTED', old,
+          old.driverId, old.passengerId);
+    }
+    function rejectRequest(rid, old, data, t, next) {
+      return owner(old.driverId) && old.status == 'PENDING'
+        && data.status == 'REJECTED' && (openTrip(t) || fullTrip(t))
+        && next == t
+        && requestNotice(rid, 'REQUEST_REJECTED', old,
+          old.driverId, old.passengerId);
+    }
+    function cancelRequest(rid, old, data, t, next) {
+      return owner(old.passengerId) && data.status == 'CANCELLED'
+        && ((old.status == 'PENDING' && (openTrip(t) || fullTrip(t)) && next == t)
+          || (old.status == 'ACCEPTED' && fullTrip(t)
+            && t.acceptedRequestId == rid && openTrip(next)))
+        && requestNotice(rid, 'REQUEST_CANCELLED', old,
+          old.passengerId, old.driverId);
+    }
+    function updateRequest(rid, old, data) {
+      let t = get(tripPath(old.tripId)).data;
+      let next = getAfter(tripPath(old.tripId)).data;
+      return old.driverId == t.driverId && t.departureAt > request.time
+        && data.diff(old).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && (acceptRequest(rid, old, data, t, next)
+          || rejectRequest(rid, old, data, t, next)
+          || cancelRequest(rid, old, data, t, next));
+    }
+    match /requests/{rid} {
+      // Cho passenger kiem tra ID cua minh chua ton tai truoc khi tao.
+      allow get: if signedIn() && (
+        (exists(reqPath(rid)) && (resource.data.passengerId == request.auth.uid
+          || resource.data.driverId == request.auth.uid))
+        || (!exists(reqPath(rid)) && rid.matches('[^/]+_' + request.auth.uid))
+      );
+      allow list: if signedIn() && (resource.data.passengerId == request.auth.uid
+        || resource.data.driverId == request.auth.uid);
+      allow create: if signedIn() && requestData(request.resource.data, rid)
+        && createRequest(rid, request.resource.data);
+      allow update: if signedIn() && requestData(request.resource.data, rid)
+        && updateRequest(rid, resource.data, request.resource.data);
+      allow delete: if false;
     }
 
-        match /favorites/{favoriteId} {
-      // Dữ liệu yêu thích phải đúng schema và thuộc người đăng nhập.
-      function validFavoriteCreate() {
-        let data = request.resource.data;
-
-        return data.keys().hasAll(['userId', 'tripId', 'createdAt'])
-          && data.keys().hasOnly(['userId', 'tripId', 'createdAt'])
-          && data.userId == request.auth.uid
-          && data.tripId is string
-          && data.tripId.size() > 0
-          && data.tripId.matches('[^/]+')
-          && favoriteId == request.auth.uid + '_' + data.tripId
-          && exists(
-            /databases/$(database)/documents/trips/$(data.tripId)
-          )
-          && data.createdAt is timestamp
-          && data.createdAt == request.time;
+    match /favorites/{fid} {
+      function favoriteData(d) {
+        return exact(d, ['userId', 'tripId', 'createdAt'])
+          && d.userId == request.auth.uid && id(d.tripId)
+          && fid == request.auth.uid + '_' + d.tripId
+          && exists(tripPath(d.tripId))
+          && d.createdAt is timestamp && d.createdAt == request.time;
       }
-
-      // Đọc bản ghi chính chủ; cho phép kiểm tra ID chính chủ chưa tồn tại.
-      allow get: if signedIn()
-        && (
-          (
-            exists(
-              /databases/$(database)/documents/favorites/$(favoriteId)
-            )
-            && resource.data.userId == request.auth.uid
-          )
-          || (
-            !exists(
-              /databases/$(database)/documents/favorites/$(favoriteId)
-            )
-            && favoriteId.matches(request.auth.uid + '_[^/]+')
-          )
-        );
-
-      // Query danh sách phải lọc userId bằng UID đang đăng nhập.
-      allow list: if signedIn()
-        && resource.data.userId == request.auth.uid;
-
-      allow create: if signedIn() && validFavoriteCreate();
-
-      allow delete: if signedIn()
-        && resource.data.userId == request.auth.uid;
-
-      // Không sửa chủ sở hữu, chuyến hoặc thời gian của bản ghi đã tạo.
+      allow get: if signedIn() && (
+        (exists(/databases/$(database)/documents/favorites/$(fid))
+          && resource.data.userId == request.auth.uid)
+        || (!exists(/databases/$(database)/documents/favorites/$(fid))
+          && fid.matches(request.auth.uid + '_[^/]+'))
+      );
+      allow list: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn() && favoriteData(request.resource.data);
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
 
-    match /ratings/{ratingId} {
+    function createRating(rid, d) {
+      let t = get(tripPath(d.tripId)).data;
+      let r = get(reqPath(t.acceptedRequestId)).data;
+      return exact(d, ['tripId', 'authorId', 'targetUserId', 'score', 'comment', 'createdAt'])
+        && id(d.tripId) && owner(d.authorId)
+        && rid == d.tripId + '_' + d.authorId
+        && t.status == 'COMPLETED' && t.availableSeats == 0
+        && t.departureAt <= request.time
+        && t.acceptedRequestId == d.tripId + '_' + d.authorId
+        && r.tripId == d.tripId && r.passengerId == d.authorId
+        && r.driverId == t.driverId && r.status == 'ACCEPTED'
+        && d.targetUserId == t.driverId && d.authorId != d.targetUserId
+        && d.score is int && d.score >= 1 && d.score <= 5
+        && text(d.comment, 500)
+        && d.createdAt is timestamp && d.createdAt == request.time;
+    }
+    match /ratings/{rid} {
       allow read: if signedIn();
-      allow write: if false;
+      allow create: if signedIn() && createRating(rid, request.resource.data);
+      allow update, delete: if false;
     }
 
-    match /notifications/{notificationId} {
-      allow read: if signedIn()
-        && resource.data.recipientId == request.auth.uid;
-      allow write: if false;
+    function notificationData(n) {
+      return exact(n, ['recipientId', 'actorId', 'type', 'tripId', 'requestId',
+          'isRead', 'createdAt'])
+        && id(n.recipientId) && owner(n.actorId) && n.recipientId != n.actorId
+        && id(n.tripId) && n.requestId is string
+        && n.isRead is bool && n.isRead == false
+        && n.createdAt is timestamp && n.createdAt == request.time;
+    }
+    function changedRequestEvent(n) {
+      let old = get(reqPath(n.requestId)).data;
+      let next = getAfter(reqPath(n.requestId)).data;
+      return old.tripId == n.tripId && next.updatedAt == request.time
+        && ((n.type == 'REQUEST_ACCEPTED' && old.status == 'PENDING'
+            && next.status == 'ACCEPTED'
+            && n.actorId == old.driverId && n.recipientId == old.passengerId)
+          || (n.type == 'REQUEST_REJECTED' && old.status == 'PENDING'
+            && next.status == 'REJECTED'
+            && n.actorId == old.driverId && n.recipientId == old.passengerId)
+          || (n.type == 'REQUEST_CANCELLED'
+            && old.status in ['PENDING', 'ACCEPTED'] && next.status == 'CANCELLED'
+            && n.actorId == old.passengerId && n.recipientId == old.driverId));
+    }
+    function requestEvent(nid, n) {
+      let next = getAfter(reqPath(n.requestId)).data;
+      let t = get(tripPath(n.tripId)).data;
+      return id(n.requestId) && nid == n.requestId + '_' + n.type
+        && next.tripId == n.tripId && next.driverId == t.driverId
+        && n.requestId == n.tripId + '_' + next.passengerId
+        && ((n.type == 'REQUEST_SENT' && !exists(reqPath(n.requestId))
+            && next.status == 'PENDING' && next.createdAt == request.time
+            && n.actorId == next.passengerId && n.recipientId == t.driverId)
+          || (n.type in ['REQUEST_ACCEPTED', 'REQUEST_REJECTED', 'REQUEST_CANCELLED']
+            && changedRequestEvent(n)));
+    }
+    function tripEvent(nid, n) {
+      let old = get(tripPath(n.tripId)).data;
+      let next = getAfter(tripPath(n.tripId)).data;
+      let r = get(reqPath(old.acceptedRequestId)).data;
+      return fullTrip(old) && n.actorId == old.driverId
+        && n.requestId == old.acceptedRequestId
+        && r.tripId == n.tripId && r.driverId == old.driverId
+        && r.status == 'ACCEPTED' && n.recipientId == r.passengerId
+        && nid == n.tripId + '_' + n.recipientId + '_' + n.type
+        && next.acceptedRequestId == old.acceptedRequestId
+        && next.updatedAt == request.time
+        && ((n.type == 'TRIP_CANCELLED' && next.status == 'CANCELLED')
+          || (n.type == 'TRIP_COMPLETED' && next.status == 'COMPLETED'));
+    }
+    match /notifications/{nid} {
+      allow read: if signedIn() && resource.data.recipientId == request.auth.uid;
+      allow create: if signedIn() && notificationData(request.resource.data)
+        && ((request.resource.data.type in ['REQUEST_SENT', 'REQUEST_ACCEPTED',
+              'REQUEST_REJECTED', 'REQUEST_CANCELLED']
+            && requestEvent(nid, request.resource.data))
+          || (request.resource.data.type in ['TRIP_CANCELLED', 'TRIP_COMPLETED']
+            && tripEvent(nid, request.resource.data)));
+      allow update: if signedIn() && resource.data.recipientId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead'])
+        && request.resource.data.isRead is bool && request.resource.data.isRead == true;
+      allow delete: if false;
     }
 
-    // Chặn mọi đường dẫn chưa được khai báo.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Kiểm tra địa điểm có đúng cấu trúc và tọa độ hợp lệ.
-    function validPlace(place) {
-      return place is map
-        && place.keys().hasAll(['name', 'latitude', 'longitude'])
-        && place.keys().hasOnly(['name', 'latitude', 'longitude'])
-        && place.name is string
-        && place.name.size() > 0
-        && (place.latitude is int || place.latitude is float)
-        && (place.longitude is int || place.longitude is float)
-        && place.latitude >= -90
-        && place.latitude <= 90
-        && place.longitude >= -180
-        && place.longitude <= 180;
-    }
-
-    // Chủ xe phải có tên xe và biển số trong hồ sơ chính chủ.
-    function hasVehicleProfile() {
-      let userPath =
-        /databases/$(database)/documents/users/$(request.auth.uid);
-      let publicPath =
-        /databases/$(database)/documents/publicProfiles/$(request.auth.uid);
-
-      return exists(userPath)
-        && exists(publicPath)
-        && get(userPath).data.vehiclePlate is string
-        && get(userPath).data.vehiclePlate.size() > 0
-        && get(publicPath).data.vehicleName is string
-        && get(publicPath).data.vehicleName.size() > 0;
-    }
-
-    // Chuyến mới phải đúng schema và trạng thái ban đầu đã chốt.
-    function validTripCreate() {
-      let data = request.resource.data;
-      let fields = [
-        'driverId', 'origin', 'destination', 'departureAt',
-        'costVnd', 'note', 'status', 'availableSeats',
-        'acceptedRequestId', 'createdAt', 'updatedAt'
-      ];
-
-      return data.keys().hasAll(fields)
-        && data.keys().hasOnly(fields)
-        && data.driverId is string
-        && data.driverId == request.auth.uid
-        && validPlace(data.origin)
-        && validPlace(data.destination)
-        && (
-          data.origin.latitude != data.destination.latitude
-          || data.origin.longitude != data.destination.longitude
-        )
-        && data.departureAt is timestamp
-        && data.departureAt > request.time
-        && data.costVnd is int
-        && data.costVnd >= 0
-        && data.note is string
-        && data.status == 'OPEN'
-        && data.availableSeats is int
-        && data.availableSeats == 1
-        && data.acceptedRequestId == ''
-        && data.createdAt is timestamp
-        && data.updatedAt is timestamp
-        && data.createdAt == request.time
-        && data.updatedAt == request.time;
-    }
+    match /{document=**} { allow read, write: if false; }
   }
 }
