@@ -5,6 +5,16 @@
         <TextView android:id="@+id/header_title" style="@style/Subtitle" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginHorizontal="52dp" android:layout_marginBottom="0dp" android:gravity="center" android:text="Tài khoản" />
         <ImageButton android:id="@+id/header_action" style="@style/IconButton" android:layout_gravity="center_vertical|end" android:src="@drawable/ic_bell" android:contentDescription="Thông báo" android:visibility="visible" android:clickable="false" android:focusable="false" />
     </FrameLayout>
+    <TextView
+        android:id="@+id/logout_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="12dp"
+        android:textSize="14sp"
+        android:textColor="@color/primary"
+        android:accessibilityLiveRegion="polite"
+        android:visibility="gone" />
     <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:fillViewport="true" android:clipToPadding="false" android:layout_weight="1">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="8dp" android:paddingBottom="24dp">
             <LinearLayout style="@style/Card">
@@ -65,7 +75,7 @@
                         <TextView android:id="@+id/menu_label" style="@style/Body" android:text="Trợ giúp" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="12dp" />
                         <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron" android:importantForAccessibility="no" />
                     </LinearLayout>
-                    <LinearLayout android:id="@+id/account_logout" style="@style/Picker" android:paddingHorizontal="12dp" android:minHeight="58dp" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
+                    <LinearLayout android:id="@+id/account_logout" style="@style/Picker" android:paddingHorizontal="12dp" android:minHeight="58dp" android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground">
                         <ImageView android:id="@+id/menu_icon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_logout" android:importantForAccessibility="no" />
                         <TextView android:id="@+id/menu_label" style="@style/Body" android:text="Đăng xuất" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="12dp" />
                         <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron" android:importantForAccessibility="no" />
