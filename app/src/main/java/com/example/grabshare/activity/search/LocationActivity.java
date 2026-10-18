@@ -92,6 +92,9 @@ public class LocationActivity extends AppCompatActivity {
                     searchTimer.cancel();
                 }
                 
+                // Khi thay đổi text, lập tức đánh dấu query cũ không còn hợp lệ (tránh việc request cũ trả về chèn đè)
+                currentSearchRequestId++;
+                
                 searchTimer = new Timer();
                 searchTimer.schedule(new TimerTask() {
                     @Override
@@ -99,6 +102,7 @@ public class LocationActivity extends AppCompatActivity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
+                                if (isFinishing() || isDestroyed()) return;
                                 performSearch();
                             }
                         });
@@ -138,6 +142,7 @@ public class LocationActivity extends AppCompatActivity {
         outState.putInt("suggestion_visibility", suggestionTitle.getVisibility());
         outState.putInt("list_visibility", locationList.getVisibility());
         outState.putInt("search_request_id", currentSearchRequestId);
+        outState.putString("search_query", searchInput.getText().toString());
     }
 
     /**
@@ -145,6 +150,10 @@ public class LocationActivity extends AppCompatActivity {
      */
     private void restoreState(Bundle savedInstanceState) {
         currentSearchRequestId = savedInstanceState.getInt("search_request_id", 0);
+        
+        // Phục hồi và đặt lại query từ instance state
+        String savedQuery = savedInstanceState.getString("search_query", "");
+        searchInput.setText(savedQuery);
         
         ArrayList<String> names = savedInstanceState.getStringArrayList("place_names");
         double[] lats = savedInstanceState.getDoubleArray("place_lats");
@@ -159,7 +168,8 @@ public class LocationActivity extends AppCompatActivity {
         }
 
         String savedStatus = savedInstanceState.getString("status_text", "");
-        if ("Đang tìm kiếm...".equals(savedStatus)) {
+        if ("Đang tìm kiếm...".equals(savedStatus) && !TextUtils.isEmpty(savedQuery)) {
+            // Chỉ tiếp tục tìm kiếm nếu trạng thái cũ là đang tìm kiếm VÀ có query rõ ràng.
             performSearch();
         } else {
             statusText.setVisibility(savedInstanceState.getInt("status_visibility", View.GONE));
@@ -174,6 +184,7 @@ public class LocationActivity extends AppCompatActivity {
      */
     private void performSearch() {
         String query = searchInput.getText().toString().trim();
+
         if (TextUtils.isEmpty(query)) {
             adapter.setPlaces(new ArrayList<Place>());
             statusText.setVisibility(View.GONE);
@@ -250,6 +261,10 @@ public class LocationActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (searchTimer != null) {
+            searchTimer.cancel();
+            searchTimer = null;
+        }
         if (searchClient != null) {
             searchClient.shutdown();
         }

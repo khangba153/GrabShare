@@ -45,11 +45,11 @@ public class TripSearchRepository {
      * @param callback Nhận danh sách chuyến xe.
      */
     public void searchOpenTrips(long departureTimeMillis, final RepositoryCallback<List<Trip>> callback) {
-        // Fix: Query từ max(giờ chọn, hiện tại)
+        // Lấy thời điểm muộn hơn giữa giờ được chọn và giờ hiện tại
         long queryTime = Math.max(departureTimeMillis, System.currentTimeMillis());
         Timestamp departureTimestamp = new Timestamp(queryTime / 1000, 0);
 
-        // Fix: Tính toán điểm kết thúc của ngày hiện tại để làm cận trên (end of day)
+        // Tính cận trên của ngày tìm kiếm (23:59:59 của ngày queryTime)
         Calendar cal = Calendar.getInstance();
         cal.setTimeInMillis(queryTime);
         cal.set(Calendar.HOUR_OF_DAY, 23);
@@ -71,7 +71,7 @@ public class TripSearchRepository {
                         List<Trip> trips = new ArrayList<>();
                         for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
                             Trip trip = doc.toObject(Trip.class);
-                            // Fix: Lọc thêm chuyến có availableSeats > 0 trước khi trả về
+                            // Lọc thêm chuyến có availableSeats > 0 trước khi trả về
                             if (trip != null && trip.getAvailableSeats() != null && trip.getAvailableSeats() > 0) {
                                 trip.setId(doc.getId());
                                 trips.add(trip);

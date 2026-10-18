@@ -60,6 +60,9 @@ public class HomeActivity extends AppCompatActivity {
     private int currentPickingField = 0; // 1 = origin, 2 = destination
     private ActivityResultLauncher<Intent> locationPickerLauncher;
 
+    private int currentRouteRequestId = 0; // Đếm thế hệ vẽ tuyến để chặn đè tuyến đường mạng trễ
+    private final java.util.concurrent.ExecutorService routeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
@@ -387,7 +390,8 @@ public class HomeActivity extends AppCompatActivity {
                     Math.min(startPoint.getLongitude(), endPoint.getLongitude())
             ), true);
 
-            fetchAndDrawRoute(startPoint, endPoint);
+            final int requestId = ++currentRouteRequestId;
+            fetchAndDrawRoute(startPoint, endPoint, requestId);
         } else if (startPoint != null) {
             mapView.getController().animateTo(startPoint);
         } else if (endPoint != null) {
@@ -400,11 +404,12 @@ public class HomeActivity extends AppCompatActivity {
     /**
      * Gọi Geoapify Routing API để lấy dữ liệu tuyến đường (GeoJSON) và vẽ Polyline trên bản đồ.
      */
-    private void fetchAndDrawRoute(final GeoPoint start, final GeoPoint end) {
-        new Thread(new Runnable() {
+    private void fetchAndDrawRoute(final GeoPoint start, final GeoPoint end, final int requestId) {
+        routeExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 java.net.HttpURLConnection conn = null;
+                java.io.BufferedReader reader = null;
                 try {
                     // Kiểm tra xem chuyến đi có xuyên Việt (Bắc - Nam vượt qua eo miền Trung) hay không
                     // Vĩ độ của Đà Nẵng khoảng 16.0
@@ -414,14 +419,15 @@ public class HomeActivity extends AppCompatActivity {
                     String urlString;
                     if (isNorthToSouth) {
                         // Chèn thêm waypoint ở Quốc lộ 1A (Đà Nẵng: 16.0044, 108.2022) để ép đường đi ôm theo hình chữ S, né cắt Lào/Campuchia
+                        // Dùng mode=motorcycle cho xe máy thay vì drive (ô tô)
                         urlString = String.format(Locale.US,
-                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C16.0044,108.2022%%7C%f,%f&mode=drive&apiKey=3ae0ba5bcf8843df8024203662e3d702",
+                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C16.0044,108.2022%%7C%f,%f&mode=motorcycle&apiKey=3ae0ba5bcf8843df8024203662e3d702",
                                 start.getLatitude(), start.getLongitude(),
                                 end.getLatitude(), end.getLongitude());
                     } else {
                         // Các chuyến nội tỉnh hoặc khoảng cách gần thì giữ nguyên 2 điểm
                         urlString = String.format(Locale.US,
-                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C%f,%f&mode=drive&apiKey=3ae0ba5bcf8843df8024203662e3d702",
+                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C%f,%f&mode=motorcycle&apiKey=3ae0ba5bcf8843df8024203662e3d702",
                                 start.getLatitude(), start.getLongitude(),
                                 end.getLatitude(), end.getLongitude());
                     }
@@ -433,14 +439,13 @@ public class HomeActivity extends AppCompatActivity {
                     conn.setReadTimeout(10000);
 
                     if (conn.getResponseCode() == java.net.HttpURLConnection.HTTP_OK) {
-                        java.io.BufferedReader reader = new java.io.BufferedReader(
+                        reader = new java.io.BufferedReader(
                                 new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
                         StringBuilder sb = new StringBuilder();
                         String line;
                         while ((line = reader.readLine()) != null) {
                             sb.append(line);
                         }
-                        reader.close();
 
                         org.json.JSONObject jsonResponse = new org.json.JSONObject(sb.toString());
                         org.json.JSONArray features = jsonResponse.getJSONArray("features");
@@ -473,39 +478,73 @@ public class HomeActivity extends AppCompatActivity {
                                 }
                             }
 
+                            if (!geoPoints.isEmpty()) {
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (isFinishing() || isDestroyed()) return;
+                                        // Kiểm tra nếu request này không còn là request mới nhất thì bỏ qua
+                                        if (requestId != currentRouteRequestId) return;
+                                        
+                                        // Xóa mọi đường Polyline ngầm bị delay mạng dội về trễ
+                                        for (int i = mapView.getOverlays().size() - 1; i >= 0; i--) {
+                                            if (mapView.getOverlays().get(i) instanceof org.osmdroid.views.overlay.Polyline) {
+                                                mapView.getOverlays().remove(i);
+                                            }
+                                        }
+
+                                        org.osmdroid.views.overlay.Polyline line = new org.osmdroid.views.overlay.Polyline();
+                                        line.setPoints(geoPoints);
+                                        // Set màu xanh nét dày
+                                        line.getOutlinePaint().setColor(android.graphics.Color.parseColor("#4A80F5")); 
+                                        line.getOutlinePaint().setStrokeWidth(12f);
+                                        // Chèn đường đi xuống dưới các Marker để không che ghim
+                                        mapView.getOverlays().add(0, line); 
+                                        mapView.postInvalidate(); // Ép load lại ngay lập tức
+                                    }
+                                });
+                            }
+                        } else {
+                            // Không có feature trả về
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
-                                    if (isFinishing() || isDestroyed()) return;
-                                    
-                                    // Chốt hạ: Duyệt một vòng xóa lại mọi đường Polyline ngầm bị delay mạng dội về trễ
-                                    for (int i = mapView.getOverlays().size() - 1; i >= 0; i--) {
-                                        if (mapView.getOverlays().get(i) instanceof org.osmdroid.views.overlay.Polyline) {
-                                            mapView.getOverlays().remove(i);
-                                        }
-                                    }
-
-                                    org.osmdroid.views.overlay.Polyline line = new org.osmdroid.views.overlay.Polyline();
-                                    line.setPoints(geoPoints);
-                                    // Set màu xanh nét dày
-                                    line.getOutlinePaint().setColor(android.graphics.Color.parseColor("#4A80F5")); 
-                                    line.getOutlinePaint().setStrokeWidth(12f);
-                                    // Chèn đường đi xuống dưới các Marker để không che ghim
-                                    mapView.getOverlays().add(0, line); 
-                                    mapView.postInvalidate(); // Ép load lại ngay lập tức
+                                    if (isFinishing() || isDestroyed() || requestId != currentRouteRequestId) return;
+                                    Toast.makeText(HomeActivity.this, "Không tìm thấy tuyến đường kết nối 2 địa điểm", Toast.LENGTH_SHORT).show();
                                 }
                             });
                         }
+                    } else {
+                        // HTTP Error (VD: 429 Limit Exceeded)
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (isFinishing() || isDestroyed() || requestId != currentRouteRequestId) return;
+                                Toast.makeText(HomeActivity.this, "Chưa thể tải tuyến đường gợi ý (Lỗi mạng/API)", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
                 } catch (Exception e) {
-                    // Lỗi mạng hoặc JSON
+                    // Exception Error
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isFinishing() || isDestroyed() || requestId != currentRouteRequestId) return;
+                            Toast.makeText(HomeActivity.this, "Chưa thể tải tuyến đường gợi ý (Lỗi mạng/API)", Toast.LENGTH_SHORT).show();
+                        }
+                    });
                 } finally {
+                    if (reader != null) {
+                        try {
+                            reader.close();
+                        } catch (Exception ignored) {}
+                    }
                     if (conn != null) {
                         conn.disconnect();
                     }
                 }
             }
-        }).start();
+        });
     }
 
     /**
@@ -555,6 +594,7 @@ public class HomeActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDetach();
+        routeExecutor.shutdownNow(); // Đảm bảo luồng phụ không chạy ngầm
     }
 
     /**

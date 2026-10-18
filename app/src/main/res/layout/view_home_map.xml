@@ -13,4 +13,13 @@
         android:layout_height="match_parent"
         android:contentDescription="Bản đồ tương tác" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:text="© OpenStreetMap contributors, © Geoapify"
+        android:textSize="10sp"
+        android:textColor="@color/muted"
+        android:padding="4dp" />
+
 </FrameLayout>
