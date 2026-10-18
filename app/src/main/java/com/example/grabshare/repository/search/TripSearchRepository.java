@@ -12,6 +12,7 @@ import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,11 +45,23 @@ public class TripSearchRepository {
      * @param callback Nhận danh sách chuyến xe.
      */
     public void searchOpenTrips(long departureTimeMillis, final RepositoryCallback<List<Trip>> callback) {
-        Timestamp departureTimestamp = new Timestamp(departureTimeMillis / 1000, 0);
+        // Fix: Query từ max(giờ chọn, hiện tại)
+        long queryTime = Math.max(departureTimeMillis, System.currentTimeMillis());
+        Timestamp departureTimestamp = new Timestamp(queryTime / 1000, 0);
+
+        // Fix: Tính toán điểm kết thúc của ngày hiện tại để làm cận trên (end of day)
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(queryTime);
+        cal.set(Calendar.HOUR_OF_DAY, 23);
+        cal.set(Calendar.MINUTE, 59);
+        cal.set(Calendar.SECOND, 59);
+        cal.set(Calendar.MILLISECOND, 999);
+        Timestamp endOfDayTimestamp = new Timestamp(cal.getTimeInMillis() / 1000, 0);
 
         firestore.collection("trips")
                 .whereEqualTo("status", "OPEN")
                 .whereGreaterThanOrEqualTo("departureAt", departureTimestamp)
+                .whereLessThanOrEqualTo("departureAt", endOfDayTimestamp)
                 .orderBy("departureAt", Query.Direction.ASCENDING)
                 .limit(50)
                 .get()
@@ -58,7 +71,8 @@ public class TripSearchRepository {
                         List<Trip> trips = new ArrayList<>();
                         for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
                             Trip trip = doc.toObject(Trip.class);
-                            if (trip != null) {
+                            // Fix: Lọc thêm chuyến có availableSeats > 0 trước khi trả về
+                            if (trip != null && trip.getAvailableSeats() != null && trip.getAvailableSeats() > 0) {
                                 trip.setId(doc.getId());
                                 trips.add(trip);
                             }
