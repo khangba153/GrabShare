@@ -210,7 +210,6 @@ public class ResultsActivity extends AppCompatActivity {
      * Lọc chuyến xe theo khoảng cách và loại bỏ chuyến của chính mình
      */
     private void filterTrips(List<Trip> trips) {
-        // Fix: Lấy FirebaseAuth.currentUser thật; dùng UID thật khi loại chuyến chính mình
         String currentUid = "";
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
