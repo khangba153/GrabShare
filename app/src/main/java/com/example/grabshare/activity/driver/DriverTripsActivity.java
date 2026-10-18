@@ -32,7 +32,6 @@ import java.util.Locale;
 
 /**
  * Hiển thị danh sách chuyến do tài khoản hiện tại đăng.
- *
  * Chỉ đọc dữ liệu và điều phối giao diện.
  * Việc truy vấn Firestore thuộc DriverTripRepository.
  */
@@ -203,7 +202,7 @@ public class DriverTripsActivity extends AppCompatActivity {
         showLoadingState();
 
         tripRepository.loadTripsForCurrentDriver(
-                new RepositoryCallback<List<Trip>>() {
+                new RepositoryCallback<>() {
 
                     /**
                      * Chuyển kết quả tải thành công sang luồng xử lý.
@@ -366,7 +365,6 @@ public class DriverTripsActivity extends AppCompatActivity {
 
     /**
      * Xác định một chuyến có thuộc lịch sử hay không.
-     *
      * Chỉ dùng trạng thái lưu trong Firestore,
      * không suy ra COMPLETED từ thời gian khởi hành.
      */

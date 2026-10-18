@@ -42,7 +42,7 @@
                     <TextView android:id="@+id/manage_cost" style="@style/BodyBold" android:text="15.000đ" />
                 </LinearLayout>
             </LinearLayout>
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/manage_edit" style="@style/ButtonSecondary" android:text="Chỉnh sửa chuyến" android:clickable="false" android:focusable="false" />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/manage_edit" style="@style/ButtonSecondary" android:text="Chỉnh sửa chuyến" android:clickable="true" android:focusable="true" />
         </LinearLayout>
     </ScrollView>
     <LinearLayout android:id="@+id/action_area" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="4dp" android:paddingBottom="12dp" android:background="@color/background" android:visibility="visible">
