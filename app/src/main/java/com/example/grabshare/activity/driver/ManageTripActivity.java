@@ -39,6 +39,8 @@ import java.util.Locale;
 public class ManageTripActivity extends AppCompatActivity {
 
     private static final String STATE_TRIP_ID = "manage_trip_id";
+    private static final String DRIVER_REQUESTS_ACTIVITY =
+            "com.example.grabshare.activity.driver.DriverRequestsActivity";
 
     private ImageButton backButton;
     private ProgressBar loadingProgressBar;
@@ -52,6 +54,7 @@ public class ManageTripActivity extends AppCompatActivity {
     private TextView noteText;
 
     private AppCompatButton editButton;
+    private AppCompatButton requestsButton;
     private AppCompatButton completeButton;
     private AppCompatButton cancelButton;
 
@@ -122,6 +125,7 @@ public class ManageTripActivity extends AppCompatActivity {
         costText = findViewById(R.id.manage_cost);
         noteText = findViewById(R.id.manage_note);
         editButton = findViewById(R.id.manage_edit);
+        requestsButton = findViewById(R.id.manage_requests);
         completeButton = findViewById(R.id.primary_action);
         cancelButton = findViewById(R.id.secondary_action);
     }
@@ -160,6 +164,13 @@ public class ManageTripActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 openEditTrip();
+            }
+        });
+
+        requestsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                openDriverRequests();
             }
         });
 
@@ -242,6 +253,7 @@ public class ManageTripActivity extends AppCompatActivity {
             noteText.setText(note.trim());
         }
 
+        requestsButton.setEnabled(true);
         updateActionAvailability(trip);
     }
 
@@ -287,6 +299,34 @@ public class ManageTripActivity extends AppCompatActivity {
         if (isTransitioning || isLoading) {
             setActionsBusy();
         }
+    }
+
+    /**
+     * Mở danh sách yêu cầu theo contract; nếu Task 5 chưa được đăng ký thì báo rõ.
+     * Chỉ truyền trip_id, màn đích sẽ tự đọc lại dữ liệu và xác minh quyền.
+     */
+    private void openDriverRequests() {
+        if (currentTrip == null || isLoading || isTransitioning) {
+            return;
+        }
+
+        Intent requestsIntent = new Intent();
+        requestsIntent.setClassName(
+                getPackageName(),
+                DRIVER_REQUESTS_ACTIVITY
+        );
+        requestsIntent.putExtra(NavigationKeys.TRIP_ID, tripId);
+
+        if (requestsIntent.resolveActivity(getPackageManager()) == null) {
+            Toast.makeText(
+                    this,
+                    "Màn Yêu cầu đi nhờ chưa được tích hợp hoặc đăng ký.",
+                    Toast.LENGTH_LONG
+            ).show();
+            return;
+        }
+
+        startActivity(requestsIntent);
     }
 
     /** Mở EditTripActivity bằng trip_id và tải lại Manage khi quay về. */
@@ -471,6 +511,7 @@ public class ManageTripActivity extends AppCompatActivity {
     /** Vô hiệu hóa mọi thao tác trong lúc đang tải hoặc cập nhật trạng thái. */
     private void setActionsBusy() {
         editButton.setEnabled(false);
+        requestsButton.setEnabled(false);
         completeButton.setEnabled(false);
         cancelButton.setEnabled(false);
         completeButton.setVisibility(View.GONE);
@@ -480,6 +521,7 @@ public class ManageTripActivity extends AppCompatActivity {
     /** Ẩn thao tác khi không thể tải/kiểm chứng chuyến. */
     private void hideTripActions() {
         editButton.setEnabled(false);
+        requestsButton.setEnabled(false);
         completeButton.setVisibility(View.GONE);
         cancelButton.setVisibility(View.GONE);
     }

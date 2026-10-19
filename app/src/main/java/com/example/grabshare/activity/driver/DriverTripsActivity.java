@@ -524,6 +524,16 @@ public class DriverTripsActivity extends AppCompatActivity {
                                 NavigationKeys.TRIP_ID,
                                 selectedTrip.getId()
                         );
+
+                        if (manageIntent.resolveActivity(getPackageManager()) == null) {
+                            Toast.makeText(
+                                    DriverTripsActivity.this,
+                                    "Màn Quản lý chuyến chưa được đăng ký trong Manifest.",
+                                    Toast.LENGTH_LONG
+                            ).show();
+                            return;
+                        }
+
                         startActivity(manageIntent);
                     }
                 }

@@ -160,6 +160,15 @@
                 android:layout_marginTop="8dp"
                 android:text="Chỉnh sửa chuyến"
                 android:enabled="false" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/manage_requests"
+                style="@style/ButtonSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Yêu cầu đi nhờ"
+                android:enabled="false" />
         </LinearLayout>
     </ScrollView>
 
