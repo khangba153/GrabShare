@@ -12,7 +12,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
-import com.google.firebase.firestore.Timestamp;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.Transaction;
 
 import java.util.HashMap;
