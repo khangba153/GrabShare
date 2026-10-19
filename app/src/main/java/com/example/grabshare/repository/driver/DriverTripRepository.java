@@ -352,6 +352,304 @@ public class DriverTripRepository {
                         }
                 );
     }
+
+
+    /**
+     * Hủy chuyến OPEN hoặc FULL khi chưa đến giờ khởi hành.
+     * Việc kiểm tra quyền và trạng thái được lặp lại trong transaction.
+     */
+    public void cancelTripForCurrentDriver(
+            final String tripId,
+            final RepositoryCallback<Void> callback
+    ) {
+        transitionTripState(tripId, true, callback);
+    }
+
+    /**
+     * Hoàn thành chuyến FULL khi đã đến hoặc qua giờ khởi hành.
+     * Chỉ cập nhật chuyến và tạo thông báo trong cùng transaction.
+     */
+    public void completeTripForCurrentDriver(
+            final String tripId,
+            final RepositoryCallback<Void> callback
+    ) {
+        transitionTripState(tripId, false, callback);
+    }
+
+    /**
+     * Chuyển trạng thái chuyến bằng transaction có kiểm tra chéo request.
+     * Request được giữ nguyên để bảo toàn lịch sử; không cập nhật hàng loạt.
+     */
+    private void transitionTripState(
+            final String tripId,
+            final boolean cancel,
+            final RepositoryCallback<Void> callback
+    ) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+
+        if (currentUser == null || currentUser.getUid().trim().isEmpty()) {
+            callback.onError(
+                    new IllegalStateException("Bạn cần đăng nhập để quản lý chuyến.")
+            );
+            return;
+        }
+
+        if (tripId == null || tripId.trim().isEmpty()) {
+            callback.onError(
+                    new IllegalArgumentException("ID chuyến không hợp lệ.")
+            );
+            return;
+        }
+
+        final String normalizedTripId = tripId.trim();
+        final String currentDriverId = currentUser.getUid();
+        final DocumentReference tripReference = firestore.collection("trips")
+                .document(normalizedTripId);
+
+        firestore.runTransaction(new Transaction.Function<Void>() {
+            @Override
+            public Void apply(@NonNull Transaction transaction)
+                    throws FirebaseFirestoreException {
+                DocumentSnapshot tripSnapshot = transaction.get(tripReference);
+
+                if (!tripSnapshot.exists()) {
+                    throw new FirebaseFirestoreException(
+                            "Chuyến không tồn tại hoặc đã bị xóa.",
+                            FirebaseFirestoreException.Code.NOT_FOUND
+                    );
+                }
+
+                String ownerId = tripSnapshot.getString("driverId");
+                if (!currentDriverId.equals(ownerId)) {
+                    throw new FirebaseFirestoreException(
+                            "Bạn không có quyền quản lý chuyến này.",
+                            FirebaseFirestoreException.Code.PERMISSION_DENIED
+                    );
+                }
+
+                String status = tripSnapshot.getString("status");
+                Timestamp departureAt = tripSnapshot.getTimestamp("departureAt");
+                Long availableSeats = tripSnapshot.getLong("availableSeats");
+                String acceptedRequestId = tripSnapshot.getString("acceptedRequestId");
+
+                if (departureAt == null || availableSeats == null
+                        || acceptedRequestId == null) {
+                    throw new FirebaseFirestoreException(
+                            "Dữ liệu chuyến không đầy đủ.",
+                            FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                    );
+                }
+
+                boolean hasAcceptedRequest = !acceptedRequestId.trim().isEmpty();
+                long departureMillis = departureAt.toDate().getTime();
+                long currentMillis = System.currentTimeMillis();
+
+                if (cancel) {
+                    boolean isOpenTrip = "OPEN".equals(status)
+                            && availableSeats == 1L
+                            && !hasAcceptedRequest;
+                    boolean isFullTrip = "FULL".equals(status)
+                            && availableSeats == 0L
+                            && hasAcceptedRequest;
+
+                    if (!isOpenTrip && !isFullTrip) {
+                        throw new FirebaseFirestoreException(
+                                "Chỉ chuyến OPEN hoặc FULL hợp lệ mới được hủy.",
+                                FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                        );
+                    }
+
+                    if (departureMillis <= currentMillis) {
+                        throw new FirebaseFirestoreException(
+                                "Không thể hủy chuyến đã đến giờ khởi hành.",
+                                FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                        );
+                    }
+                } else {
+                    boolean isFullTrip = "FULL".equals(status)
+                            && availableSeats == 0L
+                            && hasAcceptedRequest;
+
+                    if (!isFullTrip) {
+                        throw new FirebaseFirestoreException(
+                                "Chỉ chuyến FULL hợp lệ mới được hoàn thành.",
+                                FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                        );
+                    }
+
+                    if (departureMillis > currentMillis) {
+                        throw new FirebaseFirestoreException(
+                                "Chưa đến giờ khởi hành; không thể hoàn thành chuyến.",
+                                FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                        );
+                    }
+                }
+
+                String passengerId = null;
+                DocumentReference notificationReference = null;
+
+                if (hasAcceptedRequest) {
+                    DocumentReference requestReference = firestore
+                            .collection("requests")
+                            .document(acceptedRequestId);
+                    DocumentSnapshot requestSnapshot = transaction.get(requestReference);
+
+                    if (!requestSnapshot.exists()) {
+                        throw new FirebaseFirestoreException(
+                                "Pointer lệch: yêu cầu được nhận không tồn tại.",
+                                FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                        );
+                    }
+
+                    String requestTripId = requestSnapshot.getString("tripId");
+                    String requestDriverId = requestSnapshot.getString("driverId");
+                    passengerId = requestSnapshot.getString("passengerId");
+                    String requestStatus = requestSnapshot.getString("status");
+
+                    if (!normalizedTripId.equals(requestTripId)
+                            || !currentDriverId.equals(requestDriverId)
+                            || passengerId == null
+                            || passengerId.trim().isEmpty()
+                            || !"ACCEPTED".equals(requestStatus)
+                            || !(normalizedTripId + "_" + passengerId)
+                                    .equals(acceptedRequestId)) {
+                        throw new FirebaseFirestoreException(
+                                "Pointer lệch: yêu cầu không khớp chuyến, chủ xe, hành khách hoặc trạng thái.",
+                                FirebaseFirestoreException.Code.FAILED_PRECONDITION
+                        );
+                    }
+
+                    String notificationType = cancel
+                            ? "TRIP_CANCELLED"
+                            : "TRIP_COMPLETED";
+                    String notificationId = normalizedTripId + "_"
+                            + passengerId + "_" + notificationType;
+
+                    // Không đọc inbox của hành khách: Rules chỉ cho người nhận đọc.
+                    // Rules xác minh ID sự kiện và chỉ cho tạo notification chưa tồn tại.
+                    notificationReference = firestore.collection("notifications")
+                            .document(notificationId);
+                }
+
+                // Tất cả dữ liệu liên quan đã được đọc trước khi bắt đầu ghi.
+                transaction.update(
+                        tripReference,
+                        "status", cancel ? "CANCELLED" : "COMPLETED",
+                        "availableSeats", 0L,
+                        "updatedAt", FieldValue.serverTimestamp()
+                );
+
+                if (hasAcceptedRequest) {
+                    Map<String, Object> notificationData = new HashMap<>();
+                    notificationData.put("recipientId", passengerId);
+                    notificationData.put("actorId", currentDriverId);
+                    notificationData.put("type", cancel
+                            ? "TRIP_CANCELLED"
+                            : "TRIP_COMPLETED");
+                    notificationData.put("tripId", normalizedTripId);
+                    notificationData.put("requestId", acceptedRequestId);
+                    notificationData.put("isRead", false);
+                    notificationData.put("createdAt", FieldValue.serverTimestamp());
+
+                    transaction.set(notificationReference, notificationData);
+                }
+
+                return null;
+            }
+        }).addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void ignored) {
+                callback.onSuccess(null);
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                callback.onError(exception);
+            }
+        });
+    }
+
+    /**
+     * Đọc một chuyến từ máy chủ để quản lý, không giới hạn trạng thái chuyến.
+     * Quyền sở hữu luôn được xác minh lại từ dữ liệu Firestore.
+     */
+    public void loadTripForManagement(
+            final String tripId,
+            final RepositoryCallback<Trip> callback
+    ) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+
+        if (currentUser == null || currentUser.getUid().trim().isEmpty()) {
+            callback.onError(
+                    new IllegalStateException(
+                            "Bạn cần đăng nhập để quản lý chuyến."
+                    )
+            );
+            return;
+        }
+
+        if (tripId == null || tripId.trim().isEmpty()) {
+            callback.onError(
+                    new IllegalArgumentException("ID chuyến không hợp lệ.")
+            );
+            return;
+        }
+
+        final String currentDriverId = currentUser.getUid();
+        firestore.collection("trips")
+                .document(tripId.trim())
+                .get(Source.SERVER)
+                .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
+                    @Override
+                    public void onSuccess(DocumentSnapshot snapshot) {
+                        if (!snapshot.exists()) {
+                            callback.onError(
+                                    new IllegalStateException(
+                                            "Chuyến không tồn tại hoặc đã bị xóa."
+                                    )
+                            );
+                            return;
+                        }
+
+                        String ownerId = snapshot.getString("driverId");
+                        if (!currentDriverId.equals(ownerId)) {
+                            callback.onError(
+                                    new SecurityException(
+                                            "Bạn không có quyền quản lý chuyến này."
+                                    )
+                            );
+                            return;
+                        }
+
+                        Trip trip;
+                        try {
+                            trip = snapshot.toObject(Trip.class);
+                        } catch (RuntimeException exception) {
+                            callback.onError(exception);
+                            return;
+                        }
+
+                        if (trip == null) {
+                            callback.onError(
+                                    new IllegalStateException(
+                                            "Không thể đọc dữ liệu chuyến."
+                                    )
+                            );
+                            return;
+                        }
+
+                        trip.setId(snapshot.getId());
+                        callback.onSuccess(trip);
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        callback.onError(exception);
+                    }
+                });
+    }
+
     /**
      * Đọc một chuyến từ máy chủ và chỉ cho mở màn hình sửa nếu người hiện tại
      * là chủ chuyến, chuyến đang OPEN và chưa đến giờ khởi hành.

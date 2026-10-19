@@ -49,6 +49,9 @@ public class EditTripActivity extends AppCompatActivity {
 
     private static final String STATE_TRIP_ID = "edit_trip_id";
     private static final String STATE_HAS_LOADED = "edit_has_loaded";
+    private static final String STATE_COST_TEXT = "edit_cost_text";
+    private static final String STATE_NOTE_TEXT = "edit_note_text";
+    private static final String STATE_SAVE_IN_PROGRESS = "edit_save_in_progress";
     private static final String STATE_LOCATION_TARGET = "edit_location_target";
     private static final String STATE_YEAR = "edit_departure_year";
     private static final String STATE_MONTH = "edit_departure_month";
@@ -99,6 +102,7 @@ public class EditTripActivity extends AppCompatActivity {
     private int selectedLocationTarget = LOCATION_TARGET_NONE;
     private boolean hasLoadedTrip;
     private boolean isSaving;
+    private boolean saveWasInProgressWhenRecreated;
 
     /** Khởi tạo View, khôi phục trạng thái và tải chuyến cần sửa. */
     @Override
@@ -134,7 +138,14 @@ public class EditTripActivity extends AppCompatActivity {
             updateDepartureDateDisplay();
             updateDepartureTimeDisplay();
             setFormEnabled(true);
-            setStatusMessage(null);
+            if (saveWasInProgressWhenRecreated) {
+                setStatusMessage(
+                        "Màn hình đã xoay trong lúc lưu. Chưa xác nhận kết quả từ máy chủ; " +
+                                "hãy kiểm tra chuyến trước khi thử lưu lại."
+                );
+            } else {
+                setStatusMessage(null);
+            }
         } else {
             setFormEnabled(false);
             setStatusMessage("Đang tải thông tin chuyến...");
@@ -646,6 +657,7 @@ public class EditTripActivity extends AppCompatActivity {
 
     private void restoreState(Bundle state) {
         hasLoadedTrip = state.getBoolean(STATE_HAS_LOADED, false);
+        saveWasInProgressWhenRecreated = state.getBoolean(STATE_SAVE_IN_PROGRESS, false);
         selectedLocationTarget = state.getInt(STATE_LOCATION_TARGET, LOCATION_TARGET_NONE);
         departureYear = state.getInt(STATE_YEAR);
         departureMonth = state.getInt(STATE_MONTH);
@@ -699,8 +711,32 @@ public class EditTripActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+
+        // Restore these drafts explicitly after Android restores the View hierarchy.
+        if (savedInstanceState.containsKey(STATE_COST_TEXT)) {
+            costInput.setText(savedInstanceState.getString(STATE_COST_TEXT, ""));
+        }
+        if (savedInstanceState.containsKey(STATE_NOTE_TEXT)) {
+            noteInput.setText(savedInstanceState.getString(STATE_NOTE_TEXT, ""));
+        }
+
+        if (hasLoadedTrip) {
+            updateOriginDisplay();
+            updateDestinationDisplay();
+            updateDepartureDateDisplay();
+            updateDepartureTimeDisplay();
+            setFormEnabled(true);
+        }
+    }
+
+    @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         outState.putString(STATE_TRIP_ID, tripId);
+        outState.putString(STATE_COST_TEXT, costInput.getText().toString());
+        outState.putString(STATE_NOTE_TEXT, noteInput.getText().toString());
+        outState.putBoolean(STATE_SAVE_IN_PROGRESS, isSaving);
         outState.putBoolean(STATE_HAS_LOADED, hasLoadedTrip);
         outState.putInt(STATE_LOCATION_TARGET, selectedLocationTarget);
         outState.putInt(STATE_YEAR, departureYear);

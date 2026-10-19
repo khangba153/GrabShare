@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,6 +17,7 @@ import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
 import com.example.grabshare.adapter.driver.DriverTripAdapter;
+import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.repository.driver.DriverTripRepository;
@@ -108,6 +110,7 @@ public class DriverTripsActivity extends AppCompatActivity {
 
         connectFilterButtons();
         connectPostTripButton();
+        connectTripItemClick();
     }
 
     /**
@@ -478,6 +481,60 @@ public class DriverTripsActivity extends AppCompatActivity {
                     @Override
                     public void onClick(View view) {
                         selectFilter(FILTER_HISTORY);
+                    }
+                }
+        );
+    }
+
+    /**
+     * Mở màn quản lý khi người dùng chọn một chuyến trong danh sách.
+     * Chỉ truyền trip_id; ManageTripActivity sẽ đọc lại dữ liệu và quyền từ máy chủ.
+     */
+    private void connectTripItemClick() {
+        tripListView.setOnItemClickListener(
+                new android.widget.AdapterView.OnItemClickListener() {
+                    @Override
+                    public void onItemClick(
+                            android.widget.AdapterView<?> parent,
+                            View view,
+                            int position,
+                            long itemId
+                    ) {
+                        if (position < 0 || position >= tripAdapter.getCount()) {
+                            return;
+                        }
+
+                        Trip selectedTrip = tripAdapter.getItem(position);
+                        if (selectedTrip == null
+                                || selectedTrip.getId() == null
+                                || selectedTrip.getId().trim().isEmpty()) {
+                            Toast.makeText(
+                                    DriverTripsActivity.this,
+                                    "Không tìm thấy ID chuyến.",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                            return;
+                        }
+
+                        Intent manageIntent = new Intent(
+                                DriverTripsActivity.this,
+                                ManageTripActivity.class
+                        );
+                        manageIntent.putExtra(
+                                NavigationKeys.TRIP_ID,
+                                selectedTrip.getId()
+                        );
+
+                        if (manageIntent.resolveActivity(getPackageManager()) == null) {
+                            Toast.makeText(
+                                    DriverTripsActivity.this,
+                                    "Màn Quản lý chuyến chưa được đăng ký trong Manifest.",
+                                    Toast.LENGTH_LONG
+                            ).show();
+                            return;
+                        }
+
+                        startActivity(manageIntent);
                     }
                 }
         );
