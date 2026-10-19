@@ -18,6 +18,8 @@ public class Trip {
     private String acceptedRequestId;
     private Timestamp createdAt;
     private Timestamp updatedAt;
+    private Long maxDetourMeters;
+    private Long baseDistanceMeters;
 
     /** Tạo đối tượng rỗng để Firestore ánh xạ dữ liệu. */
     public Trip() {
@@ -157,5 +159,23 @@ public class Trip {
     /** Gán thời gian cập nhật. */
     public void setUpdatedAt(Timestamp updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    /** Giới hạn đường vòng; null khi chuyến chưa thiết lập. */
+    public Long getMaxDetourMeters() {
+        return maxDetourMeters;
+    }
+
+    public void setMaxDetourMeters(Long maxDetourMeters) {
+        this.maxDetourMeters = maxDetourMeters;
+    }
+
+    /** Khoảng cách tuyến gốc; null khi chưa có dữ liệu. */
+    public Long getBaseDistanceMeters() {
+        return baseDistanceMeters;
+    }
+
+    public void setBaseDistanceMeters(Long baseDistanceMeters) {
+        this.baseDistanceMeters = baseDistanceMeters;
     }
 }
