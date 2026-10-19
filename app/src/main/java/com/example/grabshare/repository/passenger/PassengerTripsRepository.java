@@ -85,7 +85,7 @@ public class PassengerTripsRepository {
      * Lắng nghe Realtime thông tin của một Yêu cầu duy nhất theo requestId,
      * tự động gắn listener cho Trip và PublicProfile liên quan.
      * @param requestId ID của document request.
-     * @param callback Callback trả kết quả SingleRequestDetails hoặc báo lỗi.
+     * @param callback Trả kết quả SingleRequestDetails hoặc báo lỗi.
      * @return ListenerRegistration hợp nhất để Activity tháo gỡ khi Stop.
      */
     public ListenerRegistration listenSingleRequest(final String requestId, final RepositoryCallback<SingleRequestDetails> callback) {
@@ -200,8 +200,10 @@ public class PassengerTripsRepository {
                                     if (!active) return;
 
                                     if (error != null) {
-                                        tripDataMap.remove(tripId);
-                                        notifyCallbackIfReady();
+                                        // Khi có lỗi đọc trip (mạng/quyền), gọi callback.onError để UI báo lỗi & thử lại thay vì nuốt lỗi
+                                        if (callback != null) {
+                                            callback.onError(error);
+                                        }
                                         return;
                                     }
 
@@ -212,6 +214,7 @@ public class PassengerTripsRepository {
                                             tripDataMap.put(tripId, trip);
                                         }
                                     } else {
+                                        // Document thực sự không tồn tại trên server (chuyến đi đã bị xóa)
                                         tripDataMap.remove(tripId);
                                     }
 

@@ -89,6 +89,7 @@ public class TripCacheRepository implements TripCacheStore {
 
     /**
      * Lấy dữ liệu chuyến đi đã lưu từ bộ nhớ tạm SQLite.
+     * Sử dụng try-with-resources để đảm bảo Cursor luôn được đóng an toàn.
      * Thực hiện đồng bộ trên luồng gọi (ExecutorService ngoài UI thread).
      * @param userId ID người dùng hiện tại.
      * @param tripId ID chuyến đi cần xem.
@@ -104,7 +105,7 @@ public class TripCacheRepository implements TripCacheStore {
         String selection = TripCacheDbHelper.COLUMN_USER_ID + " = ? AND " + TripCacheDbHelper.COLUMN_TRIP_ID + " = ?";
         String[] selectionArgs = new String[]{userId, tripId};
 
-        Cursor cursor = db.query(
+        try (Cursor cursor = db.query(
                 TripCacheDbHelper.TABLE_VIEWED_TRIPS,
                 null,
                 selection,
@@ -112,55 +113,72 @@ public class TripCacheRepository implements TripCacheStore {
                 null,
                 null,
                 null
-        );
+        )) {
+            if (cursor != null && cursor.moveToFirst()) {
+                Trip trip = new Trip();
+                trip.setId(tripId);
 
-        if (cursor == null) {
-            return null;
+                int colOrigName = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_ORIGIN_NAME);
+                int colOrigLat = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_ORIGIN_LAT);
+                int colOrigLng = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_ORIGIN_LNG);
+
+                String originName = cursor.isNull(colOrigName) ? "" : cursor.getString(colOrigName);
+                Double originLat = cursor.isNull(colOrigLat) ? null : cursor.getDouble(colOrigLat);
+                Double originLng = cursor.isNull(colOrigLng) ? null : cursor.getDouble(colOrigLng);
+                trip.setOrigin(new Place(originName, originLat, originLng));
+
+                int colDestName = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DEST_NAME);
+                int colDestLat = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DEST_LAT);
+                int colDestLng = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DEST_LNG);
+
+                String destName = cursor.isNull(colDestName) ? "" : cursor.getString(colDestName);
+                Double destLat = cursor.isNull(colDestLat) ? null : cursor.getDouble(colDestLat);
+                Double destLng = cursor.isNull(colDestLng) ? null : cursor.getDouble(colDestLng);
+                trip.setDestination(new Place(destName, destLat, destLng));
+
+                int colDriverId = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DRIVER_ID);
+                int colCost = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_COST_VND);
+                int colSeats = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_AVAILABLE_SEATS);
+                int colNote = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_NOTE);
+                int colStatus = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_STATUS);
+                int colDepAt = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DEPARTURE_AT);
+
+                trip.setDriverId(cursor.isNull(colDriverId) ? "" : cursor.getString(colDriverId));
+                trip.setCostVnd(cursor.isNull(colCost) ? null : cursor.getLong(colCost));
+                trip.setAvailableSeats(cursor.isNull(colSeats) ? null : cursor.getLong(colSeats));
+                trip.setNote(cursor.isNull(colNote) ? "" : cursor.getString(colNote));
+                trip.setStatus(cursor.isNull(colStatus) ? "" : cursor.getString(colStatus));
+
+                if (!cursor.isNull(colDepAt)) {
+                    long depTimeMillis = cursor.getLong(colDepAt);
+                    if (depTimeMillis > 0) {
+                        trip.setDepartureAt(new Timestamp(new Date(depTimeMillis)));
+                    }
+                }
+
+                int colDriverName = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DRIVER_NAME);
+                int colVehicleName = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_VEHICLE_NAME);
+                String driverName = cursor.isNull(colDriverName) ? "" : cursor.getString(colDriverName);
+                String vehicleName = cursor.isNull(colVehicleName) ? "" : cursor.getString(colVehicleName);
+
+                PublicProfile profile = null;
+                if ((driverName != null && !driverName.trim().isEmpty()) || (vehicleName != null && !vehicleName.trim().isEmpty())) {
+                    profile = new PublicProfile();
+                    profile.setId(trip.getDriverId());
+                    profile.setDisplayName(driverName);
+                    profile.setVehicleName(vehicleName);
+                }
+
+                int colSavedAt = cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_SAVED_AT);
+                long savedAt = cursor.isNull(colSavedAt) ? 0L : cursor.getLong(colSavedAt);
+
+                return new CachedTrip(trip, profile, savedAt);
+            }
+        } catch (Exception e) {
+            // Trường hợp truy vấn SQLite bị lỗi
         }
 
-        CachedTrip cachedTrip = null;
-        if (cursor.moveToFirst()) {
-            Trip trip = new Trip();
-            trip.setId(tripId);
-
-            String originName = cursor.getString(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_ORIGIN_NAME));
-            Double originLat = cursor.getDouble(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_ORIGIN_LAT));
-            Double originLng = cursor.getDouble(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_ORIGIN_LNG));
-            trip.setOrigin(new Place(originName, originLat, originLng));
-
-            String destName = cursor.getString(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DEST_NAME));
-            Double destLat = cursor.getDouble(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DEST_LAT));
-            Double destLng = cursor.getDouble(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DEST_LNG));
-            trip.setDestination(new Place(destName, destLat, destLng));
-
-            trip.setDriverId(cursor.getString(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DRIVER_ID)));
-            trip.setCostVnd(cursor.getLong(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_COST_VND)));
-            trip.setAvailableSeats(cursor.getLong(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_AVAILABLE_SEATS)));
-            trip.setNote(cursor.getString(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_NOTE)));
-            trip.setStatus(cursor.getString(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_STATUS)));
-
-            long depTimeMillis = cursor.getLong(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DEPARTURE_AT));
-            if (depTimeMillis > 0) {
-                trip.setDepartureAt(new Timestamp(new Date(depTimeMillis)));
-            }
-
-            String driverName = cursor.getString(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_DRIVER_NAME));
-            String vehicleName = cursor.getString(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_VEHICLE_NAME));
-
-            PublicProfile profile = null;
-            if ((driverName != null && !driverName.trim().isEmpty()) || (vehicleName != null && !vehicleName.trim().isEmpty())) {
-                profile = new PublicProfile();
-                profile.setId(trip.getDriverId());
-                profile.setDisplayName(driverName);
-                profile.setVehicleName(vehicleName);
-            }
-
-            long savedAt = cursor.getLong(cursor.getColumnIndexOrThrow(TripCacheDbHelper.COLUMN_SAVED_AT));
-            cachedTrip = new CachedTrip(trip, profile, savedAt);
-        }
-
-        cursor.close();
-        return cachedTrip;
+        return null;
     }
 
     /**
