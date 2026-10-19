@@ -1,6 +1,5 @@
 package com.example.grabshare.activity.driver;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
@@ -12,7 +11,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
-import com.example.grabshare.activity.notifications.NotificationsActivity;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.DriverRequestItem;
@@ -133,16 +131,6 @@ public class RequestDetailActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 finish();
-            }
-        });
-
-        notificationsButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startActivity(new Intent(
-                        RequestDetailActivity.this,
-                        NotificationsActivity.class
-                ));
             }
         });
 
