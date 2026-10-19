@@ -525,17 +525,10 @@ public class DriverTripRepository {
                     String notificationId = normalizedTripId + "_"
                             + passengerId + "_" + notificationType;
 
+                    // Không đọc inbox của hành khách: Rules chỉ cho người nhận đọc.
+                    // Rules xác minh ID sự kiện và chỉ cho tạo notification chưa tồn tại.
                     notificationReference = firestore.collection("notifications")
                             .document(notificationId);
-                    DocumentSnapshot notificationSnapshot =
-                            transaction.get(notificationReference);
-
-                    if (notificationSnapshot.exists()) {
-                        throw new FirebaseFirestoreException(
-                                "Thông báo sự kiện này đã tồn tại; không thể ghi lặp.",
-                                FirebaseFirestoreException.Code.ALREADY_EXISTS
-                        );
-                    }
                 }
 
                 // Tất cả dữ liệu liên quan đã được đọc trước khi bắt đầu ghi.
