@@ -162,4 +162,31 @@
                 android:enabled="false" />
         </LinearLayout>
     </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/action_area"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="12dp"
+        android:background="@color/background">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/primary_action"
+            style="@style/ButtonPrimary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hoàn thành chuyến"
+            android:visibility="gone" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/secondary_action"
+            style="@style/ButtonSecondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hủy chuyến"
+            android:visibility="gone" />
+    </LinearLayout>
 </LinearLayout>
