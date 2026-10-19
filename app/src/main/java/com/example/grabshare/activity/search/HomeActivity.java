@@ -21,6 +21,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.model.Place;
 
@@ -50,6 +51,7 @@ public class HomeActivity extends AppCompatActivity {
     private TextView tvDestinationValue;
     private TextView tvDateValue;
     private TextView tvTimeValue;
+    private TextView tvRouteDistance;
     private MapView mapView;
     private ScrollView mainScrollView;
 
@@ -60,7 +62,8 @@ public class HomeActivity extends AppCompatActivity {
     private int currentPickingField = 0; // 1 = origin, 2 = destination
     private ActivityResultLauncher<Intent> locationPickerLauncher;
 
-    private int currentRouteRequestId = 0; // Đếm thế hệ vẽ tuyến để chặn đè tuyến đường mạng trễ
+    private final VietnamRoutingClient routingClient = new VietnamRoutingClient("3ae0ba5bcf8843df8024203662e3d702");
+    private volatile int currentRouteRequestId = 0; // Dùng cả ở UI và luồng Routing để bỏ tác vụ tuyến cũ
     private final java.util.concurrent.ExecutorService routeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
@@ -94,6 +97,7 @@ public class HomeActivity extends AppCompatActivity {
         tvDestinationValue = findViewById(R.id.pick_end_value);
         tvDateValue = findViewById(R.id.pick_date_value);
         tvTimeValue = findViewById(R.id.pick_time_value);
+        tvRouteDistance = findViewById(R.id.home_route_distance);
         
         mapView = findViewById(R.id.map_view);
         mainScrollView = findViewById(R.id.main_scroll_view);
@@ -351,6 +355,10 @@ public class HomeActivity extends AppCompatActivity {
      * Cập nhật văn bản hiển thị cho ô chọn Điểm đi và Điểm đến trên UI.
      */
     private void updateUI() {
+        // Đổi điểm là vô hiệu hóa cả nhãn quãng đường lẫn callback tuyến cũ.
+        final int requestId = ++currentRouteRequestId;
+        routingClient.cancelCurrentRequest();
+        tvRouteDistance.setText("Chọn điểm đi và điểm đến để xem quãng đường");
         // LUÔN LUÔN xóa toàn bộ ghim và đường vẽ cũ đi trước khi bắt đầu vẽ lại
         mapView.getOverlays().clear();
         
@@ -390,7 +398,7 @@ public class HomeActivity extends AppCompatActivity {
                     Math.min(startPoint.getLongitude(), endPoint.getLongitude())
             ), true);
 
-            final int requestId = ++currentRouteRequestId;
+            tvRouteDistance.setText("Đang tính quãng đường đường bộ…");
             fetchAndDrawRoute(startPoint, endPoint, requestId);
         } else if (startPoint != null) {
             mapView.getController().animateTo(startPoint);
@@ -406,143 +414,66 @@ public class HomeActivity extends AppCompatActivity {
      */
     private void fetchAndDrawRoute(final GeoPoint start, final GeoPoint end, final int requestId) {
         routeExecutor.execute(new Runnable() {
-            @Override
-            public void run() {
-                java.net.HttpURLConnection conn = null;
-                java.io.BufferedReader reader = null;
+            /** Gọi Routing ngoài UI; kết quả chỉ được nhận nếu toàn tuyến đã qua kiểm tra VN. */
+            @Override public void run() {
+                final VietnamRoutingClient.Cancellation cancellation = new VietnamRoutingClient.Cancellation() {
+                    /** Lượt cũ không tiếp tục gọi API dự phòng sau khi người dùng đổi điểm. */
+                    @Override public boolean isCancelled() { return requestId != currentRouteRequestId; }
+                };
+                if (cancellation.isCancelled()) return;
                 try {
-                    // Kiểm tra xem chuyến đi có xuyên Việt (Bắc - Nam vượt qua eo miền Trung) hay không
-                    // Vĩ độ của Đà Nẵng khoảng 16.0
-                    boolean isNorthToSouth = (start.getLatitude() > 17.5 && end.getLatitude() < 14.5) ||
-                                             (end.getLatitude() > 17.5 && start.getLatitude() < 14.5);
-
-                    String urlString;
-                    if (isNorthToSouth) {
-                        // Chèn thêm waypoint ở Quốc lộ 1A (Đà Nẵng: 16.0044, 108.2022) để ép đường đi ôm theo hình chữ S, né cắt Lào/Campuchia
-                        // Dùng mode=motorcycle cho xe máy thay vì drive (ô tô)
-                        urlString = String.format(Locale.US,
-                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C16.0044,108.2022%%7C%f,%f&mode=motorcycle&apiKey=3ae0ba5bcf8843df8024203662e3d702",
-                                start.getLatitude(), start.getLongitude(),
-                                end.getLatitude(), end.getLongitude());
-                    } else {
-                        // Các chuyến nội tỉnh hoặc khoảng cách gần thì giữ nguyên 2 điểm
-                        urlString = String.format(Locale.US,
-                                "https://api.geoapify.com/v1/routing?waypoints=%f,%f%%7C%f,%f&mode=motorcycle&apiKey=3ae0ba5bcf8843df8024203662e3d702",
-                                start.getLatitude(), start.getLongitude(),
-                                end.getLatitude(), end.getLongitude());
-                    }
-
-                    java.net.URL url = new java.net.URL(urlString);
-                    conn = (java.net.HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("GET");
-                    conn.setConnectTimeout(10000);
-                    conn.setReadTimeout(10000);
-
-                    if (conn.getResponseCode() == java.net.HttpURLConnection.HTTP_OK) {
-                        reader = new java.io.BufferedReader(
-                                new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
-                        StringBuilder sb = new StringBuilder();
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            sb.append(line);
-                        }
-
-                        org.json.JSONObject jsonResponse = new org.json.JSONObject(sb.toString());
-                        org.json.JSONArray features = jsonResponse.getJSONArray("features");
-                        if (features.length() > 0) {
-                            org.json.JSONObject feature = features.getJSONObject(0);
-                            org.json.JSONObject geometry = feature.getJSONObject("geometry");
-                            String geomType = geometry.optString("type", "");
-                            
-                            final java.util.List<GeoPoint> geoPoints = new java.util.ArrayList<>();
-                            
-                            // Xử lý chuẩn cả 2 định dạng LineString và MultiLineString từ Geoapify
-                            if ("LineString".equalsIgnoreCase(geomType)) {
-                                org.json.JSONArray coords = geometry.getJSONArray("coordinates");
-                                for (int i = 0; i < coords.length(); i++) {
-                                    org.json.JSONArray pt = coords.getJSONArray(i);
-                                    double lon = pt.getDouble(0);
-                                    double lat = pt.getDouble(1);
-                                    geoPoints.add(new GeoPoint(lat, lon));
-                                }
-                            } else if ("MultiLineString".equalsIgnoreCase(geomType)) {
-                                org.json.JSONArray lines = geometry.getJSONArray("coordinates");
-                                for (int i = 0; i < lines.length(); i++) {
-                                    org.json.JSONArray segment = lines.getJSONArray(i);
-                                    for (int j = 0; j < segment.length(); j++) {
-                                        org.json.JSONArray pt = segment.getJSONArray(j);
-                                        double lon = pt.getDouble(0);
-                                        double lat = pt.getDouble(1);
-                                        geoPoints.add(new GeoPoint(lat, lon));
-                                    }
-                                }
-                            }
-
-                            if (!geoPoints.isEmpty()) {
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        if (isFinishing() || isDestroyed()) return;
-                                        // Kiểm tra nếu request này không còn là request mới nhất thì bỏ qua
-                                        if (requestId != currentRouteRequestId) return;
-                                        
-                                        // Xóa mọi đường Polyline ngầm bị delay mạng dội về trễ
-                                        for (int i = mapView.getOverlays().size() - 1; i >= 0; i--) {
-                                            if (mapView.getOverlays().get(i) instanceof org.osmdroid.views.overlay.Polyline) {
-                                                mapView.getOverlays().remove(i);
-                                            }
-                                        }
-
-                                        org.osmdroid.views.overlay.Polyline line = new org.osmdroid.views.overlay.Polyline();
-                                        line.setPoints(geoPoints);
-                                        // Set màu xanh nét dày
-                                        line.getOutlinePaint().setColor(android.graphics.Color.parseColor("#4A80F5")); 
-                                        line.getOutlinePaint().setStrokeWidth(12f);
-                                        // Chèn đường đi xuống dưới các Marker để không che ghim
-                                        mapView.getOverlays().add(0, line); 
-                                        mapView.postInvalidate(); // Ép load lại ngay lập tức
-                                    }
-                                });
-                            }
-                        } else {
-                            // Không có feature trả về
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (isFinishing() || isDestroyed() || requestId != currentRouteRequestId) return;
-                                    Toast.makeText(HomeActivity.this, "Không tìm thấy tuyến đường kết nối 2 địa điểm", Toast.LENGTH_SHORT).show();
-                                }
-                            });
-                        }
-                    } else {
-                        // HTTP Error (VD: 429 Limit Exceeded)
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (isFinishing() || isDestroyed() || requestId != currentRouteRequestId) return;
-                                Toast.makeText(HomeActivity.this, "Chưa thể tải tuyến đường gợi ý (Lỗi mạng/API)", Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                    }
-                } catch (Exception e) {
-                    // Exception Error
+                    java.util.List<VietnamRoutingClient.Point> endpoints = java.util.Arrays.asList(
+                            new VietnamRoutingClient.Point(start.getLatitude(), start.getLongitude()),
+                            new VietnamRoutingClient.Point(end.getLatitude(), end.getLongitude()));
+                    final VietnamRoutingClient.Route route = routingClient.findRoute(endpoints, cancellation);
                     runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (isFinishing() || isDestroyed() || requestId != currentRouteRequestId) return;
-                            Toast.makeText(HomeActivity.this, "Chưa thể tải tuyến đường gợi ý (Lỗi mạng/API)", Toast.LENGTH_SHORT).show();
+                        /** Vẽ riêng từng đoạn API, không nối tắt qua chỗ geometry bị ngắt. */
+                        @Override public void run() {
+                            if (isFinishing() || isDestroyed() || cancellation.isCancelled()) return;
+                            for (int i = mapView.getOverlays().size() - 1; i >= 0; i--) {
+                                if (mapView.getOverlays().get(i) instanceof org.osmdroid.views.overlay.Polyline) {
+                                    mapView.getOverlays().remove(i);
+                                }
+                            }
+                            for (java.util.List<VietnamRoutingClient.Point> segment : route.segments) {
+                                java.util.List<GeoPoint> points = new java.util.ArrayList<>();
+                                for (VietnamRoutingClient.Point point : segment) {
+                                    points.add(new GeoPoint(point.latitude, point.longitude));
+                                }
+                                org.osmdroid.views.overlay.Polyline line = new org.osmdroid.views.overlay.Polyline();
+                                line.setPoints(points);
+                                line.getOutlinePaint().setColor(android.graphics.Color.parseColor("#4A80F5"));
+                                line.getOutlinePaint().setStrokeWidth(12f);
+                                mapView.getOverlays().add(0, line);
+                            }
+                            showRouteDistance(route.distanceMeters);
+                            mapView.postInvalidate();
                         }
                     });
-                } finally {
-                    if (reader != null) {
-                        try {
-                            reader.close();
-                        } catch (Exception ignored) {}
-                    }
-                    if (conn != null) {
-                        conn.disconnect();
-                    }
+                } catch (java.io.IOException error) {
+                    showRouteError(requestId, error.getMessage());
+                } catch (RuntimeException invalid) {
+                    showRouteError(requestId, "Không xác nhận được tuyến Việt Nam cho các điểm đã chọn.");
                 }
+            }
+        });
+    }
+    /** Hiển thị km của đúng tuyến vừa vẽ; thiếu distance không được coi là 0 km. */
+    private void showRouteDistance(double distanceMeters) {
+        if (Double.isFinite(distanceMeters) && distanceMeters >= 0) {
+            tvRouteDistance.setText("Quãng đường trong Việt Nam: "
+                    + RouteDistanceFormatter.formatKilometers(distanceMeters));
+        } else tvRouteDistance.setText("Tuyến chưa có số liệu quãng đường đường bộ.");
+    }
+
+    /** Báo lỗi cho đúng lượt tìm, tránh để nhãn mắc ở trạng thái đang tính. */
+    private void showRouteError(final int requestId, final String message) {
+        runOnUiThread(new Runnable() {
+            /** Không cập nhật màn đã đóng hoặc tuyến đã bị thay thế. */
+            @Override public void run() {
+                if (isFinishing() || isDestroyed() || requestId != currentRouteRequestId) return;
+                tvRouteDistance.setText(message);
+                Toast.makeText(HomeActivity.this, message, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -593,6 +524,8 @@ public class HomeActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        currentRouteRequestId++;
+        routingClient.cancelCurrentRequest();
         mapView.onDetach();
         routeExecutor.shutdownNow(); // Đảm bảo luồng phụ không chạy ngầm
     }
