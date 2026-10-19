@@ -97,6 +97,18 @@ public class ManageTripActivity extends AppCompatActivity {
         loadTrip();
     }
 
+    /**
+     * Cập nhật khả năng thao tác khi người dùng quay lại màn sau khi ứng dụng ở nền.
+     * Trạng thái dữ liệu không được thay đổi chỉ dựa trên thời gian thiết bị.
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (currentTrip != null && !isLoading && !isTransitioning) {
+            updateActionAvailability(currentTrip);
+        }
+    }
+
     /** Ánh xạ các thành phần giao diện từ screen_manage.xml. */
     private void initializeViews() {
         backButton = findViewById(R.id.header_back);
@@ -228,6 +240,16 @@ public class ManageTripActivity extends AppCompatActivity {
             noteText.setText("Không có ghi chú.");
         } else {
             noteText.setText(note.trim());
+        }
+
+        updateActionAvailability(trip);
+    }
+
+    /** Tính trạng thái các nút từ dữ liệu chuyến và thời điểm hiện tại. */
+    private void updateActionAvailability(Trip trip) {
+        if (trip == null) {
+            hideTripActions();
+            return;
         }
 
         boolean isOpen = "OPEN".equals(trip.getStatus());
