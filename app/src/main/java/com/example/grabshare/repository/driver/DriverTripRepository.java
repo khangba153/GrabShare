@@ -352,6 +352,88 @@ public class DriverTripRepository {
                         }
                 );
     }
+
+    /**
+     * Đọc một chuyến từ máy chủ để quản lý, không giới hạn trạng thái chuyến.
+     * Quyền sở hữu luôn được xác minh lại từ dữ liệu Firestore.
+     */
+    public void loadTripForManagement(
+            final String tripId,
+            final RepositoryCallback<Trip> callback
+    ) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+
+        if (currentUser == null || currentUser.getUid().trim().isEmpty()) {
+            callback.onError(
+                    new IllegalStateException(
+                            "Bạn cần đăng nhập để quản lý chuyến."
+                    )
+            );
+            return;
+        }
+
+        if (tripId == null || tripId.trim().isEmpty()) {
+            callback.onError(
+                    new IllegalArgumentException("ID chuyến không hợp lệ.")
+            );
+            return;
+        }
+
+        final String currentDriverId = currentUser.getUid();
+        firestore.collection("trips")
+                .document(tripId.trim())
+                .get(Source.SERVER)
+                .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
+                    @Override
+                    public void onSuccess(DocumentSnapshot snapshot) {
+                        if (!snapshot.exists()) {
+                            callback.onError(
+                                    new IllegalStateException(
+                                            "Chuyến không tồn tại hoặc đã bị xóa."
+                                    )
+                            );
+                            return;
+                        }
+
+                        String ownerId = snapshot.getString("driverId");
+                        if (!currentDriverId.equals(ownerId)) {
+                            callback.onError(
+                                    new SecurityException(
+                                            "Bạn không có quyền quản lý chuyến này."
+                                    )
+                            );
+                            return;
+                        }
+
+                        Trip trip;
+                        try {
+                            trip = snapshot.toObject(Trip.class);
+                        } catch (RuntimeException exception) {
+                            callback.onError(exception);
+                            return;
+                        }
+
+                        if (trip == null) {
+                            callback.onError(
+                                    new IllegalStateException(
+                                            "Không thể đọc dữ liệu chuyến."
+                                    )
+                            );
+                            return;
+                        }
+
+                        trip.setId(snapshot.getId());
+                        callback.onSuccess(trip);
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        callback.onError(exception);
+                    }
+                });
+    }
+
     /**
      * Đọc một chuyến từ máy chủ và chỉ cho mở màn hình sửa nếu người hiện tại
      * là chủ chuyến, chuyến đang OPEN và chưa đến giờ khởi hành.
