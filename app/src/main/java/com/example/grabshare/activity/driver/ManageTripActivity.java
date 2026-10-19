@@ -65,6 +65,7 @@ public class ManageTripActivity extends AppCompatActivity {
     private Trip currentTrip;
     private boolean isLoading;
     private boolean isTransitioning;
+    private boolean isFirstResume = true;
 
     /** Khởi tạo giao diện, phục hồi ID chuyến và tải dữ liệu từ máy chủ. */
     @Override
@@ -107,8 +108,12 @@ public class ManageTripActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (currentTrip != null && !isLoading && !isTransitioning) {
-            updateActionAvailability(currentTrip);
+        if (isFirstResume) {
+            isFirstResume = false;
+            return;
+        }
+        if (!isLoading && !isTransitioning) {
+            loadTrip();
         }
     }
 
@@ -195,6 +200,7 @@ public class ManageTripActivity extends AppCompatActivity {
             return;
         }
 
+        currentTrip = null;
         isLoading = true;
         currentTrip = null;
         setActionsBusy();
