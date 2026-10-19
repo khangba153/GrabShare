@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
 import com.example.grabshare.activity.search.HomeActivity;
+import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Place;
@@ -60,6 +61,7 @@ public class RejectedActivity extends AppCompatActivity {
 
     private String requestId;
     private String currentUserId;
+    private boolean hasNavigated = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,20 +73,20 @@ public class RejectedActivity extends AppCompatActivity {
             requestId = getIntent().getStringExtra(NavigationKeys.REQUEST_ID);
         }
 
-        if (requestId == null || requestId.trim().isEmpty()) {
-            Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        // Kiểm tra phiên đăng nhập
+        // Kiểm tra Auth trước khi thực hiện bất kỳ thao tác hay khởi tạo listener nào
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null || currentUser.getUid() == null || currentUser.getUid().trim().isEmpty()) {
+        if (currentUser == null || currentUser.getUid().trim().isEmpty()) {
             Toast.makeText(this, "Vui lòng đăng nhập để xem thông tin.", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
         currentUserId = currentUser.getUid();
+
+        if (requestId == null || requestId.trim().isEmpty()) {
+            Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
 
         initRepositories();
         initViews();
@@ -178,7 +180,6 @@ public class RejectedActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // Hủy listener đúng vòng đời Android (Checklist 3)
         if (singleRequestListener != null) {
             singleRequestListener.remove();
             singleRequestListener = null;
@@ -186,6 +187,10 @@ public class RejectedActivity extends AppCompatActivity {
     }
 
     private void startListeningRequest() {
+        if (requestId == null || requestId.trim().isEmpty()) {
+            return;
+        }
+
         if (singleRequestListener != null) {
             singleRequestListener.remove();
         }
@@ -201,10 +206,43 @@ public class RejectedActivity extends AppCompatActivity {
 
                 TripRequest request = details.getRequest();
 
-                // Kiểm tra quyền truy cập: không rò dữ liệu request của người khác (Checklist 2)
+                // Kiểm tra quyền truy cập chính chủ
                 if (!currentUserId.equals(request.getPassengerId())) {
                     Toast.makeText(RejectedActivity.this, "Bạn không có quyền truy cập yêu cầu này.", Toast.LENGTH_SHORT).show();
                     finish();
+                    return;
+                }
+
+                Trip trip = details.getTrip();
+                String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
+
+                // State resolver điều hướng tự động nếu request không phải REJECTED
+                if ("PENDING".equalsIgnoreCase(effectiveStatus)) {
+                    if (!hasNavigated) {
+                        hasNavigated = true;
+                        Intent intent = new Intent(RejectedActivity.this, PendingActivity.class);
+                        intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                        startActivity(intent);
+                        finish();
+                    }
+                    return;
+                } else if ("ACCEPTED".equalsIgnoreCase(effectiveStatus)) {
+                    if (!hasNavigated) {
+                        hasNavigated = true;
+                        Intent intent = new Intent(RejectedActivity.this, AcceptedActivity.class);
+                        intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                        startActivity(intent);
+                        finish();
+                    }
+                    return;
+                } else if ("COMPLETED".equalsIgnoreCase(effectiveStatus)) {
+                    if (!hasNavigated) {
+                        hasNavigated = true;
+                        Intent intent = new Intent(RejectedActivity.this, UpcomingActivity.class);
+                        intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                        startActivity(intent);
+                        finish();
+                    }
                     return;
                 }
 
@@ -228,15 +266,17 @@ public class RejectedActivity extends AppCompatActivity {
 
         if (profile != null) {
             if (driverName != null) {
-                driverName.setText(profile.getDisplayName() != null ? profile.getDisplayName() : "Chủ xe");
+                driverName.setText(profile.getDisplayName() != null && !profile.getDisplayName().trim().isEmpty()
+                        ? profile.getDisplayName().trim() : "Chủ xe");
             }
             if (driverMeta != null) {
-                String vehicle = (profile.getVehicleName() != null && !profile.getVehicleName().isEmpty()) ? profile.getVehicleName() : "Xe máy";
-                driverMeta.setText("★ 5.0 · " + vehicle);
+                String vehicle = (profile.getVehicleName() != null && !profile.getVehicleName().trim().isEmpty())
+                        ? profile.getVehicleName().trim() : "Xe máy";
+                driverMeta.setText(vehicle);
             }
         } else {
             if (driverName != null) driverName.setText("Chủ xe");
-            if (driverMeta != null) driverMeta.setText("★ 5.0 · Xe máy");
+            if (driverMeta != null) driverMeta.setText("Xe máy");
         }
 
         if (trip != null) {

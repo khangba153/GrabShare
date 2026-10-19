@@ -68,32 +68,36 @@ public class UpcomingActivity extends AppCompatActivity {
     private String requestId;
     private String currentUserId;
     private SingleRequestDetails currentDetails;
+    private boolean hasNavigated = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_upcoming);
 
-        initRepositories();
-        initViews();
-        setupListeners();
-
         // Đọc requestId từ Intent Extra theo NavigationKeys.REQUEST_ID
         if (getIntent() != null) {
             requestId = getIntent().getStringExtra(NavigationKeys.REQUEST_ID);
         }
 
-        // Kiểm tra phiên đăng nhập người dùng
+        // Kiểm tra Auth trước khi khởi tạo listener
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser != null && currentUser.getUid() != null) {
-            currentUserId = currentUser.getUid();
+        if (currentUser == null || currentUser.getUid().trim().isEmpty()) {
+            Toast.makeText(this, "Vui lòng đăng nhập để xem thông tin.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
         }
+        currentUserId = currentUser.getUid();
 
         if (requestId == null || requestId.trim().isEmpty()) {
-            Toast.makeText(this, "Thiếu request_id. Vui lòng nhập request_id trong công cụ bộ chọn.", Toast.LENGTH_LONG).show();
-            if (upcomingStatus != null) upcomingStatus.setText("Thiếu mã request_id");
-            if (upcomingDescription != null) upcomingDescription.setText("Nhập request_id từ Firestore trong bộ chọn Mở Activity thật hoặc điều hướng từ Màn Chuyến của tôi.");
+            Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
         }
+
+        initRepositories();
+        initViews();
+        setupListeners();
     }
 
     private void initRepositories() {
@@ -130,9 +134,9 @@ public class UpcomingActivity extends AppCompatActivity {
             secondaryAction.setFocusable(true);
         }
 
+        // Ẩn nút liên hệ giả theo review "Ẩn nút nếu liên hệ chưa thuộc scope"
         if (tripCall != null) {
-            tripCall.setClickable(true);
-            tripCall.setFocusable(true);
+            tripCall.setVisibility(View.GONE);
         }
 
         // View chi tiết
@@ -175,15 +179,6 @@ public class UpcomingActivity extends AppCompatActivity {
                 }
             });
         }
-
-        if (tripCall != null) {
-            tripCall.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    handleCallDriver();
-                }
-            });
-        }
     }
 
     @Override
@@ -195,7 +190,6 @@ public class UpcomingActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // Tháo gỡ listener đúng vòng đời Android
         if (singleRequestListener != null) {
             singleRequestListener.remove();
             singleRequestListener = null;
@@ -225,7 +219,7 @@ public class UpcomingActivity extends AppCompatActivity {
 
                 TripRequest request = details.getRequest();
 
-                // Xác minh người sở hữu request (Checklist 1: Chỉ người được nhận thấy chuyến của mình)
+                // Xác minh chính chủ request
                 if (!currentUserId.equals(request.getPassengerId())) {
                     Toast.makeText(UpcomingActivity.this, "Bạn không có quyền xem chuyến đi này.", Toast.LENGTH_SHORT).show();
                     finish();
@@ -257,11 +251,55 @@ public class UpcomingActivity extends AppCompatActivity {
         bindDriverProfile(profile);
         bindTripAndRequestInfo(trip, request);
 
-        String tripStatus = (trip != null && trip.getStatus() != null) ? trip.getStatus() : "";
-        String requestStatus = (request != null && request.getStatus() != null) ? request.getStatus() : "";
+        // Đảm bảo nút liên hệ luôn bị ẩn vì chưa thuộc scope
+        if (tripCall != null) {
+            tripCall.setVisibility(View.GONE);
+        }
 
-        // Ưu tiên kiểm tra trạng thái trip CANCELLED (Checklist 3)
-        if ("CANCELLED".equalsIgnoreCase(tripStatus) || "CANCELLED".equalsIgnoreCase(requestStatus)) {
+        // Kiểm tra chuyến đi thiếu hoặc không khả dụng -> Khóa mutation
+        if (trip == null) {
+            if (upcomingStatus != null) upcomingStatus.setText("Không khả dụng");
+            if (upcomingDescription != null) upcomingDescription.setText("Thông tin chuyến đi liên quan không tồn tại.");
+            if (secondaryAction != null) secondaryAction.setVisibility(View.GONE);
+            if (primaryAction != null) {
+                primaryAction.setText("Quay lại");
+                primaryAction.setEnabled(true);
+                primaryAction.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        finish();
+                    }
+                });
+            }
+            return;
+        }
+
+        String requestStatus = (request.getStatus() != null) ? request.getStatus().toUpperCase() : "";
+        String tripStatus = (trip.getStatus() != null) ? trip.getStatus().toUpperCase() : "";
+
+        // Chuyển hướng nếu request không ở trạng thái ACCEPTED
+        if ("PENDING".equals(requestStatus)) {
+            if (!hasNavigated) {
+                hasNavigated = true;
+                Intent intent = new Intent(this, PendingActivity.class);
+                intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                startActivity(intent);
+                finish();
+            }
+            return;
+        } else if ("REJECTED".equals(requestStatus)) {
+            if (!hasNavigated) {
+                hasNavigated = true;
+                Intent intent = new Intent(this, RejectedActivity.class);
+                intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                startActivity(intent);
+                finish();
+            }
+            return;
+        }
+
+        // Kiểm tra trạng thái chuyến đi đã bị hủy bởi chủ xe hoặc hành khách
+        if ("CANCELLED".equals(tripStatus) || "CANCELLED".equals(requestStatus)) {
             if (upcomingStatus != null) upcomingStatus.setText("Đã hủy");
             if (upcomingDescription != null) upcomingDescription.setText("Chuyến đi đã bị hủy.");
 
@@ -275,8 +313,17 @@ public class UpcomingActivity extends AppCompatActivity {
             return;
         }
 
+        // Kiểm tra pointer của chuyến đi (chỉ chấp nhận pointer trùng khớp hoặc rỗng nếu chưa gán)
+        if (trip.getAcceptedRequestId() != null && !trip.getAcceptedRequestId().trim().isEmpty()) {
+            if (!trip.getAcceptedRequestId().trim().equals(requestId)) {
+                Toast.makeText(this, "Chuyến đi này đã nhận người khác.", Toast.LENGTH_SHORT).show();
+                finish();
+                return;
+            }
+        }
+
         // Trường hợp chuyến đi đã COMPLETED
-        if ("COMPLETED".equalsIgnoreCase(tripStatus)) {
+        if ("COMPLETED".equals(tripStatus)) {
             if (upcomingStatus != null) upcomingStatus.setText("Đã hoàn thành");
             if (upcomingDescription != null) upcomingDescription.setText("Chuyến đi đã hoàn thành. Hãy đánh giá chủ xe!");
 
@@ -290,9 +337,9 @@ public class UpcomingActivity extends AppCompatActivity {
             return;
         }
 
-        // Kiểm tra thời gian khởi hành (Checklist 2: Hủy chỉ trước giờ)
+        // Kiểm tra điều kiện thời gian: Hủy chỉ trước giờ đi
         boolean isAfterDeparture = false;
-        if (trip != null && trip.getDepartureAt() != null) {
+        if (trip.getDepartureAt() != null) {
             Date departureDate = trip.getDepartureAt().toDate();
             if (departureDate.before(new Date())) {
                 isAfterDeparture = true;
@@ -302,7 +349,7 @@ public class UpcomingActivity extends AppCompatActivity {
         if (isAfterDeparture) {
             if (upcomingStatus != null) upcomingStatus.setText("Chờ hoàn thành");
             if (upcomingDescription != null) {
-                String timeStr = (trip != null && trip.getDepartureAt() != null) ? formatTimeOnly(trip.getDepartureAt()) : "giờ hẹn";
+                String timeStr = (trip.getDepartureAt() != null) ? formatTimeOnly(trip.getDepartureAt()) : "giờ hẹn";
                 upcomingDescription.setText("Đã quá giờ khởi hành (" + timeStr + "). Đang chờ chủ xe hoàn thành.");
             }
 
@@ -315,7 +362,7 @@ public class UpcomingActivity extends AppCompatActivity {
             }
         } else {
             if (upcomingStatus != null) upcomingStatus.setText("Sắp khởi hành");
-            if (upcomingDescription != null && trip != null && trip.getDepartureAt() != null) {
+            if (upcomingDescription != null && trip.getDepartureAt() != null) {
                 upcomingDescription.setText("Hẹn bạn tại điểm đón lúc " + formatTimeOnly(trip.getDepartureAt()) + ".");
             }
 
@@ -334,15 +381,17 @@ public class UpcomingActivity extends AppCompatActivity {
     private void bindDriverProfile(PublicProfile profile) {
         if (profile != null) {
             if (driverName != null) {
-                driverName.setText(profile.getDisplayName() != null ? profile.getDisplayName() : "Chủ xe");
+                driverName.setText(profile.getDisplayName() != null && !profile.getDisplayName().trim().isEmpty()
+                        ? profile.getDisplayName().trim() : "Chủ xe");
             }
             if (driverMeta != null) {
-                String vehicle = (profile.getVehicleName() != null && !profile.getVehicleName().isEmpty()) ? profile.getVehicleName() : "Xe máy";
-                driverMeta.setText("★ 5.0 · " + vehicle);
+                String vehicle = (profile.getVehicleName() != null && !profile.getVehicleName().trim().isEmpty())
+                        ? profile.getVehicleName().trim() : "Xe máy";
+                driverMeta.setText(vehicle);
             }
         } else {
             if (driverName != null) driverName.setText("Chủ xe");
-            if (driverMeta != null) driverMeta.setText("★ 5.0 · Xe máy");
+            if (driverMeta != null) driverMeta.setText("Xe máy");
         }
     }
 
@@ -442,7 +491,10 @@ public class UpcomingActivity extends AppCompatActivity {
      * Nút hành động chính (primaryAction).
      */
     private void handlePrimaryAction() {
-        if (currentDetails == null) return;
+        if (currentDetails == null) {
+            finish();
+            return;
+        }
 
         Trip trip = currentDetails.getTrip();
         TripRequest request = currentDetails.getRequest();
@@ -460,16 +512,6 @@ public class UpcomingActivity extends AppCompatActivity {
             startActivity(intent);
             finish();
         }
-    }
-
-    /**
-     * Thao tác liên hệ chủ xe (Checklist 4: Không để nút liên hệ giả).
-     */
-    private void handleCallDriver() {
-        PublicProfile profile = (currentDetails != null) ? currentDetails.getDriverProfile() : null;
-        String name = (profile != null && profile.getDisplayName() != null) ? profile.getDisplayName() : "chủ xe";
-
-        Toast.makeText(this, "Đang kết nối liên hệ với " + name + "...", Toast.LENGTH_SHORT).show();
     }
 
     private String formatTimestamp(Timestamp timestamp) {

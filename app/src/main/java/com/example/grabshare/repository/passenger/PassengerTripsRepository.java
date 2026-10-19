@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Repository quản lý danh sách chuyến đi nhờ của Passenger với cơ chế Realtime song song cho cả requests và trips.
+ * Repository quản lý danh sách chuyến đi nhờ của Passenger với cơ chế Realtime song song cho cả requests, trips và profiles.
  */
 public class PassengerTripsRepository {
 
@@ -29,10 +29,12 @@ public class PassengerTripsRepository {
     public static class PassengerRideItem {
         private final TripRequest request;
         private final Trip trip;
+        private final com.example.grabshare.model.PublicProfile driverProfile;
 
-        public PassengerRideItem(TripRequest request, Trip trip) {
+        public PassengerRideItem(TripRequest request, Trip trip, com.example.grabshare.model.PublicProfile driverProfile) {
             this.request = request;
             this.trip = trip;
+            this.driverProfile = driverProfile;
         }
 
         public TripRequest getRequest() {
@@ -41,6 +43,10 @@ public class PassengerTripsRepository {
 
         public Trip getTrip() {
             return trip;
+        }
+
+        public com.example.grabshare.model.PublicProfile getDriverProfile() {
+            return driverProfile;
         }
     }
 
@@ -94,8 +100,8 @@ public class PassengerTripsRepository {
     }
 
     /**
-     * Lắng nghe Realtime đồng thời cả danh sách Request và các Trip tương ứng.
-     * Quản lý listener con cho trip, hủy toàn bộ listener khi remove.
+     * Lắng nghe Realtime đồng thời cả danh sách Request và các Trip, Profile tương ứng.
+     * Quản lý listener con cho trip và profile, hủy toàn bộ listener khi remove.
      * @param passengerId ID tài khoản đăng nhập passengerId.
      * @param callback Nhận kết quả danh sách ghép RideItem.
      * @return ListenerRegistration hợp nhất để Activity gỡ khi Stop.
@@ -112,7 +118,7 @@ public class PassengerTripsRepository {
     }
 
     /**
-     * Quản lý Realtime cho Request và các Listener con của Trip.
+     * Quản lý Realtime cho Request và các Listener con của Trip và PublicProfile.
      */
     private static class RealtimeTripsHandler implements ListenerRegistration {
 
@@ -120,9 +126,12 @@ public class PassengerTripsRepository {
         private final String passengerId;
         private final RepositoryCallback<List<PassengerRideItem>> callback;
 
+        private boolean active = true;
         private ListenerRegistration requestsListener;
         private final Map<String, ListenerRegistration> tripListenersMap;
         private final Map<String, Trip> tripDataMap;
+        private final Map<String, ListenerRegistration> profileListenersMap;
+        private final Map<String, com.example.grabshare.model.PublicProfile> profileDataMap;
         private List<TripRequest> currentRequestsList;
 
         public RealtimeTripsHandler(FirebaseFirestore firestore, String passengerId, RepositoryCallback<List<PassengerRideItem>> callback) {
@@ -131,6 +140,8 @@ public class PassengerTripsRepository {
             this.callback = callback;
             this.tripListenersMap = new HashMap<>();
             this.tripDataMap = new HashMap<>();
+            this.profileListenersMap = new HashMap<>();
+            this.profileDataMap = new HashMap<>();
             this.currentRequestsList = new ArrayList<>();
 
             startListeningRequests();
@@ -143,6 +154,8 @@ public class PassengerTripsRepository {
                     .addSnapshotListener(new EventListener<QuerySnapshot>() {
                         @Override
                         public void onEvent(QuerySnapshot querySnapshot, FirebaseFirestoreException error) {
+                            if (!active) return;
+
                             if (error != null) {
                                 if (callback != null) callback.onError(error);
                                 return;
@@ -151,6 +164,7 @@ public class PassengerTripsRepository {
                             if (querySnapshot == null || querySnapshot.isEmpty()) {
                                 currentRequestsList.clear();
                                 cleanupUnusedTripListeners(new HashSet<String>());
+                                cleanupUnusedProfileListeners(new HashSet<String>());
                                 if (callback != null) callback.onSuccess(new ArrayList<PassengerRideItem>());
                                 return;
                             }
@@ -183,7 +197,14 @@ public class PassengerTripsRepository {
                             .addSnapshotListener(new EventListener<DocumentSnapshot>() {
                                 @Override
                                 public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
-                                    if (error != null) return;
+                                    if (!active) return;
+
+                                    if (error != null) {
+                                        tripDataMap.remove(tripId);
+                                        notifyCallbackIfReady();
+                                        return;
+                                    }
+
                                     if (doc != null && doc.exists()) {
                                         Trip trip = doc.toObject(Trip.class);
                                         if (trip != null) {
@@ -193,10 +214,55 @@ public class PassengerTripsRepository {
                                     } else {
                                         tripDataMap.remove(tripId);
                                     }
+
+                                    syncProfileListeners();
                                     notifyCallbackIfReady();
                                 }
                             });
                     tripListenersMap.put(tripId, listener);
+                }
+            }
+            syncProfileListeners();
+        }
+
+        private void syncProfileListeners() {
+            Set<String> activeDriverIds = new HashSet<>();
+            for (Trip trip : tripDataMap.values()) {
+                if (trip != null && trip.getDriverId() != null && !trip.getDriverId().trim().isEmpty()) {
+                    activeDriverIds.add(trip.getDriverId().trim());
+                }
+            }
+
+            cleanupUnusedProfileListeners(activeDriverIds);
+
+            for (final String driverId : activeDriverIds) {
+                if (!profileListenersMap.containsKey(driverId)) {
+                    ListenerRegistration listener = firestore.collection("publicProfiles")
+                            .document(driverId)
+                            .addSnapshotListener(new EventListener<DocumentSnapshot>() {
+                                @Override
+                                public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
+                                    if (!active) return;
+
+                                    if (error != null) {
+                                        profileDataMap.remove(driverId);
+                                        notifyCallbackIfReady();
+                                        return;
+                                    }
+
+                                    if (doc != null && doc.exists()) {
+                                        com.example.grabshare.model.PublicProfile profile = doc.toObject(com.example.grabshare.model.PublicProfile.class);
+                                        if (profile != null) {
+                                            profile.setId(doc.getId());
+                                            profileDataMap.put(driverId, profile);
+                                        }
+                                    } else {
+                                        profileDataMap.remove(driverId);
+                                    }
+                                    notifyCallbackIfReady();
+                                }
+                            });
+                    profileListenersMap.put(driverId, listener);
                 }
             }
         }
@@ -215,11 +281,31 @@ public class PassengerTripsRepository {
             }
         }
 
+        private void cleanupUnusedProfileListeners(Set<String> activeDriverIds) {
+            List<String> toRemove = new ArrayList<>();
+            for (String driverId : profileListenersMap.keySet()) {
+                if (!activeDriverIds.contains(driverId)) {
+                    toRemove.add(driverId);
+                }
+            }
+            for (String driverId : toRemove) {
+                ListenerRegistration reg = profileListenersMap.remove(driverId);
+                if (reg != null) reg.remove();
+                profileDataMap.remove(driverId);
+            }
+        }
+
         private void notifyCallbackIfReady() {
+            if (!active) return;
+
             List<PassengerRideItem> items = new ArrayList<>();
             for (TripRequest request : currentRequestsList) {
                 Trip trip = tripDataMap.get(request.getTripId());
-                items.add(new PassengerRideItem(request, trip));
+                com.example.grabshare.model.PublicProfile profile = null;
+                if (trip != null && trip.getDriverId() != null) {
+                    profile = profileDataMap.get(trip.getDriverId().trim());
+                }
+                items.add(new PassengerRideItem(request, trip, profile));
             }
             if (callback != null) {
                 callback.onSuccess(items);
@@ -228,6 +314,7 @@ public class PassengerTripsRepository {
 
         @Override
         public void remove() {
+            active = false;
             if (requestsListener != null) {
                 requestsListener.remove();
                 requestsListener = null;
@@ -237,6 +324,12 @@ public class PassengerTripsRepository {
             }
             tripListenersMap.clear();
             tripDataMap.clear();
+
+            for (ListenerRegistration reg : profileListenersMap.values()) {
+                if (reg != null) reg.remove();
+            }
+            profileListenersMap.clear();
+            profileDataMap.clear();
             currentRequestsList.clear();
         }
     }
@@ -250,6 +343,7 @@ public class PassengerTripsRepository {
         private final String requestId;
         private final RepositoryCallback<SingleRequestDetails> callback;
 
+        private boolean active = true;
         private ListenerRegistration requestListener;
         private ListenerRegistration tripListener;
         private ListenerRegistration profileListener;
@@ -274,12 +368,16 @@ public class PassengerTripsRepository {
                     .addSnapshotListener(new EventListener<DocumentSnapshot>() {
                         @Override
                         public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
+                            if (!active) return;
+
                             if (error != null) {
                                 if (callback != null) callback.onError(error);
                                 return;
                             }
 
                             if (doc == null || !doc.exists()) {
+                                currentRequest = null;
+                                resetTripAndProfileListeners();
                                 if (callback != null) {
                                     callback.onError(new IllegalArgumentException("Yêu cầu không tồn tại hoặc không có quyền truy cập."));
                                 }
@@ -300,6 +398,7 @@ public class PassengerTripsRepository {
                                     notifyCallback();
                                 }
                             } else {
+                                resetTripAndProfileListeners();
                                 notifyCallback();
                             }
                         }
@@ -307,10 +406,9 @@ public class PassengerTripsRepository {
         }
 
         private void startListeningTrip(String tripId) {
-            if (tripListener != null) {
-                tripListener.remove();
-                tripListener = null;
-            }
+            if (!active) return;
+
+            resetTripAndProfileListeners();
             listenedTripId = tripId;
 
             tripListener = firestore.collection("trips")
@@ -318,8 +416,14 @@ public class PassengerTripsRepository {
                     .addSnapshotListener(new EventListener<DocumentSnapshot>() {
                         @Override
                         public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
+                            if (!active) return;
+
                             if (error != null) {
-                                notifyCallback();
+                                currentTrip = null;
+                                resetProfileListener();
+                                if (callback != null) {
+                                    callback.onError(error);
+                                }
                                 return;
                             }
 
@@ -338,10 +442,12 @@ public class PassengerTripsRepository {
                                         notifyCallback();
                                     }
                                 } else {
+                                    resetProfileListener();
                                     notifyCallback();
                                 }
                             } else {
                                 currentTrip = null;
+                                resetProfileListener();
                                 notifyCallback();
                             }
                         }
@@ -349,10 +455,9 @@ public class PassengerTripsRepository {
         }
 
         private void startListeningProfile(String driverId) {
-            if (profileListener != null) {
-                profileListener.remove();
-                profileListener = null;
-            }
+            if (!active) return;
+
+            resetProfileListener();
             listenedDriverId = driverId;
 
             profileListener = firestore.collection("publicProfiles")
@@ -360,6 +465,14 @@ public class PassengerTripsRepository {
                     .addSnapshotListener(new EventListener<DocumentSnapshot>() {
                         @Override
                         public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
+                            if (!active) return;
+
+                            if (error != null) {
+                                currentProfile = null;
+                                notifyCallback();
+                                return;
+                            }
+
                             if (doc != null && doc.exists()) {
                                 com.example.grabshare.model.PublicProfile profile = doc.toObject(com.example.grabshare.model.PublicProfile.class);
                                 if (profile != null) {
@@ -374,7 +487,28 @@ public class PassengerTripsRepository {
                     });
         }
 
+        private void resetTripAndProfileListeners() {
+            if (tripListener != null) {
+                tripListener.remove();
+                tripListener = null;
+            }
+            listenedTripId = null;
+            currentTrip = null;
+            resetProfileListener();
+        }
+
+        private void resetProfileListener() {
+            if (profileListener != null) {
+                profileListener.remove();
+                profileListener = null;
+            }
+            listenedDriverId = null;
+            currentProfile = null;
+        }
+
         private void notifyCallback() {
+            if (!active) return;
+
             if (callback != null && currentRequest != null) {
                 callback.onSuccess(new SingleRequestDetails(currentRequest, currentTrip, currentProfile));
             }
@@ -382,23 +516,13 @@ public class PassengerTripsRepository {
 
         @Override
         public void remove() {
+            active = false;
             if (requestListener != null) {
                 requestListener.remove();
                 requestListener = null;
             }
-            if (tripListener != null) {
-                tripListener.remove();
-                tripListener = null;
-            }
-            if (profileListener != null) {
-                profileListener.remove();
-                profileListener = null;
-            }
+            resetTripAndProfileListeners();
             currentRequest = null;
-            currentTrip = null;
-            currentProfile = null;
-            listenedTripId = null;
-            listenedDriverId = null;
         }
     }
 }
