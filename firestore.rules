@@ -100,10 +100,34 @@ service cloud.firestore {
       return t.status == 'FULL' && t.availableSeats == 0
         && id(t.acceptedRequestId);
     }
+    
+    // Cho phép thiếu cả hai field ở chuyến cũ hoặc có đủ ở chuyến mới.
+    function validDetour(t) {
+      let fields = ['maxDetourMeters', 'baseDistanceMeters'];
+      return !t.keys().hasAny(fields)
+        || (t.keys().hasAll(fields)
+          && t.maxDetourMeters is int
+          && t.maxDetourMeters in [0, 2000, 5000, 10000]
+          && t.baseDistanceMeters is int
+          && t.baseDistanceMeters >= 0);
+    }
+
+    // Giữ các field bắt buộc cũ, chỉ cho phép thêm hai field đã chốt.
+    function tripFields(t) {
+      return t.keys().hasAll([
+          'driverId', 'origin', 'destination', 'departureAt',
+          'costVnd', 'note', 'status', 'availableSeats',
+          'acceptedRequestId', 'createdAt', 'updatedAt'
+        ])
+        && t.keys().hasOnly([
+          'driverId', 'origin', 'destination', 'departureAt',
+          'costVnd', 'note', 'status', 'availableSeats',
+          'acceptedRequestId', 'createdAt', 'updatedAt',
+          'maxDetourMeters', 'baseDistanceMeters'
+        ]);
+    }
     function tripData(t) {
-      return exact(t, ['driverId', 'origin', 'destination', 'departureAt',
-          'costVnd', 'note', 'status', 'availableSeats', 'acceptedRequestId',
-          'createdAt', 'updatedAt'])
+      return tripFields(t) && validDetour(t)
         && id(t.driverId) && place(t.origin) && place(t.destination)
         && differentPlaces(t.origin, t.destination)
         && t.departureAt is timestamp && t.costVnd is int && t.costVnd >= 0
@@ -145,9 +169,18 @@ service cloud.firestore {
     }
     function editTrip(old, data) {
       return owner(old.driverId) && openTrip(old) && openTrip(data)
-        && old.departureAt > request.time && data.departureAt > request.time
+        && old.departureAt > request.time
+        && data.departureAt > request.time
+        // Khi đã có cấu hình, không được xóa để quay về schema cũ.
+        && (!old.keys().hasAny([
+              'maxDetourMeters', 'baseDistanceMeters'
+            ])
+          || data.keys().hasAll([
+              'maxDetourMeters', 'baseDistanceMeters'
+            ]))
         && data.diff(old).affectedKeys().hasOnly([
-          'origin', 'destination', 'departureAt', 'costVnd', 'note', 'updatedAt'
+          'origin', 'destination', 'departureAt', 'costVnd',
+          'note', 'updatedAt', 'maxDetourMeters', 'baseDistanceMeters'
         ]);
     }
     function acceptTrip(tid, old, data) {
