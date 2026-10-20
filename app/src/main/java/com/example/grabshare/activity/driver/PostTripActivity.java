@@ -14,6 +14,7 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.DatePicker;
@@ -30,6 +31,8 @@ import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
 import com.example.grabshare.activity.search.LocationActivity;
+import com.example.grabshare.activity.search.RouteDistanceFormatter;
+import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -39,9 +42,15 @@ import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.IOException;
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Hiển thị biểu mẫu và điều phối luồng đăng chuyến của chủ xe. Dữ liệu Firestore được xử lý trong DriverTripRepository.
@@ -89,17 +98,27 @@ public class PostTripActivity extends AppCompatActivity {
     private TextView departureTimeValue;
     private TextView originPlaceValue;
     private TextView destinationPlaceValue;
+    private TextView routeDistanceValue;
+    private TextView suggestedCostValue;
 
     private EditText contributionAmountInput;
     private EditText noteInput;
     private CheckBox freeContributionCheckBox;
     private AppCompatButton postTripButton;
+    private AppCompatButton useSuggestedCostButton;
+    private RadioGroup maxDetourGroup;
 
     private DriverTripRepository tripRepository;
+    private final VietnamRoutingClient routingClient =
+            new VietnamRoutingClient("3ae0ba5bcf8843df8024203662e3d702");
+    private final ExecutorService routeExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicInteger routeCalculationGeneration = new AtomicInteger();
     private ActivityResultLauncher<Intent> locationPickerLauncher;
 
     private Place selectedOriginPlace;
     private Place selectedDestinationPlace;
+    private Long baseDistanceMeters;
+    private Long suggestedCostVnd;
 
     private boolean hasSelectedDepartureDate;
     private int selectedDepartureYear;
@@ -139,8 +158,10 @@ public class PostTripActivity extends AppCompatActivity {
         connectDepartureDateSelector();
         connectDepartureTimeSelector();
         connectFreeContributionOption();
+        connectUseSuggestedCostButton();
         connectPostTripButton();
         connectSystemBackHandling();
+        requestRouteEstimate();
 
         // Không tự gửi lại khi Activity được tạo lại sau khi xoay màn hình.
         setSubmitting(false);
@@ -161,11 +182,15 @@ public class PostTripActivity extends AppCompatActivity {
         departureTimeValue = findViewById(R.id.post_time_value);
         originPlaceValue = findViewById(R.id.post_start_value);
         destinationPlaceValue = findViewById(R.id.post_end_value);
+        routeDistanceValue = findViewById(R.id.route_distance_value);
+        suggestedCostValue = findViewById(R.id.suggested_cost_value);
 
         contributionAmountInput = findViewById(R.id.post_cost);
         noteInput = findViewById(R.id.post_note);
         freeContributionCheckBox = findViewById(R.id.post_free);
         postTripButton = findViewById(R.id.primary_action);
+        useSuggestedCostButton = findViewById(R.id.use_suggested_cost);
+        maxDetourGroup = findViewById(R.id.max_detour_group);
     }
 
     /**
@@ -475,6 +500,163 @@ public class PostTripActivity extends AppCompatActivity {
             selectedDestinationPlace = selectedPlace;
             updateDestinationPlaceDisplay();
         }
+
+        requestRouteEstimate();
+    }
+
+    /**
+     * Tính lại quãng đường bộ sau khi địa chỉ hợp lệ thay đổi. Kết quả của lượt cũ
+     * bị vô hiệu hóa để không ghi đè dữ liệu của cặp điểm mới.
+     */
+    private void requestRouteEstimate() {
+        final int requestId = routeCalculationGeneration.incrementAndGet();
+        routingClient.cancelCurrentRequest();
+        baseDistanceMeters = null;
+        suggestedCostVnd = null;
+        useSuggestedCostButton.setEnabled(false);
+
+        if (selectedOriginPlace == null || selectedDestinationPlace == null) {
+            routeDistanceValue.setText("Chọn điểm đi và điểm đến để tính quãng đường.");
+            suggestedCostValue.setText("Chưa có ước tính.");
+            return;
+        }
+
+        if (isValidPlace(selectedOriginPlace) || isValidPlace(selectedDestinationPlace)
+                || sameCoordinates(selectedOriginPlace, selectedDestinationPlace)) {
+            routeDistanceValue.setText("Hai địa điểm chưa hợp lệ để tính tuyến.");
+            suggestedCostValue.setText("Chưa có ước tính.");
+            return;
+        }
+
+        final Place origin = selectedOriginPlace;
+        final Place destination = selectedDestinationPlace;
+        routeDistanceValue.setText("Đang tính quãng đường đường bộ...");
+        suggestedCostValue.setText("Đang tính giá tham khảo...");
+
+        routeExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                final VietnamRoutingClient.Cancellation cancellation =
+                        new VietnamRoutingClient.Cancellation() {
+                            @Override
+                            public boolean isCancelled() {
+                                return requestId != routeCalculationGeneration.get()
+                                        || Thread.currentThread().isInterrupted();
+                            }
+                        };
+
+                try {
+                    VietnamRoutingClient.Route route = routingClient.findRoute(
+                            Arrays.asList(
+                                    new VietnamRoutingClient.Point(
+                                            origin.getLatitude(),
+                                            origin.getLongitude()
+                                    ),
+                                    new VietnamRoutingClient.Point(
+                                            destination.getLatitude(),
+                                            destination.getLongitude()
+                                    )
+                            ),
+                            cancellation
+                    );
+
+                    final long calculatedDistanceMeters = Math.round(route.distanceMeters);
+                    final long calculatedSuggestedCost = Math.round(route.distanceMeters * 3.0);
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isActivityUsable()
+                                    || requestId != routeCalculationGeneration.get()) {
+                                return;
+                            }
+
+                            baseDistanceMeters = calculatedDistanceMeters;
+                            suggestedCostVnd = calculatedSuggestedCost;
+                            routeDistanceValue.setText(
+                                    "Quãng đường trong Việt Nam: "
+                                            + RouteDistanceFormatter.formatKilometers(
+                                                    route.distanceMeters
+                                            )
+                            );
+                            suggestedCostValue.setText(formatSuggestedCost(calculatedSuggestedCost));
+                            useSuggestedCostButton.setEnabled(!isSubmitting);
+                        }
+                    });
+                } catch (IOException error) {
+                    final String errorMessage = error.getMessage() == null
+                            ? "Không thể tính quãng đường. Hãy kiểm tra mạng và thử lại."
+                            : error.getMessage();
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isActivityUsable()
+                                    || requestId != routeCalculationGeneration.get()) {
+                                return;
+                            }
+
+                            baseDistanceMeters = null;
+                            suggestedCostVnd = null;
+                            routeDistanceValue.setText("Không thể xác nhận quãng đường.");
+                            suggestedCostValue.setText("Chưa có ước tính.");
+                            useSuggestedCostButton.setEnabled(false);
+                            showMessage(errorMessage);
+                        }
+                    });
+                } catch (RuntimeException invalidRoute) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isActivityUsable()
+                                    || requestId != routeCalculationGeneration.get()) {
+                                return;
+                            }
+
+                            baseDistanceMeters = null;
+                            suggestedCostVnd = null;
+                            routeDistanceValue.setText("Dữ liệu tuyến không hợp lệ.");
+                            suggestedCostValue.setText("Chưa có ước tính.");
+                            useSuggestedCostButton.setEnabled(false);
+                            showMessage("Không xác nhận được tuyến cho hai địa điểm đã chọn.");
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    /** Định dạng số tiền tham khảo, không thay đổi số tiền người dùng đã nhập. */
+    private String formatSuggestedCost(long amountVnd) {
+        return NumberFormat.getIntegerInstance(Locale.forLanguageTag("vi-VN"))
+                .format(amountVnd) + " đ";
+    }
+
+    /** Chỉ điền tiền tham khảo vào ô chi phí khi chủ xe chủ động nhấn nút. */
+    private void connectUseSuggestedCostButton() {
+        useSuggestedCostButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (suggestedCostVnd == null || isSubmitting) {
+                    return;
+                }
+
+                if (freeContributionCheckBox.isChecked()) {
+                    freeContributionCheckBox.setChecked(false);
+                }
+                contributionAmountInput.setText(String.valueOf(suggestedCostVnd));
+                contributionAmountInput.setSelection(
+                        contributionAmountInput.getText().length()
+                );
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        routeCalculationGeneration.incrementAndGet();
+        routingClient.cancelCurrentRequest();
+        routeExecutor.shutdownNow();
+        super.onDestroy();
     }
 
     /**
@@ -732,6 +914,11 @@ public class PostTripActivity extends AppCompatActivity {
      */
     private boolean validateForm() {
         if (!validateSelectedPlaces()) {
+            return false;
+        }
+
+        if (baseDistanceMeters == null || baseDistanceMeters <= 0L) {
+            showMessage("Vui lòng đợi hoặc tính lại quãng đường hợp lệ trước khi đăng chuyến.");
             return false;
         }
 
