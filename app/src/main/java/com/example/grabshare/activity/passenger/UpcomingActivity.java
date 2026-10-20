@@ -239,6 +239,22 @@ public class UpcomingActivity extends AppCompatActivity {
     }
 
     /**
+     * Predicate kiểm tra chính xác một chuyến đi đã ACCEPTED có hợp lệ hay không.
+     * Bắt buộc: request.status == ACCEPTED, trip.status == FULL, availableSeats == 0 và acceptedRequestId == requestId.
+     */
+    private boolean isAcceptedRideValid(TripRequest request, Trip trip) {
+        if (request == null || trip == null) return false;
+
+        boolean isReqAccepted = "ACCEPTED".equalsIgnoreCase(request.getStatus());
+        boolean isTripFull = "FULL".equalsIgnoreCase(trip.getStatus());
+        boolean isSeatsZero = trip.getAvailableSeats() != null && trip.getAvailableSeats() == 0;
+        boolean isPointerMatched = trip.getAcceptedRequestId() != null
+                && requestId.equals(trip.getAcceptedRequestId().trim());
+
+        return isReqAccepted && isTripFull && isSeatsZero && isPointerMatched;
+    }
+
+    /**
      * Cập nhật toàn bộ giao diện và trạng thái nút theo dữ liệu Realtime thu được.
      */
     private void updateUiForDetails(SingleRequestDetails details) {
@@ -251,12 +267,10 @@ public class UpcomingActivity extends AppCompatActivity {
         bindDriverProfile(profile);
         bindTripAndRequestInfo(trip, request);
 
-        // Đảm bảo nút liên hệ luôn bị ẩn vì chưa thuộc scope
         if (tripCall != null) {
             tripCall.setVisibility(View.GONE);
         }
 
-        // Kiểm tra chuyến đi thiếu hoặc không khả dụng -> Khóa mutation
         if (trip == null) {
             if (upcomingStatus != null) upcomingStatus.setText("Không khả dụng");
             if (upcomingDescription != null) upcomingDescription.setText("Thông tin chuyến đi liên quan không tồn tại.");
@@ -277,7 +291,7 @@ public class UpcomingActivity extends AppCompatActivity {
         String requestStatus = (request.getStatus() != null) ? request.getStatus().toUpperCase() : "";
         String tripStatus = (trip.getStatus() != null) ? trip.getStatus().toUpperCase() : "";
 
-        // Chuyển hướng nếu request không ở trạng thái ACCEPTED
+        // Chuyển hướng nếu request ở trạng thái PENDING / REJECTED
         if ("PENDING".equals(requestStatus)) {
             if (!hasNavigated) {
                 hasNavigated = true;
@@ -313,15 +327,6 @@ public class UpcomingActivity extends AppCompatActivity {
             return;
         }
 
-        // Kiểm tra pointer của chuyến đi (chỉ chấp nhận pointer trùng khớp hoặc rỗng nếu chưa gán)
-        if (trip.getAcceptedRequestId() != null && !trip.getAcceptedRequestId().trim().isEmpty()) {
-            if (!trip.getAcceptedRequestId().trim().equals(requestId)) {
-                Toast.makeText(this, "Chuyến đi này đã nhận người khác.", Toast.LENGTH_SHORT).show();
-                finish();
-                return;
-            }
-        }
-
         // Trường hợp chuyến đi đã COMPLETED
         if ("COMPLETED".equals(tripStatus)) {
             if (upcomingStatus != null) upcomingStatus.setText("Đã hoàn thành");
@@ -333,6 +338,27 @@ public class UpcomingActivity extends AppCompatActivity {
             if (primaryAction != null) {
                 primaryAction.setText("Đánh giá chuyến đi");
                 primaryAction.setEnabled(true);
+            }
+            return;
+        }
+
+        // Siết chặt predicate: Bắt buộc request.status==ACCEPTED, trip.status==FULL, seats==0, acceptedRequestId==requestId
+        if (!isAcceptedRideValid(request, trip)) {
+            if (upcomingStatus != null) upcomingStatus.setText("Không khả dụng");
+            if (upcomingDescription != null) upcomingDescription.setText("Dữ liệu chuyến đi chưa nhất quán hoặc đã gán cho người khác.");
+
+            if (secondaryAction != null) {
+                secondaryAction.setVisibility(View.GONE); // Khóa mutation khi predicate không hợp lệ
+            }
+            if (primaryAction != null) {
+                primaryAction.setText("Quay lại");
+                primaryAction.setEnabled(true);
+                primaryAction.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        finish();
+                    }
+                });
             }
             return;
         }
@@ -437,16 +463,23 @@ public class UpcomingActivity extends AppCompatActivity {
     }
 
     /**
-     * Nút hủy tham gia (secondaryAction) chỉ cho phép khi còn trước giờ đi.
+     * Nút hủy tham gia (secondaryAction) chỉ cho phép khi predicate hợp lệ và còn trước giờ đi.
      */
     private void handleSecondaryAction() {
-        if (currentDetails == null || currentDetails.getTrip() == null) {
+        if (currentDetails == null || currentDetails.getTrip() == null || currentDetails.getRequest() == null) {
             return;
         }
 
+        TripRequest request = currentDetails.getRequest();
         Trip trip = currentDetails.getTrip();
 
-        // Kiểm tra lại lần nữa tại thời điểm bấm nút
+        // Kiểm tra lại predicate siết chặt trước khi mở dialog
+        if (!isAcceptedRideValid(request, trip)) {
+            Toast.makeText(this, "Trạng thái chuyến đi không hợp lệ để hủy tham gia.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Kiểm tra lại thời gian tại thời điểm bấm nút
         if (trip.getDepartureAt() != null && trip.getDepartureAt().toDate().before(new Date())) {
             Toast.makeText(this, "Đã quá giờ khởi hành, không thể hủy tham gia.", Toast.LENGTH_SHORT).show();
             return;
