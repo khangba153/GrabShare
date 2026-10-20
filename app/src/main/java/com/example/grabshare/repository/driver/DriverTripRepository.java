@@ -854,7 +854,7 @@ public class DriverTripRepository {
                     );
                 }
 
-                // Không dùng set() với cả model Trip: chỉ ghi đúng 6 field trong hợp đồng task.
+                // Chỉ cập nhật các field cho phép; giữ nguyên ID và metadata tạo chuyến.
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("origin", buildPlaceData(origin));
                 updates.put("destination", buildPlaceData(destination));

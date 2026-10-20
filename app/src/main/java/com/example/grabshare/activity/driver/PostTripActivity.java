@@ -565,6 +565,9 @@ public class PostTripActivity extends AppCompatActivity {
                     );
 
                     final long calculatedDistanceMeters = Math.round(route.distanceMeters);
+                    if (calculatedDistanceMeters <= 0L) {
+                        throw new IOException("Routing trả về quãng đường không hợp lệ.");
+                    }
                     final long calculatedSuggestedCost = Math.round(route.distanceMeters * 3.0);
 
                     runOnUiThread(new Runnable() {
