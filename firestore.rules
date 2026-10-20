@@ -225,6 +225,9 @@ service cloud.firestore {
     match /trips/{tid} {
       allow read: if signedIn();
       allow create: if signedIn() && tripData(request.resource.data)
+        && request.resource.data.keys().hasAll([
+          'baseDistanceMeters', 'maxDetourMeters'
+        ])
         && request.resource.data.driverId == request.auth.uid
         && vehicleProfile() && openTrip(request.resource.data)
         && request.resource.data.departureAt > request.time
