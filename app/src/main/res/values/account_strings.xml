@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_loading">Đang tải hồ sơ…</string>
+    <string name="profile_saving">Đang lưu…</string>
+    <string name="profile_save">Lưu thay đổi</string>
+    <string name="profile_saved">Đã lưu hồ sơ.</string>
+    <string name="profile_wait_for_save">Đang chờ kết quả lưu. Vui lòng đợi.</string>
+    <string name="profile_network_error">Chưa kết nối được máy chủ. Kiểm tra mạng và thử lại.</string>
+    <string name="profile_permission_error">Không thể truy cập hoặc lưu hồ sơ này. Kiểm tra phiên đăng nhập rồi thử lại.</string>
+    <string name="profile_unknown_error">Không xử lý được hồ sơ. Hãy thử lại.</string>
+    <string name="profile_name_error">Họ và tên phải có từ 1 đến 80 ký tự.</string>
+    <string name="profile_vehicle_error">Tên xe tối đa 80 ký tự.</string>
+    <string name="profile_plate_error">Biển số tối đa 20 ký tự.</string>
+    <string name="profile_vehicle_pair_error">Nhập cả tên xe và biển số, hoặc để trống cả hai.</string>
+    <string name="profile_missing">Hồ sơ còn thiếu. Chọn Hoàn thiện hồ sơ để bổ sung thông tin.</string>
+    <string name="profile_complete_action">Hoàn thiện hồ sơ</string>
+    <string name="profile_edit_action">Chỉnh sửa hồ sơ</string>
+    <string name="profile_no_vehicle">Chưa có thông tin xe</string>
+    <string name="profile_no_name">Chưa có tên hiển thị</string>
+    <string name="profile_plate_label">Biển số: %1$s</string>
+    <string name="profile_no_plate">Chưa có biển số xe</string>
+    <string name="profile_no_email">Hồ sơ riêng chưa có email</string>
+    <string name="profile_private_hint">Email và biển số chỉ hiển thị trong hồ sơ riêng của bạn.</string>
+    <string name="profile_vehicle_hint">Có thể để trống cả tên xe và biển số nếu chỉ đi nhờ. Cần bổ sung đủ thông tin xe trước khi đăng chuyến.</string>
+    <string name="profile_email_hint">Email lấy từ tài khoản đăng nhập và không chỉnh sửa tại đây.</string>
+    <string name="profile_retry">Thử lại</string>
+    <string name="profile_cancel">Hủy</string>
+    <string name="profile_unavailable">Chưa khả dụng</string>
+    <string name="profile_unavailable_menu">%1$s · Chưa khả dụng</string>
+    <string name="profile_account_placeholder">Tài khoản của bạn</string>
+    <string name="profile_logging_out">Đang đăng xuất…</string>
+    <string name="account_terms_title">Điều khoản sử dụng</string>
+    <string name="account_help_title">Trợ giúp</string>
+    <string name="account_help_intro">GrabShare kết nối cộng đồng có nhu cầu đi cùng đường và chia sẻ chi phí chuyến xe máy.</string>
+    <string name="account_help_passenger_title">Tìm chuyến và gửi yêu cầu</string>
+    <string name="account_help_passenger">1. Chọn điểm đi, điểm đến và thời gian trên trang Tìm chuyến.\n2. Mở chi tiết để kiểm tra tuyến, giờ khởi hành và mức đóng góp.\n3. Chọn điểm đón, thêm lời nhắn nếu cần và xác nhận gửi yêu cầu.\n4. Theo dõi trạng thái ở Chuyến của tôi. Gửi yêu cầu chưa có nghĩa là đã được nhận đi cùng.</string>
+    <string name="account_help_driver_title">Đăng và quản lý chuyến</string>
+    <string name="account_help_driver">Hoàn thiện tên xe và biển số trong hồ sơ, sau đó vào Tài khoản → Chuyến tôi đăng để đăng hoặc xem chuyến. Kiểm tra tuyến, giờ, chi phí và ghi chú trước khi lưu. Mở một chuyến để xem thông tin quản lý và các yêu cầu đi nhờ.</string>
+    <string name="account_help_profile_title">Hồ sơ và kết nối mạng</string>
+    <string name="account_help_profile">Bạn có thể sửa họ tên và thông tin xe tại Tài khoản → Chỉnh sửa hồ sơ. Email đăng nhập không đổi tại đây. Khi tải hoặc lưu gặp lỗi, giữ nguyên form, kiểm tra mạng và thử lại; chỉ coi đã lưu khi ứng dụng xác nhận thành công. Trợ giúp và Điều khoản vẫn đọc được khi mất mạng.</string>
+    <string name="account_help_safety_title">Đi cùng có trách nhiệm</string>
+    <string name="account_help_safety">Thống nhất điểm đón và mức đóng góp trước khi đi, đến đúng giờ, chuẩn bị mũ bảo hiểm và báo sớm khi kế hoạch thay đổi. Kiểm tra trạng thái mới nhất của chuyến trước khi xuất phát.</string>
+    <string name="account_help_problem_title">Khi cần báo lỗi</string>
+    <string name="account_help_problem">Ghi lại màn hình, thao tác và thông báo lỗi để gửi cho nhóm phụ trách ứng dụng. Không gửi mật khẩu, mã xác thực hoặc thông tin đăng nhập. GrabShare hiện chưa có tổng đài hoặc chat hỗ trợ trong ứng dụng.</string>
+    <string name="account_terms_content">1. Phạm vi sử dụng\nGrabShare là ứng dụng cộng đồng kết nối người có nhu cầu đi cùng đường và chia sẻ chi phí chuyến xe máy. Người dùng có thể đăng chuyến hoặc gửi yêu cầu đi nhờ; ứng dụng không giới hạn riêng cho sinh viên.\n\n2. Thông tin hồ sơ và chuyến đi\nCung cấp tên hiển thị, tuyến, thời gian, điểm đón và mức đóng góp rõ ràng. Khi đăng chuyến cần có thông tin xe. Email và biển số thuộc hồ sơ riêng; tên hiển thị và tên xe thuộc hồ sơ công khai cho người dùng đã đăng nhập.\n\n3. Yêu cầu và trạng thái chuyến\nGửi yêu cầu chưa giữ chỗ. Chỉ sắp xếp đi cùng khi yêu cầu đã được chủ xe chấp nhận và chuyến vẫn còn hiệu lực. Theo dõi trạng thái mới nhất và thông báo sớm nếu cần thay đổi hoặc hủy.\n\n4. Chi phí đóng góp\nMức hiển thị là khoản đóng góp cho chuyến đi. Hai bên cần thống nhất rõ trước khi xuất phát. GrabShare hiện chưa xử lý thanh toán trong ứng dụng.\n\n5. Tôn trọng và an toàn\nTrao đổi lịch sự, đến đúng giờ, chuẩn bị mũ bảo hiểm và tự kiểm tra điều kiện chuyến đi phù hợp. Không chia sẻ mật khẩu hoặc mã xác thực. Ứng dụng chưa cung cấp xác minh VNeID, bảo hiểm chuyến đi hay theo dõi vị trí trực tiếp.\n\n6. Sử dụng dữ liệu\nChỉ sử dụng thông tin nhận được để sắp xếp chuyến đi. Không đăng lại dữ liệu riêng của người khác. Đăng xuất khi dùng xong trên thiết bị dùng chung.\n\n7. Phạm vi phiên bản\nMột số mục có thể chưa khả dụng trong quá trình hoàn thiện. Không xem một màn mẫu hoặc dữ liệu cũ là xác nhận chuyến đi; dựa vào trạng thái và thông báo xác nhận hiện tại trong ứng dụng.</string>
+</resources>
