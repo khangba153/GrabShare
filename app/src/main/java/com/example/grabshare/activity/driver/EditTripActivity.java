@@ -91,6 +91,7 @@ public class EditTripActivity extends AppCompatActivity {
     private TextView statusMessage;
     private TextView routeDistanceValue;
     private TextView suggestedCostValue;
+    private AppCompatButton retryRouteEstimateButton;
 
     private EditText costInput;
     private EditText noteInput;
@@ -190,6 +191,7 @@ public class EditTripActivity extends AppCompatActivity {
         statusMessage = findViewById(R.id.edit_status_message);
         routeDistanceValue = findViewById(R.id.route_distance_value);
         suggestedCostValue = findViewById(R.id.suggested_cost_value);
+        retryRouteEstimateButton = findViewById(R.id.retry_route_estimate);
 
         costInput = findViewById(R.id.post_cost);
         noteInput = findViewById(R.id.post_note);
@@ -261,6 +263,14 @@ public class EditTripActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 useSuggestedCost();
+            }
+        });
+        retryRouteEstimateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (!isSaving) {
+                    requestRouteEstimate();
+                }
             }
         });
         backButton.setOnClickListener(new View.OnClickListener() {
@@ -399,6 +409,8 @@ public class EditTripActivity extends AppCompatActivity {
         baseDistanceMeters = null;
         suggestedCostVnd = null;
         useSuggestedCostButton.setEnabled(false);
+        retryRouteEstimateButton.setVisibility(View.GONE);
+        retryRouteEstimateButton.setEnabled(!isSaving);
 
         if (!isValidPlace(selectedOrigin) || !isValidPlace(selectedDestination)
                 || sameCoordinates(selectedOrigin, selectedDestination)) {
@@ -463,6 +475,7 @@ public class EditTripActivity extends AppCompatActivity {
                             routeDistanceValue.setText("Không thể xác nhận quãng đường.");
                             suggestedCostValue.setText("Chưa có ước tính.");
                             useSuggestedCostButton.setEnabled(false);
+                            retryRouteEstimateButton.setVisibility(View.VISIBLE);
                             setStatusMessage(error.getMessage() == null
                                     ? "Không thể tính quãng đường. Kiểm tra mạng rồi thử lại."
                                     : error.getMessage());
@@ -481,6 +494,7 @@ public class EditTripActivity extends AppCompatActivity {
                             routeDistanceValue.setText("Dữ liệu tuyến không hợp lệ.");
                             suggestedCostValue.setText("Chưa có ước tính.");
                             useSuggestedCostButton.setEnabled(false);
+                            retryRouteEstimateButton.setVisibility(View.VISIBLE);
                             setStatusMessage("Không xác nhận được tuyến cho hai địa điểm đã chọn.");
                         }
                     });
@@ -497,6 +511,7 @@ public class EditTripActivity extends AppCompatActivity {
             routeDistanceValue.setText("Quãng đường bộ không hợp lệ.");
             suggestedCostValue.setText("Chưa có ước tính.");
             useSuggestedCostButton.setEnabled(false);
+            retryRouteEstimateButton.setVisibility(View.VISIBLE);
             return;
         }
 
@@ -508,6 +523,7 @@ public class EditTripActivity extends AppCompatActivity {
         );
         suggestedCostValue.setText(formatSuggestedCost(suggestedCostVnd));
         useSuggestedCostButton.setEnabled(!isSaving);
+        retryRouteEstimateButton.setVisibility(View.GONE);
     }
 
     /** Điền giá tham khảo khi chủ xe chủ động nhấn; không tự ghi đè lúc đổi tuyến. */
@@ -828,6 +844,7 @@ public class EditTripActivity extends AppCompatActivity {
         costInput.setEnabled(canEdit);
         noteInput.setEnabled(canEdit);
         useSuggestedCostButton.setEnabled(canEdit && suggestedCostVnd != null);
+        retryRouteEstimateButton.setEnabled(canEdit);
         for (int index = 0; index < maxDetourGroup.getChildCount(); index++) {
             maxDetourGroup.getChildAt(index).setEnabled(canEdit);
         }

@@ -100,6 +100,7 @@ public class PostTripActivity extends AppCompatActivity {
     private TextView destinationPlaceValue;
     private TextView routeDistanceValue;
     private TextView suggestedCostValue;
+    private AppCompatButton retryRouteEstimateButton;
 
     private EditText contributionAmountInput;
     private EditText noteInput;
@@ -184,6 +185,7 @@ public class PostTripActivity extends AppCompatActivity {
         destinationPlaceValue = findViewById(R.id.post_end_value);
         routeDistanceValue = findViewById(R.id.route_distance_value);
         suggestedCostValue = findViewById(R.id.suggested_cost_value);
+        retryRouteEstimateButton = findViewById(R.id.retry_route_estimate);
 
         contributionAmountInput = findViewById(R.id.post_cost);
         noteInput = findViewById(R.id.post_note);
@@ -514,6 +516,8 @@ public class PostTripActivity extends AppCompatActivity {
         baseDistanceMeters = null;
         suggestedCostVnd = null;
         useSuggestedCostButton.setEnabled(false);
+        retryRouteEstimateButton.setVisibility(View.GONE);
+        retryRouteEstimateButton.setEnabled(!isSubmitting);
 
         if (selectedOriginPlace == null || selectedDestinationPlace == null) {
             routeDistanceValue.setText("Chọn điểm đi và điểm đến để tính quãng đường.");
@@ -581,6 +585,7 @@ public class PostTripActivity extends AppCompatActivity {
                             );
                             suggestedCostValue.setText(formatSuggestedCost(calculatedSuggestedCost));
                             useSuggestedCostButton.setEnabled(!isSubmitting);
+                            retryRouteEstimateButton.setVisibility(View.GONE);
                         }
                     });
                 } catch (IOException error) {
@@ -600,6 +605,7 @@ public class PostTripActivity extends AppCompatActivity {
                             routeDistanceValue.setText("Không thể xác nhận quãng đường.");
                             suggestedCostValue.setText("Chưa có ước tính.");
                             useSuggestedCostButton.setEnabled(false);
+                            retryRouteEstimateButton.setVisibility(View.VISIBLE);
                             showMessage(errorMessage);
                         }
                     });
@@ -617,6 +623,7 @@ public class PostTripActivity extends AppCompatActivity {
                             routeDistanceValue.setText("Dữ liệu tuyến không hợp lệ.");
                             suggestedCostValue.setText("Chưa có ước tính.");
                             useSuggestedCostButton.setEnabled(false);
+                            retryRouteEstimateButton.setVisibility(View.VISIBLE);
                             showMessage("Không xác nhận được tuyến cho hai địa điểm đã chọn.");
                         }
                     });
@@ -647,6 +654,15 @@ public class PostTripActivity extends AppCompatActivity {
                 contributionAmountInput.setSelection(
                         contributionAmountInput.getText().length()
                 );
+            }
+        });
+
+        retryRouteEstimateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (!isSubmitting) {
+                    requestRouteEstimate();
+                }
             }
         });
     }
@@ -1221,6 +1237,7 @@ public class PostTripActivity extends AppCompatActivity {
                 !submitting && !freeContributionCheckBox.isChecked()
         );
         useSuggestedCostButton.setEnabled(!submitting && suggestedCostVnd != null);
+        retryRouteEstimateButton.setEnabled(!submitting);
         for (int index = 0; index < maxDetourGroup.getChildCount(); index++) {
             maxDetourGroup.getChildAt(index).setEnabled(!submitting);
         }

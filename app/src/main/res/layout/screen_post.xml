@@ -243,6 +243,14 @@
                     android:layout_marginBottom="8dp"
                     android:text="Chọn điểm đi và điểm đến để tính quãng đường" />
 
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/retry_route_estimate"
+                    style="@style/ButtonSecondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Tính lại quãng đường"
+                    android:visibility="gone" />
+
                 <TextView
                     style="@style/Caption"
                     android:text="Tiền đóng góp tham khảo (3.000 đ/km)" />
