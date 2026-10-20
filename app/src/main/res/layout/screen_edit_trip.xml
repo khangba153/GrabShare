@@ -45,6 +45,75 @@
                 </LinearLayout>
             </LinearLayout>
             <LinearLayout style="@style/Card">
+                <TextView style="@style/Caption" android:text="Quãng đường bộ gốc"/>
+                <TextView
+                    android:id="@+id/route_distance_value"
+                    style="@style/BodyBold"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Đang tải quãng đường..."/>
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/retry_route_estimate"
+                    style="@style/ButtonSecondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Tính lại quãng đường"
+                    android:visibility="gone"/>
+                <TextView style="@style/Caption" android:text="Tiền đóng góp tham khảo (3.000 đ/km)"/>
+                <TextView
+                    android:id="@+id/suggested_cost_value"
+                    style="@style/BodyBold"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:text="Đang tính..."/>
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/use_suggested_cost"
+                    style="@style/ButtonSecondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:enabled="false"
+                    android:text="Dùng giá tham khảo"/>
+                <TextView
+                    style="@style/Caption"
+                    android:layout_marginTop="12dp"
+                    android:text="Mức đi thêm tối đa chấp nhận"/>
+                <RadioGroup
+                    android:id="@+id/max_detour_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <RadioButton
+                        android:id="@+id/detour_0"
+                        style="@style/Radio"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="0 km — Không đi vòng"/>
+                    <RadioButton
+                        android:id="@+id/detour_2000"
+                        style="@style/Radio"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="2 km"/>
+                    <RadioButton
+                        android:id="@+id/detour_5000"
+                        style="@style/Radio"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="5 km"/>
+                    <RadioButton
+                        android:id="@+id/detour_10000"
+                        style="@style/Radio"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="10 km"/>
+                </RadioGroup>
+                <TextView
+                    style="@style/Hint"
+                    android:text="Giá tham khảo không thay thế giá do chủ xe nhập."/>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="12dp" android:background="@color/border"/>
                 <TextView style="@style/Caption" android:text="Đóng góp xăng xe (đ)"/>
                 <EditText android:id="@+id/post_cost" style="@style/Input" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Nhập số tiền, 0 nếu miễn phí" android:importantForAutofill="no" android:inputType="number" android:singleLine="true" android:text=""/>
                 <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="12dp" android:background="@color/border"/>
