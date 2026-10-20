@@ -1,208 +1,424 @@
 package com.example.grabshare.activity.account;
 
-import android.os.Bundle;
-
-import androidx.appcompat.app.AppCompatActivity;
-
-import com.example.grabshare.R;
-
+import android.app.Activity;
 import android.content.Intent;
+import android.os.Bundle;
 import android.view.View;
-
-import com.example.grabshare.activity.search.HomeActivity;
-
-import com.example.grabshare.activity.passenger.MyTripsActivity;
-
-import com.example.grabshare.activity.driver.DriverTripsActivity;
-
-import com.google.firebase.auth.FirebaseAuth;
-
-import androidx.lifecycle.ViewModelProvider;
-
 import android.widget.TextView;
 import android.widget.Toast;
-import androidx.lifecycle.Observer;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 
-/** Màn Tài khoản, đầu mối điều hướng các chức năng cá nhân. */
+import com.example.grabshare.R;
+import com.example.grabshare.activity.driver.DriverTripsActivity;
+import com.example.grabshare.activity.passenger.MyTripsActivity;
+import com.example.grabshare.activity.search.HomeActivity;
+import com.example.grabshare.repository.account.ProfileRepository.AccountProfile;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
+/** Hiển thị hồ sơ chính chủ và điều hướng các chức năng cá nhân. */
 public class AccountActivity extends AppCompatActivity {
 
-    private LogoutViewModel logoutViewModel;
+    //region 1. ViewModel và phiên đăng nhập
 
-    /** Hiển thị giao diện Tài khoản. */
+    private static final String STATE_USER_IDENTIFIER = "account_profile_uid";
+
+    private LogoutViewModel logoutViewModel;
+    private AccountProfileViewModel profileViewModel;
+    private FirebaseAuth firebaseAuth;
+    private FirebaseAuth.AuthStateListener authListener;
+    private String expectedUserIdentifier;
+
+    private final OnBackPressedCallback logoutBackCallback =
+            new OnBackPressedCallback(false) {
+                /** Giữ màn khi đăng xuất đang xử lý cache hoặc chờ xác nhận hoàn tất. */
+                @Override
+                public void handleOnBackPressed() {
+                    // Observer đăng xuất sẽ điều hướng khi tác vụ kết thúc.
+                }
+            };
+
+    //endregion
+
+    //region 2. Khởi tạo và vòng đời
+
+    /** Nối các menu đã có đích thật và quan sát tải hồ sơ/đăng xuất. */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_account);
-        logoutViewModel = new ViewModelProvider(this)
-                .get(LogoutViewModel.class);
+
+        firebaseAuth = FirebaseAuth.getInstance();
+        FirebaseUser signedInUser = firebaseAuth.getCurrentUser();
+        if (savedInstanceState != null) {
+            expectedUserIdentifier = savedInstanceState.getString(STATE_USER_IDENTIFIER);
+        } else if (signedInUser != null) {
+            expectedUserIdentifier = signedInUser.getUid();
+        }
+
+        logoutViewModel = new ViewModelProvider(this).get(LogoutViewModel.class);
+        profileViewModel = new ViewModelProvider(this).get(AccountProfileViewModel.class);
+
         setupNavigation();
         setupMenu();
-        getOnBackPressedDispatcher().addCallback(
-                this,
-                logoutBackCallback);
+        setupProfile();
+        getOnBackPressedDispatcher().addCallback(this, logoutBackCallback);
         setupLogout();
     }
 
-    /** Kiểm tra phiên mỗi khi màn Tài khoản trở lại phía trước. */
+    /** Đọc lại hồ sơ khi trở về từ Edit; UID khác không được giữ màn riêng cũ. */
     @Override
     protected void onStart() {
         super.onStart();
 
-        LogoutViewModel.State logoutState =
-                logoutViewModel.getState().getValue();
-
-        if (logoutState != null
-                && (logoutState.busy || logoutState.completed)) {
+        if (isFinishing()) {
             return;
         }
 
-        if (FirebaseAuth.getInstance().getCurrentUser() == null) {
-            Intent intent = new Intent(
-                    AccountActivity.this,
-                    LoginActivity.class);
+        authListener = new FirebaseAuth.AuthStateListener() {
+            /** Không can thiệp vào luồng signOut đang được LogoutViewModel xử lý. */
+            @Override
+            public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+                if (!logoutInProgress() && !isExpectedUserSignedIn()) {
+                    profileViewModel.clearProfile();
+                    openLogin();
+                }
+            }
+        };
+        firebaseAuth.addAuthStateListener(authListener);
 
-            intent.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK
-                            | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-
-            startActivity(intent);
-            finish();
+        if (!logoutInProgress()) {
+            if (isExpectedUserSignedIn()) {
+                profileViewModel.loadProfile(expectedUserIdentifier);
+            } else {
+                openLogin();
+            }
         }
     }
 
-    /** Chuyển sang Home hoặc MyTrips, dùng lại màn đã có trong stack. */
+    /** Gỡ listener của Activity cũ; ViewModel tiếp tục giữ tiến trình qua xoay. */
+    @Override
+    protected void onStop() {
+        if (authListener != null) {
+            firebaseAuth.removeAuthStateListener(authListener);
+            authListener = null;
+        }
+        super.onStop();
+    }
+
+    /** Gắn dữ liệu phục hồi với UID đã mở màn, không tự chuyển sang tài khoản khác. */
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle state) {
+        state.putString(STATE_USER_IDENTIFIER, expectedUserIdentifier);
+        super.onSaveInstanceState(state);
+    }
+
+    //endregion
+
+    //region 3. Điều hướng tab và menu
+
+    /** Chuyển Home/MyTrips bằng màn có sẵn trong stack, giữ dữ liệu form Home. */
     private void setupNavigation() {
-        findViewById(R.id.nav_home).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        Intent intent = new Intent(
-                                AccountActivity.this,
-                                HomeActivity.class);
+        findViewById(R.id.nav_home).setOnClickListener(new View.OnClickListener() {
+            /** Quay về Home, không nhân Activity khi đổi tab liên tục. */
+            @Override
+            public void onClick(View view) {
+                openTab(HomeActivity.class);
+            }
+        });
 
-                        intent.addFlags(
-                                Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-                        startActivity(intent);
-                        finish();
-                    }
-                });
-
-        findViewById(R.id.nav_trips).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        Intent intent = new Intent(
-                                AccountActivity.this,
-                                MyTripsActivity.class);
-
-                        intent.addFlags(
-                                Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-                        startActivity(intent);
-                        finish();
-                    }
-                });
+        findViewById(R.id.nav_trips).setOnClickListener(new View.OnClickListener() {
+            /** Mở danh sách chuyến đi nhờ và giữ nguyên contract của Thuận. */
+            @Override
+            public void onClick(View view) {
+                openTab(MyTripsActivity.class);
+            }
+        });
     }
 
-    /** Mở danh sách chuyến do tài khoản hiện tại đăng. */
+    /** Nối các mục leader sở hữu; các màn chưa bàn giao được ghi rõ chưa khả dụng. */
     private void setupMenu() {
-        findViewById(R.id.account_driver_trips).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        Intent intent = new Intent(
-                                AccountActivity.this,
-                                DriverTripsActivity.class);
+        connectScreen(R.id.account_driver_trips, DriverTripsActivity.class);
+        connectScreen(R.id.edit_profile, EditProfileActivity.class);
+        connectScreen(R.id.account_vehicle, EditProfileActivity.class);
+        connectScreen(R.id.account_help, HelpActivity.class);
+        connectScreen(R.id.account_terms, TermsActivity.class);
 
-                        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                        startActivity(intent);
-                    }
-                });
+        showUnavailable(R.id.account_favorites);
+        showUnavailable(R.id.account_notifications);
+        findViewById(R.id.header_action).setVisibility(View.GONE);
     }
 
-    /** Nhận thao tác đăng xuất và hiển thị trạng thái từ ViewModel. */
+    /** Mỗi menu dùng đích thật trong Manifest và chỉ mở từ phiên hợp lệ. */
+    private void connectScreen(int viewIdentifier, final Class<? extends Activity> screen) {
+        findViewById(viewIdentifier).setOnClickListener(new View.OnClickListener() {
+            /** Không mở màn khác giữa tác vụ đăng xuất hoặc sau khi UID thay đổi. */
+            @Override
+            public void onClick(View view) {
+                if (!logoutInProgress() && isExpectedUserSignedIn()) {
+                    Intent intent = new Intent(AccountActivity.this, screen);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(intent);
+                }
+            }
+        });
+    }
+
+    /** Hiển thị trạng thái chưa khả dụng để menu không tạo cảm giác bấm mà im lặng. */
+    private void showUnavailable(int viewIdentifier) {
+        View row = findViewById(viewIdentifier);
+        row.setEnabled(false);
+        row.setClickable(false);
+        row.setFocusable(false);
+        row.setAlpha(0.5f);
+
+        TextView label = row.findViewById(R.id.menu_label);
+        if (label != null) {
+            label.setText(getString(R.string.profile_unavailable_menu, label.getText()));
+        }
+    }
+
+    /** Dùng lại màn tab hiện có và đóng Account để tránh nhân stack. */
+    private void openTab(Class<? extends Activity> screen) {
+        if (logoutInProgress() || !isExpectedUserSignedIn()) {
+            return;
+        }
+
+        Intent intent = new Intent(this, screen);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
+    }
+
+    //endregion
+
+    //region 4. Tải và hiển thị hồ sơ
+
+    /** Liên kết observer và nút thử lại; không tự tạo hồ sơ từ một lần đọc lỗi. */
+    private void setupProfile() {
+        findViewById(R.id.account_profile_retry).setOnClickListener(new View.OnClickListener() {
+            /** Chỉ tải lại khi người dùng còn đúng phiên và không đăng xuất. */
+            @Override
+            public void onClick(View view) {
+                if (isExpectedUserSignedIn() && !logoutInProgress()) {
+                    profileViewModel.loadProfile(expectedUserIdentifier);
+                }
+            }
+        });
+
+        profileViewModel.getState().observe(this, new Observer<AccountProfileViewModel.State>() {
+            /** Chỉ render dữ liệu của UID đang mở màn hình. */
+            @Override
+            public void onChanged(AccountProfileViewModel.State state) {
+                renderProfile(state);
+            }
+        });
+    }
+
+    /** Hiển thị dữ liệu thật; xóa giá trị cũ khi tải lỗi, đổi phiên hoặc đăng xuất. */
+    private void renderProfile(AccountProfileViewModel.State state) {
+        if (state == null || isFinishing() || isDestroyed()) {
+            return;
+        }
+
+        AccountProfile profile = state.profile;
+        boolean allowed = isExpectedUserSignedIn() && !logoutInProgress();
+        boolean hasData = allowed
+                && profile != null
+                && expectedUserIdentifier.equals(profile.userIdentifier);
+
+        TextView name = findViewById(R.id.profile_name);
+        TextView email = findViewById(R.id.profile_email);
+        TextView vehicle = findViewById(R.id.profile_meta);
+        TextView plate = findViewById(R.id.profile_vehicle_plate);
+        TextView status = findViewById(R.id.account_profile_status);
+
+        name.setText(R.string.profile_account_placeholder);
+        email.setText("");
+        vehicle.setText("");
+        plate.setText("");
+
+        if (hasData) {
+            if (profile.displayName.isEmpty()) {
+                name.setText(R.string.profile_no_name);
+            } else {
+                name.setText(profile.displayName);
+            }
+
+            if (profile.email.isEmpty()) {
+                email.setText(R.string.profile_no_email);
+            } else {
+                email.setText(profile.email);
+            }
+
+            if (profile.vehicleName.isEmpty()) {
+                vehicle.setText(R.string.profile_no_vehicle);
+            } else {
+                vehicle.setText(profile.vehicleName);
+            }
+
+            if (profile.vehiclePlate.isEmpty()) {
+                plate.setText(R.string.profile_no_plate);
+            } else {
+                plate.setText(getString(R.string.profile_plate_label, profile.vehiclePlate));
+            }
+        }
+
+        String message = "";
+        if (allowed && state.loading) {
+            message = getString(R.string.profile_loading);
+        } else if (allowed && state.error != null) {
+            message = ProfileMessages.explain(this, state.error);
+        } else if (hasData && !profile.isComplete()) {
+            message = getString(R.string.profile_missing);
+        }
+
+        status.setText(message);
+        if (state.error == null) {
+            status.setTextColor(getColor(R.color.muted));
+        } else {
+            status.setTextColor(getColor(android.R.color.holo_red_dark));
+        }
+
+        if (message.isEmpty()) {
+            status.setVisibility(View.GONE);
+        } else {
+            status.setVisibility(View.VISIBLE);
+        }
+
+        if (allowed && state.loading) {
+            findViewById(R.id.account_profile_loading).setVisibility(View.VISIBLE);
+        } else {
+            findViewById(R.id.account_profile_loading).setVisibility(View.GONE);
+        }
+
+        if (allowed && state.error != null) {
+            findViewById(R.id.account_profile_retry).setVisibility(View.VISIBLE);
+        } else {
+            findViewById(R.id.account_profile_retry).setVisibility(View.GONE);
+        }
+
+        TextView editProfileButton = findViewById(R.id.edit_profile);
+        if (hasData && !profile.isComplete()) {
+            editProfileButton.setText(R.string.profile_complete_action);
+        } else {
+            editProfileButton.setText(R.string.profile_edit_action);
+        }
+        updateMenuAvailability(hasData && !state.loading);
+    }
+
+    /** Khóa cả các menu mới trong lúc đăng xuất để không mở thêm màn riêng. */
+    private void updateMenuAvailability(boolean profileReady) {
+        boolean available = isExpectedUserSignedIn() && !logoutInProgress();
+        int[] generalMenus = {
+                R.id.nav_home, R.id.nav_trips, R.id.account_driver_trips,
+                R.id.account_help, R.id.account_terms, R.id.account_logout
+        };
+
+        for (int viewIdentifier : generalMenus) {
+            findViewById(viewIdentifier).setEnabled(available);
+        }
+
+        findViewById(R.id.edit_profile).setEnabled(available && profileReady);
+        findViewById(R.id.account_vehicle).setEnabled(available && profileReady);
+        if (available && profileReady) {
+            findViewById(R.id.account_vehicle).setAlpha(1f);
+        } else {
+            findViewById(R.id.account_vehicle).setAlpha(0.5f);
+        }
+    }
+
+    //endregion
+
+    //region 5. Đăng xuất
+
+    /** Giữ nguyên cơ chế logout đã bàn giao và kết hợp khóa các mục mới. */
     private void setupLogout() {
-        final View logoutButton = findViewById(R.id.account_logout);
         final TextView logoutStatus = findViewById(R.id.logout_status);
 
-        logoutButton.setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.account_logout).setOnClickListener(new View.OnClickListener() {
+            /** Tác vụ xóa cache và signOut vẫn do LogoutViewModel thực hiện. */
             @Override
             public void onClick(View view) {
                 logoutViewModel.submit();
             }
         });
 
-        logoutViewModel.getState().observe(
-                this,
-                new Observer<LogoutViewModel.State>() {
-                    /** Cập nhật giao diện; chỉ về Login sau khi xử lý hoàn tất. */
-                    @Override
-                    public void onChanged(LogoutViewModel.State state) {
-                        if (state == null || isFinishing() || isDestroyed()) {
-                            return;
-                        }
+        logoutViewModel.getState().observe(this, new Observer<LogoutViewModel.State>() {
+            /** Chỉ về Login khi tác vụ hoàn tất; lỗi vẫn giữ phiên và cho thử lại. */
+            @Override
+            public void onChanged(LogoutViewModel.State state) {
+                if (state == null || isFinishing() || isDestroyed()) {
+                    return;
+                }
 
-                        boolean enabled = !state.busy && !state.completed;
+                logoutBackCallback.setEnabled(state.busy || state.completed);
+                if (state.busy || state.completed) {
+                    profileViewModel.clearProfile();
+                }
+                renderProfile(profileViewModel.getState().getValue());
 
-                        logoutBackCallback.setEnabled(
-                                state.busy || state.completed);
-
-                        logoutButton.setEnabled(enabled);
-                        findViewById(R.id.nav_home).setEnabled(enabled);
-                        findViewById(R.id.nav_trips).setEnabled(enabled);
-                        findViewById(R.id.account_driver_trips)
-                                .setEnabled(enabled);
-
-                        if (state.completed) {
-                            if (state.error != null) {
-                                Toast.makeText(
-                                        AccountActivity.this,
-                                        state.error.getMessage(),
-                                        Toast.LENGTH_LONG).show();
-                            }
-
-                            Intent intent = new Intent(
-                                    AccountActivity.this,
-                                    LoginActivity.class);
-
-                            intent.addFlags(
-                                    Intent.FLAG_ACTIVITY_NEW_TASK
-                                            | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-
-                            startActivity(intent);
-                            finish();
-                            return;
-                        }
-
-                        if (state.busy) {
-                            logoutStatus.setTextColor(
-                                    getColor(R.color.primary));
-                            logoutStatus.setText("Đang đăng xuất…");
-                            logoutStatus.setVisibility(View.VISIBLE);
-                        } else if (state.error != null) {
-                            logoutStatus.setTextColor(
-                                    getColor(android.R.color.holo_red_dark));
-                            logoutStatus.setText(state.error.getMessage());
-                            logoutStatus.setVisibility(View.VISIBLE);
-                        } else {
-                            logoutStatus.setVisibility(View.GONE);
-                        }
+                if (state.completed) {
+                    if (state.error != null) {
+                        Toast.makeText(AccountActivity.this,
+                                state.error.getMessage(), Toast.LENGTH_LONG).show();
                     }
-                });
+                    openLogin();
+                    return;
+                }
+
+                if (state.busy) {
+                    logoutStatus.setTextColor(getColor(R.color.primary));
+                    logoutStatus.setText(R.string.profile_logging_out);
+                    logoutStatus.setVisibility(View.VISIBLE);
+                } else if (state.error != null) {
+                    logoutStatus.setTextColor(getColor(android.R.color.holo_red_dark));
+                    logoutStatus.setText(ProfileMessages.explain(AccountActivity.this, state.error));
+                    logoutStatus.setVisibility(View.VISIBLE);
+                    if (isExpectedUserSignedIn()) {
+                        profileViewModel.loadProfile(expectedUserIdentifier);
+                    }
+                } else {
+                    logoutStatus.setVisibility(View.GONE);
+                }
+            }
+        });
     }
 
-    private final OnBackPressedCallback logoutBackCallback =
-            new OnBackPressedCallback(false) {
-                /** Giữ màn hình trong lúc đăng xuất để tác vụ không bị bỏ dở. */
-                @Override
-                public void handleOnBackPressed() {
-                    // Chờ observer xử lý kết quả đăng xuất.
-                }
-            };
+    //endregion
 
+    //region 6. Kiểm tra phiên và điều hướng Login
+
+    /** Busy/completed thuộc luồng logout; Auth listener không được điều hướng sớm. */
+    private boolean logoutInProgress() {
+        LogoutViewModel.State state = logoutViewModel.getState().getValue();
+        return state != null && (state.busy || state.completed);
+    }
+
+    /** Chỉ chấp nhận UID đã mở Account, kể cả khi Activity được phục hồi. */
+    private boolean isExpectedUserSignedIn() {
+        FirebaseUser signedInUser = firebaseAuth.getCurrentUser();
+        return expectedUserIdentifier != null
+                && signedInUser != null
+                && expectedUserIdentifier.equals(signedInUser.getUid());
+    }
+
+    /** Xóa stack riêng tư để Back không quay về dữ liệu của phiên trước. */
+    private void openLogin() {
+        if (isFinishing()) {
+            return;
+        }
+
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    //endregion
 }
