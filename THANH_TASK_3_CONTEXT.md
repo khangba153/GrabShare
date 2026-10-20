@@ -15,8 +15,15 @@ tài liệu chung của cả nhóm.
   vòng qua pickup sau khi chọn chuyến không còn mô tả phạm vi đích của task 3.
   Không dùng phạm vi cũ để bác bỏ hoặc thu hẹp kế hoạch Thành đã xác nhận với lead.
 - Việc phê duyệt kế hoạch và việc bàn giao code/model/Rules là hai trạng thái khác
-  nhau. Kế hoạch đã được duyệt; schema và implementation liên nhóm vẫn cần bàn giao.
-- Yêu cầu hiện tại chỉ cập nhật ngữ cảnh, chưa triển khai thuật toán hoặc sửa code.
+  nhau. Đã fetch GitHub ngày 20/10: HEAD thanhnc trùng origin/main c59ec02; PR #38
+  đã đưa Post/Edit của Thuần và Rules cho hai field mới vào main.
+- Thành đã yêu cầu triển khai task 3, tự xử lý lỗi và ghi lại lựa chọn kỹ thuật;
+  không còn giới hạn chỉ cập nhật ngữ cảnh. Không tự commit/push trong lượt này.
+- Thành chọn tự kiểm tra Firebase thật sau; không tiếp tục chờ hoặc hỏi lại đăng
+  nhập để chốt phần code. Đã nhận PR #41 của lead bằng fast-forward tới ecf0501,
+  thay đổi index favorites không trùng gói task 3 đang triển khai.
+- Sau khi chốt code, Thành yêu cầu commit task 3, không để tác giả ẩn danh.
+  Dùng danh tính Git Congthanh1912 đã cấu hình và đã dùng ở commit trước; chưa push.
 
 ## Pipeline theo kế hoạch đã xác nhận
 
@@ -50,6 +57,12 @@ tài liệu chung của cả nhóm.
 
 ## Phụ thuộc và trạng thái bàn giao
 
+Cập nhật sau khi triển khai: model Trip, Post/Edit và DriverTripRepository đã có
+baseDistanceMeters/maxDetourMeters; Rules trong main đã cho phép. Không viết thay
+gói Thuần hoặc đổi schema. Chưa xác minh deploy/index bằng phiên Firebase thật vì
+emulator kiểm tra chưa đăng nhập. Chi tiết triển khai và kiểm chứng ở
+`THANH_TASK_3_HANDOFF.md`; các ghi chú chờ bên dưới mô tả đầu vào trước bàn giao.
+
 - Leader: chốt model/Rules/schema mới, index nếu đổi query, cách rollout chuyến
   cũ thiếu cấu hình. Rules hiện tại dùng bộ field chính xác nên không tự ghi field mới.
 - Thuần: Post/Edit chọn mức đi vòng, tính/lưu baseline, cập nhật khi sửa tuyến,
@@ -63,7 +76,8 @@ tài liệu chung của cả nhóm.
   của tài liệu đang có; phải đối chiếu bản bàn giao theo kế hoạch mới trước khi ghi DB.
 - Thiếu dữ liệu không mặc định thành 0 hoặc tự suy ra giới hạn đã được tài xế chọn.
 - Các thông số cần chốt kỹ thuật: khung thời gian, ngưỡng heuristic, tolerance,
-  ngân sách lấy bù/concurrency, giới hạn ứng viên và xử lý chuyến cũ.
+  ngân sách lấy bù/concurrency, giới hạn ứng viên và xử lý chuyến cũ. Lượt triển khai
+  đã chọn mặc định và ghi rõ trong THANH_TASK_3_HANDOFF.md, không chặn chờ hỏi lại.
 - Chưa có DETOUR_CONTRACT.md trong Downloads tại lần kiểm tra trước. Việc thiếu
   file này không phủ nhận xác nhận kế hoạch mới của Thành.
 
@@ -72,7 +86,9 @@ tài liệu chung của cả nhóm.
 Tiến độ 20/10: Home đã được bổ sung nhãn km từ Routing và dùng
 VietnamRoutingClient/VietnamRouteValidator để chỉ nhận tuyến có dữ liệu quốc gia
 đầy đủ và toàn bộ là VN. Đã kiểm tra 9 ca API thật, build Debug đạt; chi tiết trong
-`THANH_VIETNAM_ROUTING_REPORT.md`. Chưa thay thuật toán Results hoặc schema Trip.
+`THANH_VIETNAM_ROUTING_REPORT.md`. Tiếp đó đã thay Results bằng pipeline dọc tuyến,
+thêm ResultsViewModel/EnRouteSearch/SearchRequestBudget và giao diện metric/lọc;
+không sửa schema Trip. Tham khảo THANH_TASK_3_HANDOFF.md cho trạng thái hiện tại.
 
 1. Chốt chữ ký dữ liệu/Routing với leader và Thuần.
 2. Routing client và hiện km trên Home; chuẩn bị API để Thuần nối Post/Edit.

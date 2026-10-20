@@ -1,316 +1,197 @@
 package com.example.grabshare.activity.search;
 
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.location.Location;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
-
-import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import com.example.grabshare.R;
 import com.example.grabshare.adapter.search.TripAdapter;
 import com.example.grabshare.contract.NavigationKeys;
-import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Place;
-import com.example.grabshare.model.PublicProfile;
-import com.example.grabshare.model.Trip;
-import com.example.grabshare.repository.search.TripSearchRepository;
+import com.example.grabshare.repository.search.EnRouteSearch;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 
-/**
- * Activity Hiển thị kết quả chuyến phù hợp (Thành-3).
- */
+/** Kết quả ghép dọc tuyến; Activity chỉ xử lý giao diện, tác vụ nằm trong ViewModel. */
 public class ResultsActivity extends AppCompatActivity {
-
-    private TextView searchSummary;
-    private TextView statusText;
-    private RecyclerView rideList;
-    private TextView routeStart;
-    private TextView routeEnd;
-    
-    private TripSearchRepository repository;
+    private ResultsViewModel model;
     private TripAdapter adapter;
-    private final List<TripSearchRepository.TripWithProfile> matchedTrips = new ArrayList<>();
-    
-    private Place searchOrigin;
-    private Place searchDestination;
-    private long searchDepartureTime;
-    
-    // Khoảng cách tối đa (mét) để coi là "khớp" tuyến đường (ví dụ 5km)
-    private static final float MAX_MATCH_DISTANCE_METERS = 5000f;
+    private EnRouteSearch.Criteria criteria;
+    private Spinner sortSpinner;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    /** Nối điều kiện Home, hàng đợi tìm chuyến và thao tác Detail bằng trip_id. */
+    @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_results);
-
-        searchSummary = findViewById(R.id.search_summary);
-        statusText = findViewById(R.id.status_text);
-        rideList = findViewById(R.id.ride_list);
-        routeStart = findViewById(R.id.route_start);
-        routeEnd = findViewById(R.id.route_end);
-        
-        repository = new TripSearchRepository();
-        
+        ((TextView) findViewById(R.id.route_start)).setText("Chưa chọn điểm đón");
+        ((TextView) findViewById(R.id.route_end)).setText("Chưa chọn điểm trả");
+        model = new ViewModelProvider(this).get(ResultsViewModel.class);
+        findViewById(R.id.header_back).setOnClickListener(new View.OnClickListener() {
+            /** Trở về đúng màn nhập điều kiện. */
+            @Override public void onClick(View view) { finish(); }
+        });
+        findViewById(R.id.search_summary_card).setOnClickListener(new View.OnClickListener() {
+            /** Đổi điểm hoặc ngày bắt đầu từ Home, không dùng hàng đợi cũ. */
+            @Override public void onClick(View view) { finish(); }
+        });
         adapter = new TripAdapter(new TripAdapter.OnTripClickListener() {
-            @Override
-            public void onTripClick(TripSearchRepository.TripWithProfile tripWithProfile) {
-                // Mở Detail bằng trip_id
+            /** Detail đọc lại server; metric kết quả không cấp quyền gửi yêu cầu. */
+            @Override public void onTripClick(EnRouteSearch.Match match) {
+                FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                if (criteria == null || user == null || !criteria.userId.equals(user.getUid())) return;
+                if (match.trip.getDepartureAt().toDate().getTime() <= System.currentTimeMillis()) {
+                    model.revalidate();
+                    return;
+                }
                 Intent intent = new Intent(ResultsActivity.this, TripDetailActivity.class);
-                intent.putExtra(NavigationKeys.TRIP_ID, tripWithProfile.trip.getId());
+                intent.putExtra(NavigationKeys.TRIP_ID, match.trip.getId());
                 startActivity(intent);
             }
         });
-        rideList.setLayoutManager(new LinearLayoutManager(this));
-        rideList.setAdapter(adapter);
-
-        setupListeners();
-        
-        if (savedInstanceState != null) {
-            restoreState(savedInstanceState);
-        } else {
-            loadSearchCriteria();
+        RecyclerView list = findViewById(R.id.ride_list);
+        list.setLayoutManager(new LinearLayoutManager(this));
+        list.setAdapter(adapter);
+        sortSpinner = findViewById(R.id.en_route_sort);
+        sortSpinner.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[] { "Đề xuất: ít lệch → gần điểm đón → giá", "Giá thấp nhất",
+                        "Tài xế xuất phát gần điểm đón nhất", "Ít lệch đường nhất" }));
+        sortSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            /** Sắp xếp trên RAM ngay cả khi đang kiểm tra thêm ứng viên. */
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                model.setSort(EnRouteSearch.Sort.values()[position]);
+            }
+            /** Không xóa lựa chọn khi Spinner chưa có dòng đang chọn. */
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+        findViewById(R.id.en_route_more).setOnClickListener(new View.OnClickListener() {
+            /** Lấy ứng viên tiếp theo, không đọc lại Firestore. */
+            @Override public void onClick(View view) { model.loadMore(); }
+        });
+        findViewById(R.id.en_route_refresh).setOnClickListener(new View.OnClickListener() {
+            /** Bắt đầu snapshot mới từ máy chủ, vô hiệu hóa callback cũ. */
+            @Override public void onClick(View view) { model.refresh(); }
+        });
+        findViewById(R.id.open_filters).setOnClickListener(new View.OnClickListener() {
+            /** Giới hạn giá chỉ áp dụng danh sách đã có metric. */
+            @Override public void onClick(View view) { showPriceFilter(); }
+        });
+        try {
+            criteria = readCriteria(savedInstanceState);
+            ((TextView) findViewById(R.id.route_start)).setText(criteria.pickup.getName());
+            ((TextView) findViewById(R.id.route_end)).setText(criteria.dropoff.getName());
+            SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy · HH:mm", new Locale("vi", "VN"));
+            format.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+            ((TextView) findViewById(R.id.search_summary)).setText("Bạn muốn đi: "
+                    + format.format(criteria.requestedAt) + "\nTìm chuyến chưa khởi hành trong cùng ngày (giờ Việt Nam).");
+            if (savedInstanceState != null && model.getState().getValue() == null) {
+                int selection = savedInstanceState.getInt("results_sort", 0);
+                if (selection >= 0 && selection < EnRouteSearch.Sort.values().length) {
+                    model.setSort(EnRouteSearch.Sort.values()[selection]);
+                    sortSpinner.setSelection(selection);
+                }
+                if (savedInstanceState.containsKey("results_max_price")) {
+                    model.setMaxPrice(savedInstanceState.getLong("results_max_price"));
+                }
+            }
+            model.getState().observe(this, new Observer<ResultsViewModel.State>() {
+                /** LiveData chỉ vẽ khi màn ở trạng thái hoạt động. */
+                @Override public void onChanged(ResultsViewModel.State state) { render(state); }
+            });
+            model.initialize(criteria);
+        } catch (IllegalArgumentException invalid) {
+            ((TextView) findViewById(R.id.status_text)).setText("Thiếu hoặc sai điều kiện. Quay lại Home để chọn điểm và thời gian.");
+            findViewById(R.id.en_route_more).setEnabled(false);
+            findViewById(R.id.en_route_refresh).setEnabled(false);
+            findViewById(R.id.open_filters).setEnabled(false);
+            sortSpinner.setEnabled(false);
         }
-        
-        executeSearch();
     }
 
-    private void setupListeners() {
-        findViewById(R.id.header_back).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                finish();
+    /** Không tự query lại khi trở về từ Detail hoặc khi xoay màn. */
+    @Override protected void onResume() { super.onResume(); if (model != null) model.revalidate(); }
+
+    /** Giữ điều kiện và lựa chọn lọc qua process death, không serialize Trip. */
+    @Override protected void onSaveInstanceState(Bundle state) {
+        if (criteria != null) {
+            state.putString("origin_name", criteria.pickup.getName());
+            state.putDouble("origin_lat", criteria.pickup.getLatitude());
+            state.putDouble("origin_lng", criteria.pickup.getLongitude());
+            state.putString("dest_name", criteria.dropoff.getName());
+            state.putDouble("dest_lat", criteria.dropoff.getLatitude());
+            state.putDouble("dest_lng", criteria.dropoff.getLongitude());
+            state.putLong("departure_time", criteria.requestedAt);
+            state.putString("results_uid", criteria.userId);
+            ResultsViewModel.State value = model.getState().getValue();
+            if (value != null) {
+                state.putInt("results_sort", value.sort.ordinal());
+                if (value.maxPrice != null) state.putLong("results_max_price", value.maxPrice);
+            }
+        }
+        super.onSaveInstanceState(state);
+    }
+
+    /** Không coi extra thiếu là tọa độ 0 hoặc lấy UID khác sau khi process bị hủy. */
+    private EnRouteSearch.Criteria readCriteria(Bundle saved) {
+        Bundle data = saved == null ? getIntent().getExtras() : saved;
+        if (data == null) throw new IllegalArgumentException("Thiếu điều kiện tìm.");
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        String uid = saved != null ? saved.getString("results_uid") : user == null ? null : user.getUid();
+        return new EnRouteSearch.Criteria(new Place(data.getString("origin_name"),
+                data.getDouble("origin_lat", Double.NaN), data.getDouble("origin_lng", Double.NaN)),
+                new Place(data.getString("dest_name"), data.getDouble("dest_lat", Double.NaN),
+                        data.getDouble("dest_lng", Double.NaN)), data.getLong("departure_time", 0), uid);
+    }
+
+    /** Trình bày rõ phạm vi đã kiểm tra và không giấu kết quả đang có lúc lấy thêm. */
+    private void render(ResultsViewModel.State state) {
+        adapter.setTrips(state.matches);
+        ((TextView) findViewById(R.id.status_text)).setText(state.message);
+        findViewById(R.id.en_route_progress).setVisibility(state.busy ? View.VISIBLE : View.GONE);
+        findViewById(R.id.en_route_more).setEnabled(state.sessionValid && !state.busy && state.hasMore);
+        findViewById(R.id.en_route_refresh).setEnabled(state.sessionValid);
+        findViewById(R.id.open_filters).setEnabled(state.sessionValid);
+        sortSpinner.setEnabled(state.sessionValid);
+        if (sortSpinner.getSelectedItemPosition() != state.sort.ordinal()) sortSpinner.setSelection(state.sort.ordinal());
+        ((TextView) findViewById(R.id.open_filters)).setText(state.maxPrice == null
+                ? "Giá dự kiến: không giới hạn" : String.format(new Locale("vi", "VN"), "Giá dự kiến tối đa: %,dđ", state.maxPrice));
+    }
+
+    /** Nhập số nguyên VNĐ; để trống gỡ lọc, giữ dialog mở nếu dữ liệu không hợp lệ. */
+    private void showPriceFilter() {
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setHint("Để trống để bỏ giới hạn");
+        ResultsViewModel.State value = model.getState().getValue();
+        if (value != null && value.maxPrice != null) input.setText(String.valueOf(value.maxPrice));
+        final AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Giá dự kiến tối đa (VNĐ)")
+                .setView(input).setNegativeButton("Hủy", null).setPositiveButton("Áp dụng", null).create();
+        dialog.show();
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+            /** Kiểm tra tràn số trước khi lọc trên RAM. */
+            @Override public void onClick(View view) {
+                String text = input.getText().toString().trim();
+                try {
+                    Long maximum = text.isEmpty() ? null : Long.valueOf(text);
+                    if (maximum != null && maximum < 0) throw new NumberFormatException();
+                    model.setMaxPrice(maximum);
+                    dialog.dismiss();
+                } catch (NumberFormatException invalid) { input.setError("Nhập số nguyên VNĐ hợp lệ, không âm."); }
             }
         });
-        
-        // Bấm vào thẻ tìm kiếm để đổi điều kiện (Quay lại Home)
-        findViewById(R.id.search_summary_card).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                finish();
-            }
-        });
-    }
-
-    /**
-     * Nhận điều kiện tìm kiếm từ HomeActivity
-     */
-    private void loadSearchCriteria() {
-        Intent intent = getIntent();
-        if (intent != null) {
-            searchOrigin = new Place(
-                    intent.getStringExtra("origin_name"),
-                    intent.getDoubleExtra("origin_lat", 0),
-                    intent.getDoubleExtra("origin_lng", 0)
-            );
-            
-            searchDestination = new Place(
-                    intent.getStringExtra("dest_name"),
-                    intent.getDoubleExtra("dest_lat", 0),
-                    intent.getDoubleExtra("dest_lng", 0)
-            );
-            
-            searchDepartureTime = intent.getLongExtra("departure_time", System.currentTimeMillis());
-            
-            updateHeaderUI();
-        }
-    }
-
-    private void updateHeaderUI() {
-        SimpleDateFormat df = new SimpleDateFormat("dd/MM · HH:mm", Locale.getDefault());
-        searchSummary.setText(df.format(searchDepartureTime));
-
-        if (searchOrigin != null && searchOrigin.getName() != null) {
-            routeStart.setText(searchOrigin.getName());
-        }
-        if (searchDestination != null && searchDestination.getName() != null) {
-            routeEnd.setText(searchDestination.getName());
-        }
-    }
-
-    @Override
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putLong("departure_time", searchDepartureTime);
-        if (searchOrigin != null) {
-            outState.putString("origin_name", searchOrigin.getName());
-            outState.putDouble("origin_lat", searchOrigin.getLatitude() != null ? searchOrigin.getLatitude() : 0);
-            outState.putDouble("origin_lng", searchOrigin.getLongitude() != null ? searchOrigin.getLongitude() : 0);
-        }
-        if (searchDestination != null) {
-            outState.putString("dest_name", searchDestination.getName());
-            outState.putDouble("dest_lat", searchDestination.getLatitude() != null ? searchDestination.getLatitude() : 0);
-            outState.putDouble("dest_lng", searchDestination.getLongitude() != null ? searchDestination.getLongitude() : 0);
-        }
-    }
-
-    private void restoreState(Bundle savedInstanceState) {
-        searchDepartureTime = savedInstanceState.getLong("departure_time", System.currentTimeMillis());
-        if (savedInstanceState.containsKey("origin_name")) {
-            searchOrigin = new Place(
-                    savedInstanceState.getString("origin_name"),
-                    savedInstanceState.getDouble("origin_lat"),
-                    savedInstanceState.getDouble("origin_lng")
-            );
-        }
-        if (savedInstanceState.containsKey("dest_name")) {
-            searchDestination = new Place(
-                    savedInstanceState.getString("dest_name"),
-                    savedInstanceState.getDouble("dest_lat"),
-                    savedInstanceState.getDouble("dest_lng")
-            );
-        }
-        updateHeaderUI();
-    }
-
-    /**
-     * Thực hiện truy vấn và lọc dữ liệu
-     */
-    private void executeSearch() {
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) {
-            Toast.makeText(this, "Vui lòng đăng nhập để tìm chuyến!", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        statusText.setVisibility(View.VISIBLE);
-        statusText.setText("Đang tìm kiếm chuyến xe...");
-        rideList.setVisibility(View.GONE);
-        matchedTrips.clear();
-
-        repository.searchOpenTrips(searchDepartureTime, new RepositoryCallback<List<Trip>>() {
-            @Override
-            public void onSuccess(List<Trip> trips) {
-                filterTrips(trips);
-            }
-
-            @Override
-            public void onError(Exception e) {
-                statusText.setVisibility(View.VISIBLE);
-                statusText.setText("Lỗi khi tải dữ liệu: " + e.getMessage());
-            }
-        });
-    }
-
-    /**
-     * Lọc chuyến xe theo khoảng cách và loại bỏ chuyến của chính mình
-     */
-    private void filterTrips(List<Trip> trips) {
-        String currentUid = "";
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser != null) {
-            currentUid = currentUser.getUid();
-        }
-
-        final List<Trip> validTrips = new ArrayList<>();
-        
-        for (Trip trip : trips) {
-            // Lọc driverId chính mình
-            if (currentUid.equals(trip.getDriverId())) {
-                continue;
-            }
-            
-            // Lọc khoảng cách hai đầu trong Java (Bán kính chốt: 5km)
-            if (trip.getOrigin() != null && trip.getDestination() != null) {
-                float startDist = calculateDistance(searchOrigin, trip.getOrigin());
-                float endDist = calculateDistance(searchDestination, trip.getDestination());
-                
-                if (startDist <= MAX_MATCH_DISTANCE_METERS && endDist <= MAX_MATCH_DISTANCE_METERS) {
-                    validTrips.add(trip);
-                }
-            }
-        }
-
-        if (validTrips.isEmpty()) {
-            statusText.setVisibility(View.VISIBLE);
-            statusText.setText("Không tìm thấy chuyến xe phù hợp. Vui lòng thử tìm lại!");
-            adapter.setTrips(new ArrayList<TripSearchRepository.TripWithProfile>());
-            return;
-        }
-
-        // Tải profile cho các chuyến xe hợp lệ
-        fetchProfilesForTrips(validTrips);
-    }
-
-    /**
-     * Lấy profile cho từng tài xế để hiển thị
-     */
-    private void fetchProfilesForTrips(final List<Trip> validTrips) {
-        final int totalTrips = validTrips.size();
-        final int[] loadedCount = {0};
-
-        for (final Trip trip : validTrips) {
-            repository.getDriverProfile(trip.getDriverId(), new RepositoryCallback<PublicProfile>() {
-                @Override
-                public void onSuccess(PublicProfile profile) {
-                    addMatchedTrip(trip, profile, totalTrips, loadedCount);
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    // Vẫn hiển thị chuyến dù không lấy được profile
-                    addMatchedTrip(trip, null, totalTrips, loadedCount);
-                }
-            });
-        }
-    }
-    
-    private synchronized void addMatchedTrip(Trip trip, PublicProfile profile, int totalTrips, int[] loadedCount) {
-        TripSearchRepository.TripWithProfile twp = new TripSearchRepository.TripWithProfile();
-        twp.trip = trip;
-        twp.profile = profile;
-        matchedTrips.add(twp);
-        
-        loadedCount[0]++;
-        if (loadedCount[0] == totalTrips) {
-            // Đã tải xong tất cả, sắp xếp lại theo giờ đi và hiển thị
-            Collections.sort(matchedTrips, new Comparator<TripSearchRepository.TripWithProfile>() {
-                @Override
-                public int compare(TripSearchRepository.TripWithProfile t1, TripSearchRepository.TripWithProfile t2) {
-                    if (t1.trip.getDepartureAt() != null && t2.trip.getDepartureAt() != null) {
-                        return t1.trip.getDepartureAt().compareTo(t2.trip.getDepartureAt());
-                    }
-                    return 0;
-                }
-            });
-            
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if (isFinishing() || isDestroyed()) return;
-                    statusText.setVisibility(View.GONE);
-                    rideList.setVisibility(View.VISIBLE);
-                    adapter.setTrips(matchedTrips);
-                }
-            });
-        }
-    }
-
-    /**
-     * Hàm tiện ích tính khoảng cách (mét) giữa 2 tọa độ (Sử dụng công thức của Android Location)
-     */
-    private float calculateDistance(Place p1, Place p2) {
-        if (p1 == null || p2 == null) return Float.MAX_VALUE;
-        float[] results = new float[1];
-        Location.distanceBetween(
-                p1.getLatitude(), p1.getLongitude(),
-                p2.getLatitude(), p2.getLongitude(),
-                results
-        );
-        return results[0];
     }
 }

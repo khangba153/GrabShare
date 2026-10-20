@@ -14,11 +14,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /** Tính tuyến xe máy và chỉ công bố tuyến đã được API xác nhận nằm trong Việt Nam. */
 public class VietnamRoutingClient {
+    /** Tái sử dụng cấu hình Routing hiện có của ứng dụng cho worker tìm chuyến. */
+    public static VietnamRoutingClient forSearch(RequestGate gate) {
+        return new VietnamRoutingClient("3ae0ba5bcf8843df8024203662e3d702", gate);
+    }
+
     public static final String POLICY_VERSION = "vn-motorcycle-balanced-v1";
     private final String apiKey;
+    private final RequestGate requestGate;
     private volatile HttpURLConnection activeConnection;
 
     /** Điểm tuyến độc lập với Activity, Place và thư viện hiển thị bản đồ. */
@@ -62,6 +69,39 @@ public class VietnamRoutingClient {
         boolean isCancelled();
     }
 
+    /** Bộ điều tiết của lượt tìm, đếm từng HTTP kể cả các lần thử hành lang. */
+    public interface RequestGate {
+        /** Ném lỗi có kiểu khi hết ngân sách hoặc lượt tìm đã bị hủy. */
+        void beforeRequest() throws RoutingException;
+    }
+
+    public enum Failure { QUOTA, ACCESS, INPUT, BUDGET }
+
+    /** Lỗi có kiểu để Results dừng cả nhóm khi quota/quyền bị từ chối. */
+    public static final class RoutingException extends IOException {
+        public final Failure failure;
+        /** Chỉ giữ thông báo an toàn, không chứa URL hoặc credential. */
+        public RoutingException(Failure failure, String message) {
+            super(message);
+            this.failure = failure;
+        }
+    }
+
+    /** Cặp tuyến sử dụng cùng cấu hình và cùng bộ mốc hành lang. */
+    public static final class MatchRoute {
+        public final Route route;
+        public final double baselineMeters;
+        public final boolean baselineAdjusted;
+        /** Giữ baseline cũ khi khớp số liệu hiện tại trong sai số làm tròn nhỏ. */
+        private MatchRoute(Route route, double freshBaseline, long storedBaseline) {
+            this.route = route;
+            baselineAdjusted = Math.abs(freshBaseline - storedBaseline) > 50;
+            baselineMeters = baselineAdjusted ? freshBaseline : storedBaseline;
+        }
+        /** Tính mức đi thêm không âm từ hai tuyến đã được kiểm tra tương thích. */
+        public double detourMeters() { return Math.max(0, route.distanceMeters - baselineMeters); }
+    }
+
     /** Điểm dẫn hướng trong nước; chỉ dùng khi tuyến trực tiếp chưa đạt. */
     private static final List<Point> CORRIDOR = Arrays.asList(
             new Point(10.762622, 106.660172), new Point(12.24, 109.19),
@@ -76,8 +116,14 @@ public class VietnamRoutingClient {
 
     /** Dùng credential Routing đã có của project, không tạo tài khoản hoặc API mới. */
     public VietnamRoutingClient(String apiKey) {
+        this(apiKey, null);
+    }
+
+    /** Tạo client riêng cho mỗi worker, dùng chung giới hạn HTTP của lượt tìm. */
+    public VietnamRoutingClient(String apiKey, RequestGate requestGate) {
         if (apiKey == null || apiKey.trim().isEmpty()) throw new IllegalArgumentException("Thiếu cấu hình Routing.");
         this.apiKey = apiKey;
+        this.requestGate = requestGate;
     }
 
     /** Hủy kết nối đang chờ khi người dùng đổi điểm hoặc đóng màn. */
@@ -108,7 +154,7 @@ public class VietnamRoutingClient {
                 return parse(response, selected, attempt != 0, requests);
             } catch (RejectedRoute rejected) {
                 reason = rejected.getMessage();
-            } catch (TerminalFailure failure) {
+            } catch (RoutingException failure) {
                 throw failure;
             } catch (JSONException invalid) {
                 reason = "Routing trả dữ liệu không hợp lệ; chưa thể xác nhận tuyến Việt Nam.";
@@ -118,6 +164,101 @@ public class VietnamRoutingClient {
             }
         }
         throw new IOException(reason);
+    }
+
+    /** So tuyến ghép và tuyến gốc cùng hành lang; hiệu chỉnh trên RAM khi DB chưa có version tuyến. */
+    public MatchRoute findMatchRoute(List<Point> requiredPoints, long storedBaseline,
+                                    Cancellation cancellation) throws IOException {
+        return findMatchRoute(requiredPoints, storedBaseline, cancellation, null);
+    }
+
+    /** Tái sử dụng baseline đã xác minh trong cùng lượt tìm, không giữ geometry nặng trong cache. */
+    public MatchRoute findMatchRoute(List<Point> requiredPoints, long storedBaseline,
+                                    Cancellation cancellation, Map<String, Double> verifiedBaselines) throws IOException {
+        if (requiredPoints == null || requiredPoints.size() != 4 || requiredPoints.contains(null)
+                || storedBaseline <= 0) throw new IllegalArgumentException("Thiếu bốn điểm hoặc tuyến gốc.");
+        List<Point> ends = Arrays.asList(requiredPoints.get(0), requiredPoints.get(3));
+        Plan directBase = plan(ends, false);
+        Plan guidedBase = plan(ends, true);
+        int count = 0;
+        String reason = "Chưa kiểm tra được cặp tuyến trong Việt Nam.";
+        for (int attempt = 0; attempt < 3; attempt++) {
+            checkCancelled(cancellation);
+            if (attempt == 1 && guidedBase.points.size() == directBase.points.size()) continue;
+            Plan baseline = attempt == 0 ? directBase : guidedBase;
+            Plan combined = attempt == 0 ? plan(requiredPoints, false)
+                    : sharedCorridorPlan(requiredPoints, guidedBase);
+            boolean avoid = attempt == 2;
+            try {
+                Point start = ends.get(0);
+                Point end = ends.get(1);
+                String cacheKey = String.format(Locale.US, "%s|%d|%.7f,%.7f|%.7f,%.7f", POLICY_VERSION,
+                        attempt, start.latitude, start.longitude, end.latitude, end.longitude);
+                Double originalMeters = verifiedBaselines == null ? null : verifiedBaselines.get(cacheKey);
+                if (originalMeters != null && Double.isNaN(originalMeters)) {
+                    throw new RejectedRoute("Tuyến gốc của phương án này chưa được xác nhận trong Việt Nam.");
+                }
+                if (originalMeters == null) {
+                    try {
+                        originalMeters = parse(request(baseline.points, avoid, cancellation), baseline,
+                                attempt != 0, ++count).distanceMeters;
+                    } catch (RejectedRoute rejected) {
+                        // Chỉ giữ trong lượt tìm, không lặp phương án baseline đã bị kiểm tra từ chối.
+                        if (verifiedBaselines != null) verifiedBaselines.put(cacheKey, Double.NaN);
+                        throw rejected;
+                    }
+                    if (verifiedBaselines != null) verifiedBaselines.put(cacheKey, originalMeters);
+                }
+                checkCancelled(cancellation);
+                Route joined = parse(request(combined.points, avoid, cancellation), combined, attempt != 0, ++count);
+                checkCancelled(cancellation);
+                return new MatchRoute(joined, originalMeters, storedBaseline);
+            } catch (RoutingException terminal) {
+                throw terminal;
+            } catch (RejectedRoute rejected) {
+                reason = rejected.getMessage();
+            } catch (JSONException invalid) {
+                reason = "Routing trả dữ liệu không hợp lệ; chưa đánh giá được chuyến.";
+            } catch (IOException network) {
+                checkCancelled(cancellation);
+                reason = "Không tải được đường bộ; một số chuyến chưa được đánh giá. Hãy làm mới để thử lại.";
+            }
+        }
+        throw new IOException(reason);
+    }
+
+    /** Gắn đúng các mốc của A/D vào các chặng A/B/C/D, không sinh bộ mốc khác cho từng chặng. */
+    private static Plan sharedCorridorPlan(List<Point> required, Plan baseline) {
+        Plan result = new Plan();
+        result.points.add(required.get(0));
+        Point start = required.get(0);
+        Point end = required.get(3);
+        double span = end.latitude - start.latitude;
+        int anchor = 1;
+        double previousProgress = 0;
+        for (int leg = 1; leg < required.size(); leg++) {
+            double progress = leg == 3 ? 1 : span == 0 ? 0
+                    : Math.max(0, Math.min(1, (required.get(leg).latitude - start.latitude) / span));
+            progress = Math.max(previousProgress, progress);
+            while (anchor < baseline.points.size() - 1) {
+                Point point = baseline.points.get(anchor);
+                double anchorProgress = span == 0 ? 0 : (point.latitude - start.latitude) / span;
+                if (anchorProgress > progress) break;
+                appendPoint(result, point);
+                anchor++;
+            }
+            appendPoint(result, required.get(leg));
+            result.requiredLegEnds.add(result.points.size() - 1);
+            previousProgress = progress;
+        }
+        return result;
+    }
+
+    /** Bỏ waypoint trùng liên tiếp nhưng vẫn giữ mốc kết thúc chặng có khoảng cách bằng 0. */
+    private static void appendPoint(Plan plan, Point point) {
+        Point last = plan.points.get(plan.points.size() - 1);
+        if (Math.abs(last.latitude - point.latitude) > 0.00000001
+                || Math.abs(last.longitude - point.longitude) > 0.00000001) plan.points.add(point);
     }
 
     /** Chèn hành lang theo từng cặp bắt buộc, không đổi thứ tự điểm đón/trả. */
@@ -133,11 +274,11 @@ public class VietnamRoutingClient {
                     Point point = CORRIDOR.get(north ? offset : CORRIDOR.size() - 1 - offset);
                     if (point.latitude > Math.min(start.latitude, end.latitude) + 0.4
                             && point.latitude < Math.max(start.latitude, end.latitude) - 0.4) {
-                        result.points.add(point);
+                        appendPoint(result, point);
                     }
                 }
             }
-            result.points.add(end);
+            appendPoint(result, end);
             result.requiredLegEnds.add(result.points.size() - 1);
         }
         return result;
@@ -146,6 +287,8 @@ public class VietnamRoutingClient {
     /** Gọi API có metadata quốc gia, đơn vị mét và profile xe máy thống nhất. */
     protected JSONObject request(List<Point> points, boolean avoidCountries, Cancellation cancellation)
             throws IOException, JSONException {
+        checkCancelled(cancellation);
+        if (requestGate != null) requestGate.beforeRequest();
         StringBuilder waypoints = new StringBuilder();
         for (Point point : points) {
             if (waypoints.length() > 0) waypoints.append('|');
@@ -165,10 +308,11 @@ public class VietnamRoutingClient {
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(25000);
             int code = connection.getResponseCode();
-            if (code == 429) throw new TerminalFailure("Routing đã đạt giới hạn sử dụng. Vui lòng thử lại sau.");
-            if (code == 401 || code == 403) throw new TerminalFailure("Routing từ chối truy cập. Cần kiểm tra cấu hình API.");
-            if (code == 400 || code == 404) throw new TerminalFailure(
-                    "Không tìm được đường xe máy gần điểm đã chọn. Hãy chọn điểm gần đường và thử lại.");
+            if (code == 429) throw new RoutingException(Failure.QUOTA, "Routing đã đạt giới hạn sử dụng. Vui lòng thử lại sau.");
+            if (code == 401 || code == 403) throw new RoutingException(Failure.ACCESS, "Routing từ chối truy cập. Cần kiểm tra cấu hình API.");
+            if (code == 400 || code == 404) throw new RoutingException(Failure.INPUT,
+                    "Routing không xử lý được các điểm đã chọn (HTTP " + code
+                            + "). Hãy chọn địa chỉ cụ thể gần đường thay vì tên tỉnh và thử lại.");
             if (code != HttpURLConnection.HTTP_OK) throw new IOException("Routing tạm thời không phản hồi.");
             StringBuilder body = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"))) {
@@ -265,10 +409,5 @@ public class VietnamRoutingClient {
     private static final class RejectedRoute extends IOException {
         /** Lưu lỗi kiểm tra, không chứa URL hoặc credential. */
         RejectedRoute(String message) { super(message); }
-    }
-    /** Lỗi quyền/quota/đầu vào không được tự lặp để tiêu tốn thêm API. */
-    private static final class TerminalFailure extends IOException {
-        /** Lưu lỗi người dùng có thể xử lý trước lần thử mới. */
-        TerminalFailure(String message) { super(message); }
     }
 }

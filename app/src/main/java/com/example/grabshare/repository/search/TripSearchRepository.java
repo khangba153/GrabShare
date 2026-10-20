@@ -19,21 +19,54 @@ import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.Source;
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Lớp quản lý dữ liệu truy vấn từ Firestore cho màn hình Tìm kiếm chuyến.
  */
 public class TripSearchRepository {
+    /** Snapshot của một lượt đọc server, không cắt ngẫu nhiên 50 chuyến trước bước xếp hạng. */
+    public static class SearchSnapshot {
+        public final List<Trip> trips = new ArrayList<>();
+        public int invalidDocuments;
+    }
+
+    /** Đọc một lần khung ngày rộng, dùng index status/departureAt đã có trên main. */
+    public void searchEnRouteTrips(long startInclusive, long endExclusive,
+                                  final RepositoryCallback<SearchSnapshot> callback) {
+        if (startInclusive >= endExclusive) {
+            callback.onError(new IllegalArgumentException("Ngày tìm đã qua. Hãy chọn lại ngày."));
+            return;
+        }
+        firestore.collection("trips").whereEqualTo("status", "OPEN")
+                .whereGreaterThanOrEqualTo("departureAt", new Timestamp(startInclusive / 1000,
+                        (int) (startInclusive % 1000) * 1000000))
+                .whereLessThan("departureAt", new Timestamp(endExclusive / 1000, 0))
+                .orderBy("departureAt", Query.Direction.ASCENDING)
+                .get(Source.SERVER)
+                .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
+                    /** Bỏ document hỏng có thống kê, không làm hỏng toàn lượt tìm. */
+                    @Override public void onSuccess(QuerySnapshot snapshot) {
+                        SearchSnapshot result = new SearchSnapshot();
+                        for (DocumentSnapshot document : snapshot.getDocuments()) {
+                            try {
+                                Trip trip = document.toObject(Trip.class);
+                                if (trip == null) { result.invalidDocuments++; continue; }
+                                trip.setId(document.getId());
+                                result.trips.add(trip);
+                            } catch (RuntimeException invalid) { result.invalidDocuments++; }
+                        }
+                        callback.onSuccess(result);
+                    }
+                }).addOnFailureListener(new OnFailureListener() {
+                    /** Giữ lỗi server/index, không thay bằng snapshot cache rồi báo không có chuyến. */
+                    @Override public void onFailure(Exception error) { callback.onError(error); }
+                });
+    }
     private final FirebaseFirestore firestore;
-    private final ExecutorService executorService;
 
     public TripSearchRepository() {
         firestore = FirebaseFirestore.getInstance();
-        executorService = Executors.newSingleThreadExecutor();
     }
 
     /** Thông tin công khai; lỗi đọc rating không bị biến thành chưa có đánh giá. */
@@ -128,65 +161,6 @@ public class TripSearchRepository {
     }
 
     /**
-     * Dữ liệu trả về gồm chuyến đi và thông tin profile của chủ xe.
-     */
-    public static class TripWithProfile {
-        public Trip trip;
-        public PublicProfile profile;
-        public double distanceStart;
-        public double distanceEnd;
-    }
-
-    /**
-     * Lấy danh sách chuyến xe phù hợp.
-     * @param departureTimeMillis Thời gian khởi hành mong muốn.
-     * @param callback Nhận danh sách chuyến xe.
-     */
-    public void searchOpenTrips(long departureTimeMillis, final RepositoryCallback<List<Trip>> callback) {
-        // Lấy thời điểm muộn hơn giữa giờ được chọn và giờ hiện tại
-        long queryTime = Math.max(departureTimeMillis, System.currentTimeMillis());
-        Timestamp departureTimestamp = new Timestamp(queryTime / 1000, 0);
-
-        // Tính cận trên của ngày tìm kiếm (23:59:59 của ngày queryTime)
-        Calendar cal = Calendar.getInstance();
-        cal.setTimeInMillis(queryTime);
-        cal.set(Calendar.HOUR_OF_DAY, 23);
-        cal.set(Calendar.MINUTE, 59);
-        cal.set(Calendar.SECOND, 59);
-        cal.set(Calendar.MILLISECOND, 999);
-        Timestamp endOfDayTimestamp = new Timestamp(cal.getTimeInMillis() / 1000, 0);
-
-        firestore.collection("trips")
-                .whereEqualTo("status", "OPEN")
-                .whereGreaterThanOrEqualTo("departureAt", departureTimestamp)
-                .whereLessThanOrEqualTo("departureAt", endOfDayTimestamp)
-                .orderBy("departureAt", Query.Direction.ASCENDING)
-                .limit(50)
-                .get()
-                .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
-                    @Override
-                    public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
-                        List<Trip> trips = new ArrayList<>();
-                        for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
-                            Trip trip = doc.toObject(Trip.class);
-                            // Lọc thêm chuyến có availableSeats > 0 trước khi trả về
-                            if (trip != null && trip.getAvailableSeats() != null && trip.getAvailableSeats() > 0) {
-                                trip.setId(doc.getId());
-                                trips.add(trip);
-                            }
-                        }
-                        callback.onSuccess(trips);
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(Exception e) {
-                        callback.onError(e);
-                    }
-                });
-    }
-
-    /**
      * Lấy profile công khai của tài xế.
      */
     public void getDriverProfile(String driverId, final RepositoryCallback<PublicProfile> callback) {
@@ -196,18 +170,18 @@ public class TripSearchRepository {
         }
 
         firestore.collection("publicProfiles").document(driverId)
-                .get()
+                .get(Source.SERVER)
                 .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
                     @Override
                     public void onSuccess(DocumentSnapshot documentSnapshot) {
                         if (documentSnapshot.exists()) {
-                            PublicProfile profile = documentSnapshot.toObject(PublicProfile.class);
-                            if (profile != null) {
-                                profile.setId(documentSnapshot.getId());
-                                callback.onSuccess(profile);
-                            } else {
-                                callback.onError(new Exception("Profile null"));
-                            }
+                            try {
+                                PublicProfile profile = documentSnapshot.toObject(PublicProfile.class);
+                                if (profile != null) {
+                                    profile.setId(documentSnapshot.getId());
+                                    callback.onSuccess(profile);
+                                } else callback.onError(new Exception("Profile null"));
+                            } catch (RuntimeException invalid) { callback.onError(invalid); }
                         } else {
                             callback.onError(new Exception("Không tìm thấy profile"));
                         }

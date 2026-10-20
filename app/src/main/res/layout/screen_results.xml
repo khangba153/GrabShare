@@ -1,46 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/background" android:importantForAccessibility="noHideDescendants">
-    <FrameLayout android:id="@+id/header" android:layout_width="match_parent" android:layout_height="64dp" android:paddingHorizontal="12dp" android:visibility="visible">
-        <ImageButton android:id="@+id/header_back" style="@style/IconButton" android:layout_gravity="center_vertical|start" android:src="@drawable/ic_back" android:contentDescription="Quay lại" android:visibility="visible" />
-        <TextView android:id="@+id/header_title" style="@style/Subtitle" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginHorizontal="52dp" android:layout_marginBottom="0dp" android:gravity="center" android:text="Chuyến phù hợp" />
-        <ImageButton android:id="@+id/header_action" style="@style/IconButton" android:layout_gravity="center_vertical|end" android:src="@drawable/ic_bell" android:contentDescription="Thông báo" android:visibility="visible" />
-    </FrameLayout>
-    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:fillViewport="true" android:clipToPadding="false" android:layout_weight="1">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="8dp" android:paddingBottom="24dp">
-            <LinearLayout android:id="@+id/search_summary_card" style="@style/Card" android:background="@drawable/bg_lavender" android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@color/background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
+        android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp">
+        <ImageButton android:id="@+id/header_back" style="@style/IconButton"
+            android:src="@drawable/ic_back" android:contentDescription="Quay lại điều kiện tìm chuyến" />
+        <TextView style="@style/Subtitle" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:text="Chuyến phù hợp dọc tuyến" />
+    </LinearLayout>
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:fillViewport="true">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="16dp">
+            <LinearLayout android:id="@+id/search_summary_card" style="@style/Card"
+                android:background="@drawable/bg_lavender" android:clickable="true" android:focusable="true"
+                android:foreground="?attr/selectableItemBackground" android:contentDescription="Đổi điều kiện tìm chuyến">
                 <include layout="@layout/view_route" />
-                <TextView android:id="@+id/search_summary" style="@style/Caption" android:text="Hôm nay · 17:30" />
+                <TextView android:id="@+id/search_summary" style="@style/Caption" />
             </LinearLayout>
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/open_filters" style="@style/ButtonSecondary" android:text="Bộ lọc · Giờ đi, chi phí, đánh giá" />
-            <TextView style="@style/Subtitle" android:text="Chuyến phù hợp với bạn" android:layout_marginTop="18dp" />
-
-            <TextView android:id="@+id/status_text" style="@style/Body" android:text="Đang tải dữ liệu..." android:layout_marginTop="16dp" android:gravity="center" android:visibility="gone" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/ride_list"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+            <TextView style="@style/Body" android:text="Sắp xếp kết quả đã kiểm tra" android:labelFor="@id/en_route_sort" />
+            <Spinner android:id="@+id/en_route_sort" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:contentDescription="Sắp xếp kết quả" />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/open_filters"
+                style="@style/ButtonSecondary" android:text="Giá dự kiến: không giới hạn" />
+            <ProgressBar android:id="@+id/en_route_progress" style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:indeterminate="true" android:visibility="gone" />
+            <TextView android:id="@+id/status_text" style="@style/Body" android:accessibilityLiveRegion="polite"
+                android:text="Đang chuẩn bị tìm chuyến…" android:paddingVertical="12dp" />
+            <androidx.recyclerview.widget.RecyclerView android:id="@+id/ride_list"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false" />
-
-            <TextView android:id="@+id/hint_text" style="@style/Hint" android:text="Chọn một chuyến để xem thông tin chi tiết." />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/en_route_more"
+                style="@style/ButtonPrimary" android:text="Xem thêm ứng viên" android:enabled="false" />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/en_route_refresh"
+                style="@style/ButtonSecondary" android:text="Làm mới từ máy chủ" />
+            <TextView style="@style/Hint"
+                android:text="Đề xuất trong tập đã kiểm tra, có lọc sơ bộ bằng tọa độ nên có thể bỏ sót. Khoảng cách được tính bằng Geoapify / OpenStreetMap. Chọn chuyến để xem dữ liệu hiện tại." />
         </LinearLayout>
     </ScrollView>
-    <LinearLayout android:id="@+id/action_area" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="4dp" android:paddingBottom="12dp" android:background="@color/background" android:visibility="gone">
-        <androidx.appcompat.widget.AppCompatButton android:id="@+id/primary_action" style="@style/ButtonPrimary" android:text="Tiếp tục" android:clickable="false" android:focusable="false" />
-        <androidx.appcompat.widget.AppCompatButton android:id="@+id/secondary_action" style="@style/ButtonSecondary" android:text="Quay lại" android:clickable="false" android:focusable="false" />
-    </LinearLayout>
-    <LinearLayout android:id="@+id/bottom_nav" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:background="@color/white" android:elevation="6dp" android:visibility="visible">
-        <LinearLayout android:id="@+id/nav_home" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
-            <ImageView android:id="@+id/nav_home_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_pin" android:importantForAccessibility="no" android:tint="@color/primary" />
-            <TextView android:id="@+id/nav_home_label" style="@style/Caption" android:text="Tìm chuyến" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/primary" />
-        </LinearLayout>
-        <LinearLayout android:id="@+id/nav_trips" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
-            <ImageView android:id="@+id/nav_trips_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_calendar" android:importantForAccessibility="no" android:tint="@color/muted" />
-            <TextView android:id="@+id/nav_trips_label" style="@style/Caption" android:text="Chuyến của tôi" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/muted" />
-        </LinearLayout>
-        <LinearLayout android:id="@+id/nav_account" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
-            <ImageView android:id="@+id/nav_account_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_user" android:importantForAccessibility="no" android:tint="@color/muted" />
-            <TextView android:id="@+id/nav_account_label" style="@style/Caption" android:text="Tài khoản" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/muted" />
-        </LinearLayout>
-    </LinearLayout>
 </LinearLayout>

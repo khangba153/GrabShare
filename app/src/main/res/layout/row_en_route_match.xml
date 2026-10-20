@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"
+    android:layout_marginVertical="8dp" android:padding="16dp" android:background="@drawable/bg_lavender"
+    android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground">
+    <TextView android:id="@+id/match_driver" style="@style/Subtitle" />
+    <TextView android:id="@+id/match_vehicle" style="@style/Caption" />
+    <TextView android:id="@+id/match_time" style="@style/Body" />
+    <TextView android:id="@+id/match_price" style="@style/Subtitle" android:textColor="@color/primary" />
+    <TextView android:id="@+id/match_route" style="@style/Body" />
+    <TextView android:id="@+id/match_gap" style="@style/Body" />
+    <TextView android:id="@+id/match_detour" style="@style/Body" android:textColor="@color/primary" />
+    <TextView android:id="@+id/match_note" style="@style/Hint" />
+</LinearLayout>
