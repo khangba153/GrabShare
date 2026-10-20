@@ -159,7 +159,7 @@ public class PostTripActivity extends AppCompatActivity {
         connectDepartureDateSelector();
         connectDepartureTimeSelector();
         connectFreeContributionOption();
-        connectUseSuggestedCostButton();
+        connectPriceAndRouteActions();
         connectPostTripButton();
         connectSystemBackHandling();
         requestRouteEstimate();
@@ -641,8 +641,8 @@ public class PostTripActivity extends AppCompatActivity {
                 .format(amountVnd) + " đ";
     }
 
-    /** Chỉ điền tiền tham khảo vào ô chi phí khi chủ xe chủ động nhấn nút. */
-    private void connectUseSuggestedCostButton() {
+    /** Kết nối thao tác dùng giá tham khảo và thử tính lại tuyến. */
+    private void connectPriceAndRouteActions() {
         useSuggestedCostButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
