@@ -14,6 +14,21 @@
         android:contentDescription="Bản đồ tương tác" />
 
     <TextView
+        android:id="@+id/home_route_distance"
+        style="@style/BodyBold"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_margin="12dp"
+        android:padding="10dp"
+        android:background="@drawable/bg_card"
+        android:textColor="@color/primary"
+        android:elevation="4dp"
+        android:saveEnabled="false"
+        android:accessibilityLiveRegion="polite"
+        android:text="Chọn điểm đi và điểm đến để xem quãng đường" />
+
+    <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"

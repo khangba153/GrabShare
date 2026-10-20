@@ -202,6 +202,8 @@ public class DriverTripRepository {
             final Timestamp departureAt,
             final Long costVnd,
             final String note,
+            final Long baseDistanceMeters,
+            final Long maxDetourMeters,
             final RepositoryCallback<Void> callback
     ) {
         FirebaseUser currentUser = firebaseAuth.getCurrentUser();
@@ -258,6 +260,18 @@ public class DriverTripRepository {
             );
             return;
         }
+        if (baseDistanceMeters == null || baseDistanceMeters <= 0L) {
+            callback.onError(new IllegalArgumentException(
+                    "Quãng đường gốc phải là số mét nguyên dương."
+            ));
+            return;
+        }
+        if (!isValidMaxDetourMeters(maxDetourMeters)) {
+            callback.onError(new IllegalArgumentException(
+                    "Mức đi thêm phải là 0, 2000, 5000 hoặc 10000 mét."
+            ));
+            return;
+        }
 
         final String driverId = currentUser.getUid();
         final String safeNote = note == null ? "" : note.trim();
@@ -277,7 +291,9 @@ public class DriverTripRepository {
                 destination,
                 departureAt,
                 costVnd,
-                safeNote
+                safeNote,
+                baseDistanceMeters,
+                maxDetourMeters
         );
 
         firestore.runTransaction(
@@ -311,7 +327,8 @@ public class DriverTripRepository {
                                             destination,
                                             departureAt,
                                             costVnd,
-                                            safeNote
+                                            safeNote,
+                                            maxDetourMeters
                                     );
 
                                     if (sameTrip) {
@@ -737,6 +754,8 @@ public class DriverTripRepository {
             final Timestamp departureAt,
             final Long costVnd,
             final String note,
+            final Long baseDistanceMeters,
+            final Long maxDetourMeters,
             final RepositoryCallback<Void> callback
     ) {
         FirebaseUser currentUser = firebaseAuth.getCurrentUser();
@@ -771,6 +790,18 @@ public class DriverTripRepository {
         if (costVnd == null || costVnd < 0L) {
             callback.onError(new IllegalArgumentException(
                     "Chi phí phải là số nguyên không âm."
+            ));
+            return;
+        }
+        if (baseDistanceMeters == null || baseDistanceMeters <= 0L) {
+            callback.onError(new IllegalArgumentException(
+                    "Quãng đường gốc phải là số mét nguyên dương."
+            ));
+            return;
+        }
+        if (!isValidMaxDetourMeters(maxDetourMeters)) {
+            callback.onError(new IllegalArgumentException(
+                    "Mức đi thêm phải là 0, 2000, 5000 hoặc 10000 mét."
             ));
             return;
         }
@@ -823,13 +854,15 @@ public class DriverTripRepository {
                     );
                 }
 
-                // Không dùng set() với cả model Trip: chỉ ghi đúng 6 field trong hợp đồng task.
+                // Chỉ cập nhật các field cho phép; giữ nguyên ID và metadata tạo chuyến.
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("origin", buildPlaceData(origin));
                 updates.put("destination", buildPlaceData(destination));
                 updates.put("departureAt", departureAt);
                 updates.put("costVnd", costVnd);
                 updates.put("note", safeNote);
+                updates.put("baseDistanceMeters", baseDistanceMeters);
+                updates.put("maxDetourMeters", maxDetourMeters);
                 updates.put("updatedAt", FieldValue.serverTimestamp());
                 transaction.update(tripReference, updates);
                 return null;
@@ -845,6 +878,12 @@ public class DriverTripRepository {
                 callback.onError(exception);
             }
         });
+    }
+
+    /** Kiểm tra mức đi thêm theo các lựa chọn được Firestore Rules chấp nhận. */
+    private boolean isValidMaxDetourMeters(Long value) {
+        return value != null
+                && (value == 0L || value == 2000L || value == 5000L || value == 10000L);
     }
 
     /**
@@ -867,7 +906,9 @@ public class DriverTripRepository {
             Place destination,
             Timestamp departureAt,
             Long costVnd,
-            String note
+            String note,
+            Long baseDistanceMeters,
+            Long maxDetourMeters
     ) {
         Map<String, Object> tripData = new HashMap<>();
         tripData.put("driverId", driverId);
@@ -876,6 +917,8 @@ public class DriverTripRepository {
         tripData.put("departureAt", departureAt);
         tripData.put("costVnd", costVnd);
         tripData.put("note", note);
+        tripData.put("baseDistanceMeters", baseDistanceMeters);
+        tripData.put("maxDetourMeters", maxDetourMeters);
         tripData.put("status", "OPEN");
         tripData.put("availableSeats", 1L);
         tripData.put("acceptedRequestId", "");
@@ -959,7 +1002,8 @@ public class DriverTripRepository {
             Place destination,
             Timestamp departureAt,
             Long costVnd,
-            String note
+            String note,
+            Long maxDetourMeters
     ) {
         String storedDriverId = snapshot.getString("driverId");
         String storedStatus = snapshot.getString("status");
@@ -968,8 +1012,13 @@ public class DriverTripRepository {
         Long storedCost = snapshot.getLong("costVnd");
         Long storedAvailableSeats = snapshot.getLong("availableSeats");
         Timestamp storedDepartureAt = snapshot.getTimestamp("departureAt");
+        Long storedBaseDistanceMeters = snapshot.getLong("baseDistanceMeters");
+        Long storedMaxDetourMeters = snapshot.getLong("maxDetourMeters");
 
-        if (!driverId.equals(storedDriverId)
+        if (storedBaseDistanceMeters == null || storedBaseDistanceMeters <= 0L
+                || storedMaxDetourMeters == null
+                || storedMaxDetourMeters.longValue() != maxDetourMeters.longValue()
+                || !driverId.equals(storedDriverId)
                 || !"OPEN".equals(storedStatus)
                 || !safeString(note).equals(safeString(storedNote))
                 || !safeString(storedAcceptedRequestId).isEmpty()
