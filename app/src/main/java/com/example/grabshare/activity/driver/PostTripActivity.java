@@ -921,6 +921,10 @@ public class PostTripActivity extends AppCompatActivity {
             showMessage("Vui lòng đợi hoặc tính lại quãng đường hợp lệ trước khi đăng chuyến.");
             return false;
         }
+        if (getSelectedMaxDetourMeters() == null) {
+            showMessage("Vui lòng chọn mức đi thêm tối đa.");
+            return false;
+        }
 
         if (!validateDepartureDateTime()) {
             return false;
@@ -1022,6 +1026,24 @@ public class PostTripActivity extends AppCompatActivity {
         return selectedDepartureCalendar.after(currentCalendar);
     }
 
+    /** Lấy mức đi thêm đã chọn theo đơn vị mét, phù hợp hợp đồng Firestore. */
+    private Long getSelectedMaxDetourMeters() {
+        int selectedId = maxDetourGroup.getCheckedRadioButtonId();
+        if (selectedId == R.id.detour_0) {
+            return 0L;
+        }
+        if (selectedId == R.id.detour_2000) {
+            return 2000L;
+        }
+        if (selectedId == R.id.detour_5000) {
+            return 5000L;
+        }
+        if (selectedId == R.id.detour_10000) {
+            return 10000L;
+        }
+        return null;
+    }
+
     /**
      * Khởi động luồng đăng chuyến, xác minh hồ sơ trước rồi mới yêu cầu transaction tạo document.
      */
@@ -1050,6 +1072,8 @@ public class PostTripActivity extends AppCompatActivity {
                 getSelectedDepartureCalendar().getTime()
         );
         final Long requestedCostVnd = validatedContributionAmount;
+        final Long requestedBaseDistanceMeters = baseDistanceMeters;
+        final Long requestedMaxDetourMeters = getSelectedMaxDetourMeters();
         final String requestedNote = noteInput.getText().toString().trim();
 
         setSubmitting(true);
@@ -1088,7 +1112,9 @@ public class PostTripActivity extends AppCompatActivity {
                                 requestedDestination,
                                 requestedDepartureAt,
                                 requestedCostVnd,
-                                requestedNote
+                                requestedNote,
+                                requestedBaseDistanceMeters,
+                                requestedMaxDetourMeters
                         );
                     }
 
@@ -1120,7 +1146,9 @@ public class PostTripActivity extends AppCompatActivity {
             Place requestedDestination,
             Timestamp requestedDepartureAt,
             Long requestedCostVnd,
-            String requestedNote
+            String requestedNote,
+            Long requestedBaseDistanceMeters,
+            Long requestedMaxDetourMeters
     ) {
         tripRepository.createTrip(
                 requestedTripId,
@@ -1129,6 +1157,8 @@ public class PostTripActivity extends AppCompatActivity {
                 requestedDepartureAt,
                 requestedCostVnd,
                 requestedNote,
+                requestedBaseDistanceMeters,
+                requestedMaxDetourMeters,
                 new RepositoryCallback<>() {
                     /**
                      * Mở danh sách chuyến sau khi transaction được máy chủ xác nhận.
@@ -1190,6 +1220,10 @@ public class PostTripActivity extends AppCompatActivity {
         contributionAmountInput.setEnabled(
                 !submitting && !freeContributionCheckBox.isChecked()
         );
+        useSuggestedCostButton.setEnabled(!submitting && suggestedCostVnd != null);
+        for (int index = 0; index < maxDetourGroup.getChildCount(); index++) {
+            maxDetourGroup.getChildAt(index).setEnabled(!submitting);
+        }
         noteInput.setEnabled(!submitting);
         backButton.setEnabled(!submitting);
         postTripButton.setEnabled(!submitting);
