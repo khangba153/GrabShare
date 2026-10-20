@@ -3,70 +3,113 @@ package com.example.grabshare.repository.search;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
+import com.google.firebase.Timestamp;
+
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.TimeZone;
 
 /** Toán học và kết quả tìm dọc tuyến trên RAM; không ghi các metric vào Firestore. */
 public final class EnRouteSearch {
+
     public static final int BATCH_SIZE = 10;
-    public static final int MIN_NEW_MATCHES = 3;
-    public static final int MAX_CANDIDATES_PER_ACTION = 30;
-    public static final int MAX_HTTP_PER_ACTION = 60;
-    public static final long ACTION_TIMEOUT_MS = 75000;
+
+    public static final int MINIMUM_NEW_MATCH_COUNT = 3;
+
+    public static final int MAXIMUM_CANDIDATES_PER_ACTION = 30;
+
+    public static final int MAXIMUM_HTTP_REQUESTS_PER_ACTION = 60;
+
+    public static final long ACTION_TIMEOUT_MILLISECONDS = 75000;
+
     public static final double TOLERANCE_METERS = 300;
-    public enum Sort { RECOMMENDED, PRICE, START_GAP, DETOUR }
+
+    public static final long MAXIMUM_DRIVER_DELAY_MILLISECONDS = 60 * 60 * 1000;
+
+    public enum Sort {
+        RECOMMENDED,
+        PRICE,
+        START_GAP,
+        DETOUR
+    }
 
     /** Không tạo lớp tiện ích. */
-    private EnRouteSearch() { }
+    private EnRouteSearch() {}
 
     /** Điều kiện bất biến; sao chép Place để tránh màn khác đổi điểm đang tính. */
     public static final class Criteria {
+
         public final Place pickup;
+
         public final Place dropoff;
+
         public final long requestedAt;
+
         public final String userId;
+
         /** Kiểm tra dữ liệu thay vì mặc định tọa độ thiếu thành (0,0). */
         public Criteria(Place pickup, Place dropoff, long requestedAt, String userId) {
-            if (!SearchTripPolicy.validPlace(pickup) || !SearchTripPolicy.validPlace(dropoff)
-                    || distance(pickup, dropoff) < 1 || !SearchTripPolicy.validId(userId)
-                    || requestedAt <= 0) throw new IllegalArgumentException("Thiếu hoặc sai điều kiện tìm chuyến.");
+            if (!SearchTripPolicy.validPlace(pickup)
+                    || !SearchTripPolicy.validPlace(dropoff)
+                    || distance(pickup, dropoff) < 1
+                    || !SearchTripPolicy.validId(userId)
+                    || requestedAt <= 0) {
+                throw new IllegalArgumentException("Thiếu hoặc sai điều kiện tìm chuyến.");
+            }
             this.pickup = new Place(pickup.getName(), pickup.getLatitude(), pickup.getLongitude());
-            this.dropoff = new Place(dropoff.getName(), dropoff.getLatitude(), dropoff.getLongitude());
-            this.requestedAt = requestedAt;
+            this.dropoff =
+                    new Place(dropoff.getName(), dropoff.getLatitude(), dropoff.getLongitude());
+            this.requestedAt = requestedAt / 60000 * 60000;
             this.userId = userId;
         }
     }
 
     /** Ứng viên có thứ tự sơ bộ; khoảng cách này chưa phải đường bộ. */
     public static final class Candidate {
+
         public final Trip trip;
+
         public final double estimatedStartGapMeters;
+
         public final double estimatedDetourMeters;
+
         /** Lưu metric sơ bộ riêng với model dùng chung. */
-        Candidate(Trip trip, double start, double detour) {
+        Candidate(
+                Trip trip,
+                double estimatedStartDistanceMeters,
+                double estimatedAdditionalDistanceMeters) {
             this.trip = trip;
-            estimatedStartGapMeters = start;
-            estimatedDetourMeters = detour;
+            estimatedStartGapMeters = estimatedStartDistanceMeters;
+            estimatedDetourMeters = estimatedAdditionalDistanceMeters;
         }
     }
 
     /** Kết quả đã kiểm tra đường bộ, chỉ tồn tại trong lượt tìm. */
     public static final class Match {
+
         public final Trip trip;
+
         public final PublicProfile profile;
+
         public final double startGapMeters;
+
         public final double detourMeters;
+
         public final double baselineMeters;
+
         public final boolean baselineAdjusted;
+
         /** Tạo kết quả bất biến để giao diện có thể sắp xếp mà không gọi API lại. */
-        public Match(Trip trip, PublicProfile profile, double startGapMeters, double detourMeters,
-                     double baselineMeters, boolean baselineAdjusted) {
+        public Match(
+                Trip trip,
+                PublicProfile profile,
+                double startGapMeters,
+                double detourMeters,
+                double baselineMeters,
+                boolean baselineAdjusted) {
             this.trip = trip;
             this.profile = profile;
             this.startGapMeters = startGapMeters;
@@ -74,107 +117,223 @@ public final class EnRouteSearch {
             this.baselineMeters = baselineMeters;
             this.baselineAdjusted = baselineAdjusted;
         }
+
         /** Bổ sung profile không thay metric đã được kiểm tra. */
-        public Match withProfile(PublicProfile value) {
-            return new Match(trip, value, startGapMeters, detourMeters, baselineMeters, baselineAdjusted);
+        public Match withProfile(PublicProfile driverProfile) {
+            return new Match(
+                    trip,
+                    driverProfile,
+                    startGapMeters,
+                    detourMeters,
+                    baselineMeters,
+                    baselineAdjusted);
         }
     }
 
     /** Thống kê thiếu dữ liệu tách khỏi các chuyến bị loại bằng heuristic. */
     public static final class Prepared {
-        public final List<Candidate> candidates = new ArrayList<>();
+
+        public final List<Candidate> candidates = new ArrayList<Candidate>();
+
         public int missingMetadata;
+
         public int invalid;
+
         public int preliminaryRejected;
     }
 
-    /** Lấy toàn ngày Việt Nam nhưng giữ điều kiện chuyến chưa khởi hành của Rules. */
-    public static long[] timeWindow(long requestedAt, long now) {
-        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-        calendar.setTimeInMillis(requestedAt);
-        calendar.set(Calendar.HOUR_OF_DAY, 0);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
-        long start = Math.max(calendar.getTimeInMillis(), now);
-        calendar.add(Calendar.DAY_OF_MONTH, 1);
-        return new long[] { start, calendar.getTimeInMillis() };
+    /**
+     * Khách chọn T thì nhận tài xế từ T đến T+1 giờ, không lấy trước T hoặc nới thêm khi giờ đã
+     * qua.
+     */
+    public static long[] timeWindow(long requestedAt, long currentTimeMilliseconds) {
+        long selectedMinute = requestedAt / 60000 * 60000;
+        return new long[] {
+            Math.max(selectedMinute, currentTimeMilliseconds),
+            selectedMinute + MAXIMUM_DRIVER_DELAY_MILLISECONDS
+        };
     }
 
     /** Sàng lọc rộng để dành Routing cho ứng viên tốt hơn, không khẳng định không bỏ sót. */
-    public static Prepared prepare(List<Trip> trips, Criteria criteria, long now) {
+    public static Prepared prepare(
+            List<Trip> trips, Criteria criteria, long currentTimeMilliseconds) {
         Prepared result = new Prepared();
-        Set<String> seen = new HashSet<>();
-        long[] window = timeWindow(criteria.requestedAt, now);
+        Set<String> seenTripIdentifiers = new HashSet<String>();
+        long[] departureTimeWindow = timeWindow(criteria.requestedAt, currentTimeMilliseconds);
         for (Trip trip : trips) {
-            if (!SearchTripPolicy.validTrip(trip)) { result.invalid++; continue; }
-            if (!seen.add(trip.getId()) || criteria.userId.equals(trip.getDriverId())
-                    || !"OPEN".equals(trip.getStatus()) || trip.getAvailableSeats() != 1
-                    || trip.getDepartureAt().toDate().getTime() < window[0]
-                    || trip.getDepartureAt().toDate().getTime() >= window[1]) continue;
-            Long base = trip.getBaseDistanceMeters();
-            Long limit = trip.getMaxDetourMeters();
-            if (base == null || base <= 0 || limit == null
-                    || (limit != 0 && limit != 2000 && limit != 5000 && limit != 10000)) {
-                result.missingMetadata++;
+            if (!SearchTripPolicy.validTrip(trip)) {
+                result.invalid = result.invalid + 1;
                 continue;
             }
-            double ab = distance(trip.getOrigin(), criteria.pickup);
-            double bc = distance(criteria.pickup, criteria.dropoff);
-            double cd = distance(criteria.dropoff, trip.getDestination());
-            double ad = distance(trip.getOrigin(), trip.getDestination());
-            double detour = Math.max(0, ab + bc + cd - ad);
-            // Ngưỡng rộng; tuyến cong chữ S vẫn có thể bị heuristic bỏ sót, ghi rõ ở UI.
-            // Bù độ cong của đường bộ gốc so với dây cung; không loại khách dọc chữ S chỉ vì xa dây cung.
-            double allowance = Math.max(50000, 4 * limit) + Math.max(0, base - ad);
-            boolean reversed = distance(trip.getOrigin(), criteria.pickup)
-                    > distance(trip.getOrigin(), criteria.dropoff) + allowance
-                    && distance(criteria.dropoff, trip.getDestination())
-                    > distance(criteria.pickup, trip.getDestination()) + allowance;
-            if (detour > allowance || reversed) { result.preliminaryRejected++; continue; }
-            result.candidates.add(new Candidate(trip, ab, detour));
-        }
-        Collections.sort(result.candidates, new Comparator<Candidate>() {
-            /** Xếp ứng viên theo độ lệch, AB rồi ID để phân nhóm ổn định. */
-            @Override public int compare(Candidate a, Candidate b) {
-                int value = Double.compare(a.estimatedDetourMeters, b.estimatedDetourMeters);
-                if (value == 0) value = Double.compare(a.estimatedStartGapMeters, b.estimatedStartGapMeters);
-                return value == 0 ? a.trip.getId().compareTo(b.trip.getId()) : value;
+            if (!seenTripIdentifiers.add(trip.getId())
+                    || criteria.userId.equals(trip.getDriverId())
+                    || !"OPEN".equals(trip.getStatus())
+                    || trip.getAvailableSeats() != 1
+                    || trip.getDepartureAt().compareTo(timestampAt(departureTimeWindow[0])) < 0
+                    || trip.getDepartureAt().compareTo(timestampAt(departureTimeWindow[1])) > 0) {
+                continue;
             }
-        });
+            Long storedBaselineMeters = trip.getBaseDistanceMeters();
+            Long maximumDetourMeters = trip.getMaxDetourMeters();
+            if (storedBaselineMeters == null
+                    || storedBaselineMeters <= 0
+                    || maximumDetourMeters == null
+                    || (maximumDetourMeters != 0
+                            && maximumDetourMeters != 2000
+                            && maximumDetourMeters != 5000
+                            && maximumDetourMeters != 10000)) {
+                result.missingMetadata = result.missingMetadata + 1;
+                continue;
+            }
+            double driverOriginToPickupMeters = distance(trip.getOrigin(), criteria.pickup);
+            double pickupToDropoffMeters = distance(criteria.pickup, criteria.dropoff);
+            double dropoffToDriverDestinationMeters =
+                    distance(criteria.dropoff, trip.getDestination());
+            double driverOriginToDestinationMeters =
+                    distance(trip.getOrigin(), trip.getDestination());
+            double estimatedAdditionalDistanceMeters =
+                    Math.max(
+                            0,
+                            driverOriginToPickupMeters
+                                    + pickupToDropoffMeters
+                                    + dropoffToDriverDestinationMeters
+                                    - driverOriginToDestinationMeters);
+            // Ngưỡng rộng; tuyến cong chữ S vẫn có thể bị heuristic bỏ sót, ghi rõ ở UI.
+            // Bù độ cong của đường bộ gốc so với dây cung; không loại khách dọc chữ S chỉ vì xa dây
+            // cung.
+            double preliminaryDetourAllowanceMeters =
+                    Math.max(50000, 4 * maximumDetourMeters)
+                            + Math.max(0, storedBaselineMeters - driverOriginToDestinationMeters);
+            boolean isClearlyReversed =
+                    distance(trip.getOrigin(), criteria.pickup)
+                                    > distance(trip.getOrigin(), criteria.dropoff)
+                                            + preliminaryDetourAllowanceMeters
+                            && distance(criteria.dropoff, trip.getDestination())
+                                    > distance(criteria.pickup, trip.getDestination())
+                                            + preliminaryDetourAllowanceMeters;
+            if (estimatedAdditionalDistanceMeters > preliminaryDetourAllowanceMeters
+                    || isClearlyReversed) {
+                result.preliminaryRejected = result.preliminaryRejected + 1;
+                continue;
+            }
+            result.candidates.add(
+                    new Candidate(
+                            trip, driverOriginToPickupMeters, estimatedAdditionalDistanceMeters));
+        }
+        Collections.sort(
+                result.candidates,
+                new Comparator<Candidate>() {
+
+                    /** Xếp ứng viên theo độ lệch, AB rồi ID để phân nhóm ổn định. */
+                    @Override
+                    public int compare(Candidate firstCandidate, Candidate secondCandidate) {
+                        int comparisonResult =
+                                Double.compare(
+                                        firstCandidate.estimatedDetourMeters,
+                                        secondCandidate.estimatedDetourMeters);
+                        if (comparisonResult == 0) {
+                            comparisonResult =
+                                    Double.compare(
+                                            firstCandidate.estimatedStartGapMeters,
+                                            secondCandidate.estimatedStartGapMeters);
+                        }
+                        if (comparisonResult == 0) {
+                            return firstCandidate
+                                    .trip
+                                    .getId()
+                                    .compareTo(secondCandidate.trip.getId());
+                        } else {
+                            return comparisonResult;
+                        }
+                    }
+                });
         return result;
     }
 
+    /** Giữ đúng mili giây ở hai biên, không nhận chuyến vượt biên do làm tròn Timestamp. */
+    private static Timestamp timestampAt(long timestampMilliseconds) {
+        return new Timestamp(
+                timestampMilliseconds / 1000, (int) (timestampMilliseconds % 1000) * 1000000);
+    }
+
     /** Khoảng cách cung lớn bằng mét, không dùng thay cho detour đường bộ. */
-    public static double distance(Place a, Place b) {
-        double lat1 = Math.toRadians(a.getLatitude());
-        double lat2 = Math.toRadians(b.getLatitude());
-        double halfLat = Math.sin((lat2 - lat1) / 2);
-        double halfLon = Math.sin(Math.toRadians(b.getLongitude() - a.getLongitude()) / 2);
-        double haversine = halfLat * halfLat + Math.cos(lat1) * Math.cos(lat2) * halfLon * halfLon;
+    public static double distance(Place firstPlace, Place secondPlace) {
+        double firstLatitudeRadians = Math.toRadians(firstPlace.getLatitude());
+        double secondLatitudeRadians = Math.toRadians(secondPlace.getLatitude());
+        double halfLatitudeSine = Math.sin((secondLatitudeRadians - firstLatitudeRadians) / 2);
+        double halfLongitudeSine =
+                Math.sin(
+                        Math.toRadians(secondPlace.getLongitude() - firstPlace.getLongitude()) / 2);
+        double haversine =
+                halfLatitudeSine * halfLatitudeSine
+                        + Math.cos(firstLatitudeRadians)
+                                * Math.cos(secondLatitudeRadians)
+                                * halfLongitudeSine
+                                * halfLongitudeSine;
         return 6371008.8 * 2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, haversine))));
     }
 
     /** Chỉ lọc/sắp xếp những ứng viên đã kiểm tra, không thay hàng đợi còn chờ. */
-    public static List<Match> sorted(List<Match> matches, final Sort sort, Long maxPrice, long now) {
-        List<Match> result = new ArrayList<>();
+    public static List<Match> sorted(
+            List<Match> matches,
+            final Sort sort,
+            Long maximumPriceVnd,
+            long currentTimeMilliseconds) {
+        List<Match> result = new ArrayList<Match>();
         for (Match match : matches) {
-            if (match.trip.getDepartureAt().toDate().getTime() > now
-                    && (maxPrice == null || match.trip.getCostVnd() <= maxPrice)) result.add(match);
-        }
-        Collections.sort(result, new Comparator<Match>() {
-            /** Dùng metric đường bộ và ID làm tiêu chí phá hòa cuối cùng. */
-            @Override public int compare(Match a, Match b) {
-                int value;
-                if (sort == Sort.PRICE) value = Long.compare(a.trip.getCostVnd(), b.trip.getCostVnd());
-                else if (sort == Sort.START_GAP) value = Double.compare(a.startGapMeters, b.startGapMeters);
-                else value = Double.compare(a.detourMeters, b.detourMeters);
-                if (value == 0) value = Double.compare(a.detourMeters, b.detourMeters);
-                if (value == 0) value = Double.compare(a.startGapMeters, b.startGapMeters);
-                if (value == 0) value = Long.compare(a.trip.getCostVnd(), b.trip.getCostVnd());
-                return value == 0 ? a.trip.getId().compareTo(b.trip.getId()) : value;
+            if (match.trip.getDepartureAt().toDate().getTime() > currentTimeMilliseconds
+                    && (maximumPriceVnd == null || match.trip.getCostVnd() <= maximumPriceVnd)) {
+                result.add(match);
             }
-        });
+        }
+        Collections.sort(
+                result,
+                new Comparator<Match>() {
+
+                    /** Dùng metric đường bộ và ID làm tiêu chí phá hòa cuối cùng. */
+                    @Override
+                    public int compare(Match firstMatch, Match secondMatch) {
+                        int comparisonResult;
+                        if (sort == Sort.PRICE) {
+                            comparisonResult =
+                                    Long.compare(
+                                            firstMatch.trip.getCostVnd(),
+                                            secondMatch.trip.getCostVnd());
+                        } else {
+                            if (sort == Sort.START_GAP) {
+                                comparisonResult =
+                                        Double.compare(
+                                                firstMatch.startGapMeters,
+                                                secondMatch.startGapMeters);
+                            } else {
+                                comparisonResult =
+                                        Double.compare(
+                                                firstMatch.detourMeters, secondMatch.detourMeters);
+                            }
+                        }
+                        if (comparisonResult == 0) {
+                            comparisonResult =
+                                    Double.compare(
+                                            firstMatch.detourMeters, secondMatch.detourMeters);
+                        }
+                        if (comparisonResult == 0) {
+                            comparisonResult =
+                                    Double.compare(
+                                            firstMatch.startGapMeters, secondMatch.startGapMeters);
+                        }
+                        if (comparisonResult == 0) {
+                            comparisonResult =
+                                    Long.compare(
+                                            firstMatch.trip.getCostVnd(),
+                                            secondMatch.trip.getCostVnd());
+                        }
+                        if (comparisonResult == 0) {
+                            return firstMatch.trip.getId().compareTo(secondMatch.trip.getId());
+                        } else {
+                            return comparisonResult;
+                        }
+                    }
+                });
         return result;
     }
 }

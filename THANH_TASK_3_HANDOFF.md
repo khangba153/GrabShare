@@ -28,12 +28,17 @@ lọc dữ liệu/chính chủ/chỗ/thời gian → heuristic và hàng đợi 
 theo nhóm 10 → kiểm tra detour thực → ghép public profile → thẻ kết quả → Detail
 bằng `trip_id`. Detail tiếp tục đọc lại dữ liệu hiện tại theo luồng đã có.
 
-### Bước 1: đọc chuyến theo thời gian rộng
+### Bước 1: cửa sổ một giờ — yêu cầu mới của Thành
 
-- Toàn ngày người tìm chọn theo `Asia/Ho_Chi_Minh`; cận dưới là đầu ngày hoặc
-  hiện tại, lấy mốc muộn hơn; cận trên là đầu ngày kế tiếp, loại trừ.
-- Không ép departureAt của A phải sau giờ khách chọn tại B.
-- Bỏ `.limit(50)` cũ. Snapshot đọc toàn bộ chuyến OPEN trong khung, rồi mới xếp
+- Khách chọn T: chỉ lấy `T <= departureAt <= T + 1 giờ`, gồm hai biên. Ví dụ
+  khách chọn 14:00 thì nhận tài xế 14:00, 14:30, 15:00; loại 13:59 hoặc 15:01.
+- Bỏ giây/mili giây ẩn trong giờ khách chọn vì giao diện chỉ cho chọn tới phút.
+  Cận dưới thực tế là max(T, hiện tại) để giữ điều kiện chuyến chưa khởi hành.
+  Cận trên vẫn là T+1 giờ, không dời theo thời gian hiện tại. Query và lọc RAM
+  dùng cùng hai biên, so Timestamp chính xác cả nano giây.
+- Không cắt ở nửa đêm: 23:30 nhận tới 00:30 ngày kế tiếp. Giao diện hiển thị cả
+  ngày/giờ kết thúc theo giờ Việt Nam. Đây là thay đổi thay thế cửa sổ cả ngày trước đó.
+- Bỏ `.limit(50)` cũ. Snapshot đọc toàn bộ chuyến OPEN trong cửa sổ, rồi mới xếp
   hạng. Xem thêm không đọc DB lại. Làm mới đọc snapshot mới.
 - Không nhận chuyến tài xế đã xuất phát: trạng thái hiện tại của Rules/Review
   vẫn yêu cầu gửi request trước departureAt. Ghép chuyến đã chạy/qua đêm thuộc
@@ -106,6 +111,7 @@ trừ hai tuyến không tương thích mà chưa cần đổi schema chung.
 
 | File | Vai trò |
 |---|---|
+| activity/search/HomeActivity.java | Bỏ giây/mili giây ẩn trước khi truyền giờ tìm |
 | activity/search/ResultsActivity.java | Nhận điều kiện, bộ lọc/sort, Xem thêm/Làm mới, mở Detail |
 | activity/search/ResultsViewModel.java — mới | Điều phối snapshot/hàng đợi/worker/lifecycle/session |
 | repository/search/EnRouteSearch.java — mới | Criteria, heuristic, metric, thời gian VN, comparator |
@@ -122,6 +128,23 @@ Các đường dẫn Java trong bảng nằm dưới app/src/main/java/com/examp
 
 ## Kiểm chứng
 
+- Rà soát theo yêu cầu code tường minh: 9 file production và 6 file kiểm thử.
+  Đã mở rộng ?: thành if/else, nhánh và vòng lặp có khối rõ ràng, tách khai báo
+  từng biến, khai báo đủ generic, đổi tên khoảng cách/hằng thời gian và các biến
+  ngắn, thay ++/-- và phép gán rút gọn bằng phép gán đầy đủ. Không đổi tên trường
+  Firestore, Android resource hoặc chính sách lọc một giờ. Không sửa code gói Thuần.
+  Kiểm tra cú pháp bằng cây Java trên 15 file: 0 vi phạm trong các quy tắc trên.
+  Build Debug, 12 unit test và đủ 18 Android test (gồm API/Firestore thật) đạt sau khi chỉnh cách viết. Kết quả chạy Android
+  được lưu tại build/task3-style/android-tests.txt; báo cáo cú pháp tại
+  build/task3-style/audit-result.txt. Công cụ định dạng/phân tích chỉ ở thư mục
+  build ignored, không thêm dependency vào app hoặc sửa cấu hình chung.
+- Lượt sửa bộ lọc một giờ: build Debug đạt; 12 unit test đạt (10 EnRouteSearch,
+  2 ngân sách); 7 Android test pipeline/layout đạt. Test đọc Firestore thật với
+  giờ khách 21/10/2026 15:40 chỉ trả chuyến 15:56 trong cửa sổ [15:40,16:40],
+  không còn chuyến 15:33. Chuyến 15:56 vẫn bị loại vì chính chủ, đúng điều kiện khác.
+  Có test đúng hai biên, vượt biên 1 ns, bỏ giây ẩn, không nới cận trên khi giờ cũ
+  và cửa sổ qua nửa đêm. APK mới đã cài -r lên emulator, không xóa dữ liệu đăng nhập.
+- Các kết quả toàn pipeline/Routing bên dưới là lượt kiểm tra trước thay đổi cửa sổ.
 - Build Debug và APK kiểm thử: thành công.
 - Unit: 10 test qua (thời gian VN, ghép giữa tuyến, thiếu dữ liệu, chính chủ/trùng/
   hết chỗ/quá giờ, chiều ngược, sort/giá, đầu vào, quota đồng thời, deadline).
@@ -163,6 +186,26 @@ Số đo và ảnh nằm cùng thư mục build/task3-verification/ (ignored, kh
 
 ## Phần chưa mở rộng và checklist Thành kiểm tra
 
+### Chẩn đoán ảnh không tìm thấy chuyến — 20/10/2026
+
+Trước khi đổi sang cửa sổ một giờ, đã dùng phiên đăng nhập hiện có để đọc Firestore server, không ghi dữ liệu:
+ngày được chọn 21/10/2026 lấy từ 00:00 ngày 21 tới trước 00:00 ngày 22 (giờ VN),
+đọc được 3 chuyến OPEN/1, giờ đi 01:25, 15:33, 15:56. Cả 3 đều có driverId bằng
+UID đang tìm, nên không có ứng viên của người khác để đưa vào Routing.
+Chuyến 01:25 và UEH A/B lúc 15:33 thiếu cả baseline/maxDetour; chuyến 15:56 có
+baseline 2646 m và maxDetour 2000 m nhưng vẫn bị loại vì chính chủ. Không phải
+lỗi ép giờ 15:40 làm mất chuyến 15:33. So tên địa điểm không được dùng để lọc.
+
+Test bổ sung diagnoseSelectedDayWithoutWritingData nhận runner argument
+`diagnose_date=2026-10-21`, `diagnose_time=15:40` (mặc định 12:00), theo cửa sổ mới;
+chỉ log số liệu/giờ/own flag, không log UID/token hoặc
+tên địa điểm cá nhân. Test đọc server theo ngày và index đã qua bằng phiên thật.
+Log đã lọc tại build/task3-verification/search-date-diagnostic.txt.
+Để kiểm tra ghép: tài khoản A đăng chuyến có đủ hai field; tài khoản B tìm cùng
+ngày, thử đúng A/D trước rồi thay điểm đón/trả để kiểm tra detour. Chuyến cũ thiếu
+metadata cần chủ chuyến mở Edit, tính lại đường và chọn mức đi thêm rồi lưu.
+Chưa thay điều kiện lọc, chưa tự sửa dữ liệu chuyến để tạo kết quả.
+
 Thành đã chọn “Tôi sẽ kiểm tra Firebase sau” trong chat ngày 20/10/2026.
 Do đó phần xác minh bằng tài khoản/Firebase thật bên dưới được bàn giao để Thành
 chạy sau, không tiếp tục chặn việc chốt code hoặc lặp yêu cầu đăng nhập. Các test
@@ -181,11 +224,30 @@ thuật toán, lifecycle và Routing đã được thực hiện như phần Ki�
 - [ ] Kiểm tra các tuyến dài thực tế trước khi chọn tolerance khác. Số km vẫn phụ
       thuộc dữ liệu/mode và hành lang; chưa cam kết tuyến VN ngắn nhất hoặc bằng Google Maps.
 
-Task 3 không mở rộng schema request: điểm trả C, giá thương lượng và deep link
-Google Maps sau chấp nhận chưa được lưu/nối trong gói này. Results mở Detail
-bằng trip_id như contract; Review vẫn là flow chọn điểm đón riêng hiện có.
-Muốn giữ tự động B/C xuyên suốt yêu cầu và tài xế nhận điểm trả cần bàn giao thêm
-ở gói request/lead. Task 4/5 không được tự đổi trong lượt triển khai task 3.
+Theo yêu cầu mới của Thành ngày 20/10, Results truyền thêm Bundle riêng chứa
+hai điểm đã tìm, gắn với trip_id và tài khoản, qua Detail đến Review.
+PassengerSearchRoute giữ tuyến qua saved state, hiển thị hai điểm dưới chuyến
+chủ xe. Review dùng sẵn pickup cho bản nháp/submit và ẩn chọn lại điểm đón;
+muốn đổi tuyến phải quay lại tìm chuyến để không lệch tuyến đã đánh giá.
+Caller cũ chỉ có trip_id vẫn được chọn điểm đón. Không đổi contract dùng chung.
+
+File đổi trong lượt nối tuyến: ResultsActivity.java, TripDetailActivity.java,
+RequestReviewActivity.java, screen_detail.xml, screen_review.xml. File mới:
+PassengerSearchRoute.java, view_passenger_search_route.xml và
+PassengerSearchRouteTest.java. Code sửa viết tường minh theo quy tắc của Thành.
+Build Debug + 12 unit test + 22 Android test đạt; 4 test mới kiểm tra Bundle/
+khác tài khoản/chuyến, xoay Review, caller cũ và Detail → Review với chuyến thật.
+Không bấm gửi hoặc tạo dữ liệu kiểm thử; kết quả ở
+build/task3-style/passenger-route-tests.txt. Bản mới đã cài trên emulator.
+
+- [ ] Tìm chuyến lại, mở Detail: thấy tuyến chủ xe và tuyến người đi nhờ riêng.
+- [ ] Mở Review: đúng hai điểm đã tìm, không hỏi chọn lại điểm đón.
+- [ ] Xoay màn: hai điểm và lời nhắn còn nguyên; quay lại tìm nếu muốn đổi tuyến.
+
+Schema request chưa mở rộng: điểm xuống C mới hiển thị để người đi nhờ xác nhận,
+chưa được lưu vào request hoặc hiển thị ở màn của tài xế. Cần thống nhất lead/
+gói request về model, Rules và các màn Pending/chủ xe trước khi lưu thêm C.
+Giá thương lượng và deep link Google Maps sau chấp nhận vẫn chưa triển khai.
 
 Tài liệu API đã đối chiếu:
 [Geoapify Routing](https://apidocs.geoapify.com/docs/routing/),

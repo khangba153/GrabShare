@@ -7,6 +7,12 @@ tài liệu chung của cả nhóm.
 
 ## Quyết định cần giữ qua các lượt làm việc
 
+- Quy tắc Thành nhắc lại: viết code tường minh, không viết tắt tên biến/hằng và
+  không dùng cú pháp rút gọn. Không lambda, Handler, tham chiếu hàm, toán tử ba
+  ngôi, if/vòng lặp thiếu ngoặc khối, gộp nhiều khai báo hoặc nhiều lệnh một dòng,
+  ++/-- hay phép gán +=/-=. Khai báo đầy đủ kiểu generic; ưu tiên tên mô tả mục
+  đích và đơn vị (Milliseconds, Meters). Giữ tên cố định của Android/Firebase,
+  resource và hợp đồng dữ liệu để tương thích. Áp dụng cả mã kiểm thử của gói mình.
 - Không yêu cầu Thành xác nhận lại việc lead đã đồng ý kế hoạch mới.
 - Task 3 mới là ghép dọc tuyến A -> B -> C -> D: A/D là điểm đi/đến của tài xế;
   B/C là điểm đón/trả của người đi nhờ.
@@ -24,13 +30,17 @@ tài liệu chung của cả nhóm.
   thay đổi index favorites không trùng gói task 3 đang triển khai.
 - Sau khi chốt code, Thành yêu cầu commit task 3, không để tác giả ẩn danh.
   Dùng danh tính Git Congthanh1912 đã cấu hình và đã dùng ở commit trước; chưa push.
+- Thành cập nhật yêu cầu giờ: khách chọn T chỉ nhận tài xế khởi hành trong
+  [T, T+1 giờ], gồm hai mốc; không nhận tài xế trước giờ khách chọn. Thay thế
+  thiết kế truy vấn cả ngày trước đây. Đã sửa query, lọc RAM, UI và kiểm tra mốc biên.
 
 ## Pipeline theo kế hoạch đã xác nhận
 
 0. Khi tài xế tạo chuyến, tính đường bộ gốc A -> D để tái sử dụng và lưu mức đi thêm
    tối đa tài xế chấp nhận. Khi đổi tuyến/cấu hình phải cập nhật baseline phù hợp.
-1. Query chuyến OPEN còn chỗ, loại chính chủ, theo khung thời gian rộng đã chốt.
-   Không ép giờ xuất phát ở A phải khớp từng phút với giờ khách mong muốn tại B.
+1. Query chuyến OPEN còn chỗ, loại chính chủ: giờ tài xế thuộc [giờ khách chọn,
+   giờ khách chọn +1 giờ], gồm hai biên và phải chưa khởi hành. Chuẩn hóa giờ
+   khách tới phút; cửa sổ có thể đi qua nửa đêm, không lấy cả ngày như kế hoạch cũ.
 2. Trên RAM tính khoảng cách tọa độ AB, BC, CD, AD và độ lệch ước lượng
    AB + BC + CD - AD; lọc sơ bộ theo ngưỡng và xếp ứng viên theo độ lệch rồi AB.
    Đây là heuristic, không tự tuyên bố bảo đảm thuận chiều hoặc không bỏ sót.
@@ -100,5 +110,11 @@ không sửa schema Trip. Tham khảo THANH_TASK_3_HANDOFF.md cho trạng thái 
 Phần thương lượng giá, lưu điểm trả vào request và chuyển sang Google Maps là
 các mở rộng được nêu trong ý tưởng tổng thể; chưa triển khai trong phạm vi tập
 trung task 3 hiện tại. Không tự đổi task 4/5 hoặc schema request theo ngữ cảnh này.
+Ngoại lệ đã được Thành yêu cầu ngày 20/10: nối sẵn điểm đón/điểm xuống từ Results
+qua Detail sang Review, hiển thị dưới tuyến chủ xe, dùng pickup đã tìm khi gửi,
+không yêu cầu chọn lại. Đã thực hiện bằng Bundle riêng của gói search, ràng buộc
+đúng chuyến/tài khoản và giữ qua xoay màn. Caller chỉ có trip_id vẫn chọn pickup.
+Điểm xuống hiện chỉ dùng xác nhận trên giao diện; lưu xuống request và hiển thị
+cho tài xế còn phụ thuộc thống nhất schema/Rules với lead. Không tự đổi schema.
 Giữ quy tắc Java không lambda/Handler, comment tiếng Việt trên hàm, không sửa
 gói khác hoặc file chung ngoài phần đã thống nhất; không tự commit/push.
