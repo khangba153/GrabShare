@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,6 +24,8 @@ import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
 import com.example.grabshare.activity.search.LocationActivity;
+import com.example.grabshare.activity.search.RouteDistanceFormatter;
+import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -34,8 +37,14 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 
+import java.io.IOException;
+import java.text.NumberFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Màn hình chỉnh sửa chuyến. Activity quản lý form và điều hướng;
@@ -66,6 +75,8 @@ public class EditTripActivity extends AppCompatActivity {
     private static final String STATE_DESTINATION_NAME = "edit_destination_name";
     private static final String STATE_DESTINATION_LAT = "edit_destination_latitude";
     private static final String STATE_DESTINATION_LON = "edit_destination_longitude";
+    private static final String STATE_HAS_BASE_DISTANCE = "edit_has_base_distance";
+    private static final String STATE_BASE_DISTANCE = "edit_base_distance_meters";
 
     private LinearLayout originPicker;
     private LinearLayout destinationPicker;
@@ -78,19 +89,29 @@ public class EditTripActivity extends AppCompatActivity {
     private TextView departureDateValue;
     private TextView departureTimeValue;
     private TextView statusMessage;
+    private TextView routeDistanceValue;
+    private TextView suggestedCostValue;
 
     private EditText costInput;
     private EditText noteInput;
 
     private AppCompatButton saveButton;
     private AppCompatButton cancelButton;
+    private AppCompatButton useSuggestedCostButton;
+    private RadioGroup maxDetourGroup;
 
     private DriverTripRepository tripRepository;
+    private final VietnamRoutingClient routingClient =
+            new VietnamRoutingClient("3ae0ba5bcf8843df8024203662e3d702");
+    private final ExecutorService routeExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicInteger routeCalculationGeneration = new AtomicInteger();
     private ActivityResultLauncher<Intent> locationPickerLauncher;
 
     private String tripId;
     private Place selectedOrigin;
     private Place selectedDestination;
+    private Long baseDistanceMeters;
+    private Long suggestedCostVnd;
 
     // Calendar fields use the device's local time zone, matching the date/time pickers.
     private int departureYear;
@@ -146,6 +167,7 @@ public class EditTripActivity extends AppCompatActivity {
             } else {
                 setStatusMessage(null);
             }
+            renderOrCalculateRouteEstimate();
         } else {
             setFormEnabled(false);
             setStatusMessage("Đang tải thông tin chuyến...");
@@ -166,11 +188,15 @@ public class EditTripActivity extends AppCompatActivity {
         departureDateValue = findViewById(R.id.post_date_value);
         departureTimeValue = findViewById(R.id.post_time_value);
         statusMessage = findViewById(R.id.edit_status_message);
+        routeDistanceValue = findViewById(R.id.route_distance_value);
+        suggestedCostValue = findViewById(R.id.suggested_cost_value);
 
         costInput = findViewById(R.id.post_cost);
         noteInput = findViewById(R.id.post_note);
         saveButton = findViewById(R.id.primary_action);
         cancelButton = findViewById(R.id.secondary_action);
+        useSuggestedCostButton = findViewById(R.id.use_suggested_cost);
+        maxDetourGroup = findViewById(R.id.max_detour_group);
     }
 
     private void initializeRepository() {
@@ -231,6 +257,12 @@ public class EditTripActivity extends AppCompatActivity {
                 leaveWithoutSaving();
             }
         });
+        useSuggestedCostButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                useSuggestedCost();
+            }
+        });
         backButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -280,6 +312,8 @@ public class EditTripActivity extends AppCompatActivity {
                         );
                         noteInput.setText(trip.getNote() == null ? "" : trip.getNote());
 
+                        baseDistanceMeters = trip.getBaseDistanceMeters();
+                        setMaxDetourSelection(trip.getMaxDetourMeters());
                         hasLoadedTrip = true;
                         updateOriginDisplay();
                         updateDestinationDisplay();
@@ -287,6 +321,7 @@ public class EditTripActivity extends AppCompatActivity {
                         updateDepartureTimeDisplay();
                         setStatusMessage(null);
                         setFormEnabled(true);
+                        renderOrCalculateRouteEstimate();
                     }
 
                     @Override
@@ -345,6 +380,191 @@ public class EditTripActivity extends AppCompatActivity {
             updateDestinationDisplay();
         }
         setStatusMessage(null);
+        requestRouteEstimate();
+    }
+
+    /** Hiện baseline đã lưu nếu còn tương ứng với tuyến; nếu thiếu thì gọi Routing. */
+    private void renderOrCalculateRouteEstimate() {
+        if (baseDistanceMeters != null && baseDistanceMeters > 0L) {
+            updateEstimateDisplay(baseDistanceMeters);
+        } else {
+            requestRouteEstimate();
+        }
+    }
+
+    /** Tính lại baseline khi người dùng thay đổi điểm đi hoặc điểm đến. */
+    private void requestRouteEstimate() {
+        final int requestId = routeCalculationGeneration.incrementAndGet();
+        routingClient.cancelCurrentRequest();
+        baseDistanceMeters = null;
+        suggestedCostVnd = null;
+        useSuggestedCostButton.setEnabled(false);
+
+        if (!isValidPlace(selectedOrigin) || !isValidPlace(selectedDestination)
+                || sameCoordinates(selectedOrigin, selectedDestination)) {
+            routeDistanceValue.setText("Chưa có quãng đường hợp lệ.");
+            suggestedCostValue.setText("Chưa có ước tính.");
+            return;
+        }
+
+        final Place origin = selectedOrigin;
+        final Place destination = selectedDestination;
+        routeDistanceValue.setText("Đang tính quãng đường đường bộ...");
+        suggestedCostValue.setText("Đang tính giá tham khảo...");
+
+        routeExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                final VietnamRoutingClient.Cancellation cancellation =
+                        new VietnamRoutingClient.Cancellation() {
+                            @Override
+                            public boolean isCancelled() {
+                                return requestId != routeCalculationGeneration.get()
+                                        || Thread.currentThread().isInterrupted();
+                            }
+                        };
+
+                try {
+                    final VietnamRoutingClient.Route route = routingClient.findRoute(
+                            Arrays.asList(
+                                    new VietnamRoutingClient.Point(
+                                            origin.getLatitude(),
+                                            origin.getLongitude()
+                                    ),
+                                    new VietnamRoutingClient.Point(
+                                            destination.getLatitude(),
+                                            destination.getLongitude()
+                                    )
+                            ),
+                            cancellation
+                    );
+                    final long calculatedMeters = Math.round(route.distanceMeters);
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isActivityUsable()
+                                    || requestId != routeCalculationGeneration.get()) {
+                                return;
+                            }
+                            updateEstimateDisplay(calculatedMeters);
+                        }
+                    });
+                } catch (final IOException error) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isActivityUsable()
+                                    || requestId != routeCalculationGeneration.get()) {
+                                return;
+                            }
+                            baseDistanceMeters = null;
+                            suggestedCostVnd = null;
+                            routeDistanceValue.setText("Không thể xác nhận quãng đường.");
+                            suggestedCostValue.setText("Chưa có ước tính.");
+                            useSuggestedCostButton.setEnabled(false);
+                            setStatusMessage(error.getMessage() == null
+                                    ? "Không thể tính quãng đường. Kiểm tra mạng rồi thử lại."
+                                    : error.getMessage());
+                        }
+                    });
+                } catch (RuntimeException invalidRoute) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isActivityUsable()
+                                    || requestId != routeCalculationGeneration.get()) {
+                                return;
+                            }
+                            baseDistanceMeters = null;
+                            suggestedCostVnd = null;
+                            routeDistanceValue.setText("Dữ liệu tuyến không hợp lệ.");
+                            suggestedCostValue.setText("Chưa có ước tính.");
+                            useSuggestedCostButton.setEnabled(false);
+                            setStatusMessage("Không xác nhận được tuyến cho hai địa điểm đã chọn.");
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    /** Cập nhật khoảng cách và giá tham khảo từ cùng một kết quả Routing đã xác thực. */
+    private void updateEstimateDisplay(long distanceMeters) {
+        if (distanceMeters <= 0L) {
+            baseDistanceMeters = null;
+            suggestedCostVnd = null;
+            routeDistanceValue.setText("Quãng đường bộ không hợp lệ.");
+            suggestedCostValue.setText("Chưa có ước tính.");
+            useSuggestedCostButton.setEnabled(false);
+            return;
+        }
+
+        baseDistanceMeters = distanceMeters;
+        suggestedCostVnd = Math.round(distanceMeters * 3.0);
+        routeDistanceValue.setText(
+                "Quãng đường trong Việt Nam: "
+                        + RouteDistanceFormatter.formatKilometers(distanceMeters)
+        );
+        suggestedCostValue.setText(formatSuggestedCost(suggestedCostVnd));
+        useSuggestedCostButton.setEnabled(!isSaving);
+    }
+
+    /** Điền giá tham khảo khi chủ xe chủ động nhấn; không tự ghi đè lúc đổi tuyến. */
+    private void useSuggestedCost() {
+        if (suggestedCostVnd == null || isSaving) {
+            return;
+        }
+        costInput.setText(String.valueOf(suggestedCostVnd));
+        costInput.setSelection(costInput.getText().length());
+    }
+
+    private String formatSuggestedCost(long amountVnd) {
+        return NumberFormat.getIntegerInstance(Locale.forLanguageTag("vi-VN"))
+                .format(amountVnd) + " đ";
+    }
+
+    /** Đổi mức đã lưu thành lựa chọn UI; thiếu cấu hình ở chuyến cũ thì không tự gán mặc định. */
+    private void setMaxDetourSelection(Long maxDetourMeters) {
+        if (maxDetourMeters == null) {
+            maxDetourGroup.clearCheck();
+        } else if (maxDetourMeters == 0L) {
+            maxDetourGroup.check(R.id.detour_0);
+        } else if (maxDetourMeters == 2000L) {
+            maxDetourGroup.check(R.id.detour_2000);
+        } else if (maxDetourMeters == 5000L) {
+            maxDetourGroup.check(R.id.detour_5000);
+        } else if (maxDetourMeters == 10000L) {
+            maxDetourGroup.check(R.id.detour_10000);
+        } else {
+            maxDetourGroup.clearCheck();
+        }
+    }
+
+    /** Trả mức đi thêm đã chọn dưới dạng mét theo hợp đồng dữ liệu. */
+    private Long getSelectedMaxDetourMeters() {
+        int selectedId = maxDetourGroup.getCheckedRadioButtonId();
+        if (selectedId == R.id.detour_0) {
+            return 0L;
+        }
+        if (selectedId == R.id.detour_2000) {
+            return 2000L;
+        }
+        if (selectedId == R.id.detour_5000) {
+            return 5000L;
+        }
+        if (selectedId == R.id.detour_10000) {
+            return 10000L;
+        }
+        return null;
+    }
+
+    @Override
+    protected void onDestroy() {
+        routeCalculationGeneration.incrementAndGet();
+        routingClient.cancelCurrentRequest();
+        routeExecutor.shutdownNow();
+        super.onDestroy();
     }
 
     private void showDepartureDatePicker() {
@@ -476,6 +696,15 @@ public class EditTripActivity extends AppCompatActivity {
             return false;
         }
 
+        if (baseDistanceMeters == null || baseDistanceMeters <= 0L) {
+            setStatusMessage("Vui lòng đợi hoặc tính lại quãng đường hợp lệ trước khi lưu.");
+            return false;
+        }
+        if (getSelectedMaxDetourMeters() == null) {
+            setStatusMessage("Chọn mức đi thêm tối đa để lưu chuyến.");
+            return false;
+        }
+
         Calendar departure = getSelectedDepartureCalendar();
         if (departure.getTimeInMillis() <= System.currentTimeMillis()) {
             setStatusMessage("Ngày và giờ khởi hành phải ở trong tương lai.");
@@ -520,6 +749,8 @@ public class EditTripActivity extends AppCompatActivity {
         final Place destinationToSave = selectedDestination;
         final Timestamp departureToSave = new Timestamp(getSelectedDepartureCalendar().getTime());
         final Long costToSave = cost;
+        final Long baseDistanceToSave = baseDistanceMeters;
+        final Long maxDetourToSave = getSelectedMaxDetourMeters();
         final String noteToSave = noteInput.getText().toString().trim();
 
         isSaving = true;
@@ -533,6 +764,8 @@ public class EditTripActivity extends AppCompatActivity {
                 departureToSave,
                 costToSave,
                 noteToSave,
+                baseDistanceToSave,
+                maxDetourToSave,
                 new RepositoryCallback<Void>() {
                     @Override
                     public void onSuccess(Void ignored) {
@@ -594,6 +827,10 @@ public class EditTripActivity extends AppCompatActivity {
         departureTimePicker.setEnabled(canEdit);
         costInput.setEnabled(canEdit);
         noteInput.setEnabled(canEdit);
+        useSuggestedCostButton.setEnabled(canEdit && suggestedCostVnd != null);
+        for (int index = 0; index < maxDetourGroup.getChildCount(); index++) {
+            maxDetourGroup.getChildAt(index).setEnabled(canEdit);
+        }
         saveButton.setEnabled(canEdit && hasLoadedTrip);
         saveButton.setText(isSaving ? "Đang lưu..." : "Lưu thay đổi");
         cancelButton.setEnabled(!isSaving);
@@ -672,6 +909,9 @@ public class EditTripActivity extends AppCompatActivity {
                 state, STATE_HAS_DESTINATION, STATE_DESTINATION_NAME,
                 STATE_DESTINATION_LAT, STATE_DESTINATION_LON
         );
+        baseDistanceMeters = state.getBoolean(STATE_HAS_BASE_DISTANCE, false)
+                ? state.getLong(STATE_BASE_DISTANCE)
+                : null;
     }
 
     private void savePlace(
@@ -748,6 +988,10 @@ public class EditTripActivity extends AppCompatActivity {
                 STATE_ORIGIN_NAME, STATE_ORIGIN_LAT, STATE_ORIGIN_LON);
         savePlace(outState, selectedDestination, STATE_HAS_DESTINATION,
                 STATE_DESTINATION_NAME, STATE_DESTINATION_LAT, STATE_DESTINATION_LON);
+        outState.putBoolean(STATE_HAS_BASE_DISTANCE, baseDistanceMeters != null);
+        if (baseDistanceMeters != null) {
+            outState.putLong(STATE_BASE_DISTANCE, baseDistanceMeters);
+        }
         super.onSaveInstanceState(outState);
     }
 }
