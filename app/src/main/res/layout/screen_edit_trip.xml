@@ -78,38 +78,23 @@
                 <TextView
                     style="@style/Caption"
                     android:layout_marginTop="12dp"
-                    android:text="Mức đi thêm tối đa chấp nhận"/>
-                <RadioGroup
-                    android:id="@+id/max_detour_group"
+                    android:labelFor="@id/max_detour_input"
+                    android:text="@string/detour_limit_label" />
+                <EditText
+                    android:id="@+id/max_detour_input"
+                    style="@style/Input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
-                    <RadioButton
-                        android:id="@+id/detour_0"
-                        style="@style/Radio"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="0 km — Không đi vòng"/>
-                    <RadioButton
-                        android:id="@+id/detour_2000"
-                        style="@style/Radio"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:checked="true"
-                        android:text="2 km"/>
-                    <RadioButton
-                        android:id="@+id/detour_5000"
-                        style="@style/Radio"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="5 km"/>
-                    <RadioButton
-                        android:id="@+id/detour_10000"
-                        style="@style/Radio"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="10 km"/>
-                </RadioGroup>
+                    android:hint="@string/detour_limit_hint"
+                    android:importantForAutofill="no"
+                    android:inputType="textNoSuggestions"
+                    android:saveEnabled="true"
+                    android:singleLine="true" />
+                <TextView
+                    style="@style/Hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/detour_limit_help" />
                 <TextView
                     style="@style/Hint"
                     android:text="Giá tham khảo không thay thế giá do chủ xe nhập."/>

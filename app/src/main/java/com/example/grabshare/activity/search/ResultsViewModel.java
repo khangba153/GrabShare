@@ -492,8 +492,8 @@ public class ResultsViewModel extends ViewModel {
                                 }
                             },
                             baselineCache);
-            if (route.detourMeters()
-                            <= candidate.trip.getMaxDetourMeters() + EnRouteSearch.TOLERANCE_METERS
+            // Số km chủ xe nhập là giới hạn thật; chỉ làm tròn lên mét, không nới thêm sai số.
+            if (Math.ceil(route.detourMeters()) <= candidate.trip.getMaxDetourMeters()
                     && candidate.trip.getDepartureAt().toDate().getTime()
                             > System.currentTimeMillis()) {
                 result.match =

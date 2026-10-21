@@ -48,6 +48,30 @@ public class EnRouteSearchTest {
         return trip;
     }
 
+    /** Tìm kiếm nhận mức nhập tay mới nhưng vẫn loại số mét sai bước hoặc vượt trần. */
+    @Test
+    public void acceptsManualDetourLimitsAndRejectsInvalidStoredValues() {
+        long requestedTime = Instant.parse("2026-10-20T14:00:00Z").toEpochMilli();
+        long[] validLimits = {0L, 100L, 2500L, 3700L, 10000L};
+        for (long validLimit : validLimits) {
+            Trip candidateTrip = at("manual-limit", requestedTime);
+            candidateTrip.setMaxDetourMeters(validLimit);
+            assertEquals(1, EnRouteSearch.prepare(
+                    Collections.singletonList(candidateTrip),
+                    new EnRouteSearch.Criteria(nhaTrang, thanhHoa, requestedTime, "rider"),
+                    CURRENT_TIME_MILLISECONDS).candidates.size());
+        }
+        long[] invalidLimits = {-100L, 2501L, 10100L};
+        for (long invalidLimit : invalidLimits) {
+            Trip candidateTrip = at("invalid-limit", requestedTime);
+            candidateTrip.setMaxDetourMeters(invalidLimit);
+            assertEquals(0, EnRouteSearch.prepare(
+                    Collections.singletonList(candidateTrip),
+                    new EnRouteSearch.Criteria(nhaTrang, thanhHoa, requestedTime, "rider"),
+                    CURRENT_TIME_MILLISECONDS).candidates.size());
+        }
+    }
+
     /** Khách chọn 14:00 thì chỉ giữ 14:00 tới 15:00, gồm cả hai mốc. */
     @Test
     public void oneHourWindowIncludesBothBoundariesAndRejectsOutside() {

@@ -3,6 +3,7 @@ package com.example.grabshare.repository.driver;
 import androidx.annotation.NonNull;
 
 import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.contract.DetourLimit;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.Trip;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -268,7 +269,7 @@ public class DriverTripRepository {
         }
         if (!isValidMaxDetourMeters(maxDetourMeters)) {
             callback.onError(new IllegalArgumentException(
-                    "Mức đi thêm phải là 0, 2000, 5000 hoặc 10000 mét."
+                    "Mức đi thêm phải từ 0 đến 10000 mét và chia hết cho 100 mét."
             ));
             return;
         }
@@ -801,7 +802,7 @@ public class DriverTripRepository {
         }
         if (!isValidMaxDetourMeters(maxDetourMeters)) {
             callback.onError(new IllegalArgumentException(
-                    "Mức đi thêm phải là 0, 2000, 5000 hoặc 10000 mét."
+                    "Mức đi thêm phải từ 0 đến 10000 mét và chia hết cho 100 mét."
             ));
             return;
         }
@@ -880,10 +881,9 @@ public class DriverTripRepository {
         });
     }
 
-    /** Kiểm tra mức đi thêm theo các lựa chọn được Firestore Rules chấp nhận. */
+    /** Kiểm tra số mét theo cùng quy tắc nhập tay và Firestore Rules. */
     private boolean isValidMaxDetourMeters(Long value) {
-        return value != null
-                && (value == 0L || value == 2000L || value == 5000L || value == 10000L);
+        return DetourLimit.isValidMeters(value);
     }
 
     /**

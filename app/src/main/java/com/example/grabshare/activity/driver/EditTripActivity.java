@@ -4,11 +4,11 @@ import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,6 +29,7 @@ import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.contract.DetourLimit;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.repository.driver.DriverTripRepository;
@@ -60,6 +61,7 @@ public class EditTripActivity extends AppCompatActivity {
     private static final String STATE_HAS_LOADED = "edit_has_loaded";
     private static final String STATE_COST_TEXT = "edit_cost_text";
     private static final String STATE_NOTE_TEXT = "edit_note_text";
+    private static final String STATE_MAXIMUM_DETOUR_TEXT = "edit_maximum_detour_text";
     private static final String STATE_SAVE_IN_PROGRESS = "edit_save_in_progress";
     private static final String STATE_LOCATION_TARGET = "edit_location_target";
     private static final String STATE_YEAR = "edit_departure_year";
@@ -99,7 +101,7 @@ public class EditTripActivity extends AppCompatActivity {
     private AppCompatButton saveButton;
     private AppCompatButton cancelButton;
     private AppCompatButton useSuggestedCostButton;
-    private RadioGroup maxDetourGroup;
+    private EditText maximumDetourInput;
 
     private DriverTripRepository tripRepository;
     private final VietnamRoutingClient routingClient =
@@ -198,7 +200,13 @@ public class EditTripActivity extends AppCompatActivity {
         saveButton = findViewById(R.id.primary_action);
         cancelButton = findViewById(R.id.secondary_action);
         useSuggestedCostButton = findViewById(R.id.use_suggested_cost);
-        maxDetourGroup = findViewById(R.id.max_detour_group);
+        maximumDetourInput = findViewById(R.id.max_detour_input);
+        // Chỉ đổi gợi ý bàn phím; chuỗi sai được giữ lại để báo lỗi, không tự lọc thành số khác.
+        maximumDetourInput.setRawInputType(
+                InputType.TYPE_CLASS_NUMBER
+                        | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        | InputType.TYPE_NUMBER_FLAG_SIGNED
+        );
     }
 
     private void initializeRepository() {
@@ -323,7 +331,7 @@ public class EditTripActivity extends AppCompatActivity {
                         noteInput.setText(trip.getNote() == null ? "" : trip.getNote());
 
                         baseDistanceMeters = trip.getBaseDistanceMeters();
-                        setMaxDetourSelection(trip.getMaxDetourMeters());
+                        showMaximumDetour(trip.getMaxDetourMeters());
                         hasLoadedTrip = true;
                         updateOriginDisplay();
                         updateDestinationDisplay();
@@ -540,39 +548,31 @@ public class EditTripActivity extends AppCompatActivity {
                 .format(amountVnd) + " đ";
     }
 
-    /** Đổi mức đã lưu thành lựa chọn UI; thiếu cấu hình ở chuyến cũ thì không tự gán mặc định. */
-    private void setMaxDetourSelection(Long maxDetourMeters) {
-        if (maxDetourMeters == null) {
-            maxDetourGroup.clearCheck();
-        } else if (maxDetourMeters == 0L) {
-            maxDetourGroup.check(R.id.detour_0);
-        } else if (maxDetourMeters == 2000L) {
-            maxDetourGroup.check(R.id.detour_2000);
-        } else if (maxDetourMeters == 5000L) {
-            maxDetourGroup.check(R.id.detour_5000);
-        } else if (maxDetourMeters == 10000L) {
-            maxDetourGroup.check(R.id.detour_10000);
-        } else {
-            maxDetourGroup.clearCheck();
-        }
+    /** Hiện đúng số km đã lưu; chuyến cũ thiếu cấu hình không được tự gán mặc định. */
+    private void showMaximumDetour(Long maximumDetourMeters) {
+        maximumDetourInput.setText(DetourLimit.formatKilometers(maximumDetourMeters));
     }
 
-    /** Trả mức đi thêm đã chọn dưới dạng mét theo hợp đồng dữ liệu. */
-    private Long getSelectedMaxDetourMeters() {
-        int selectedId = maxDetourGroup.getCheckedRadioButtonId();
-        if (selectedId == R.id.detour_0) {
-            return 0L;
+    /** Đọc số km nhập tay thành mét theo cùng quy tắc với màn đăng chuyến. */
+    private Long getMaximumDetourMeters() {
+        return DetourLimit.parseKilometers(maximumDetourInput.getText().toString());
+    }
+
+    /** Giữ nguyên chuỗi sai và hiển thị lỗi tại ô nhập trước khi ghi Firestore. */
+    private boolean validateMaximumDetour() {
+        maximumDetourInput.setError(null);
+        if (getMaximumDetourMeters() != null) {
+            return true;
         }
-        if (selectedId == R.id.detour_2000) {
-            return 2000L;
+        String message = getString(R.string.detour_limit_invalid);
+        if (maximumDetourInput.getText().toString().trim().isEmpty()) {
+            message = getString(R.string.detour_limit_required);
         }
-        if (selectedId == R.id.detour_5000) {
-            return 5000L;
-        }
-        if (selectedId == R.id.detour_10000) {
-            return 10000L;
-        }
-        return null;
+        maximumDetourInput.setError(message);
+        maximumDetourInput.requestFocus();
+        setStatusMessage(message);
+        showToast(message);
+        return false;
     }
 
     @Override
@@ -716,8 +716,7 @@ public class EditTripActivity extends AppCompatActivity {
             setStatusMessage("Vui lòng đợi hoặc tính lại quãng đường hợp lệ trước khi lưu.");
             return false;
         }
-        if (getSelectedMaxDetourMeters() == null) {
-            setStatusMessage("Chọn mức đi thêm tối đa để lưu chuyến.");
+        if (!validateMaximumDetour()) {
             return false;
         }
 
@@ -766,7 +765,7 @@ public class EditTripActivity extends AppCompatActivity {
         final Timestamp departureToSave = new Timestamp(getSelectedDepartureCalendar().getTime());
         final Long costToSave = cost;
         final Long baseDistanceToSave = baseDistanceMeters;
-        final Long maxDetourToSave = getSelectedMaxDetourMeters();
+        final Long maxDetourToSave = getMaximumDetourMeters();
         final String noteToSave = noteInput.getText().toString().trim();
 
         isSaving = true;
@@ -845,9 +844,7 @@ public class EditTripActivity extends AppCompatActivity {
         noteInput.setEnabled(canEdit);
         useSuggestedCostButton.setEnabled(canEdit && suggestedCostVnd != null);
         retryRouteEstimateButton.setEnabled(canEdit);
-        for (int index = 0; index < maxDetourGroup.getChildCount(); index++) {
-            maxDetourGroup.getChildAt(index).setEnabled(canEdit);
-        }
+        maximumDetourInput.setEnabled(canEdit);
         saveButton.setEnabled(canEdit && hasLoadedTrip);
         saveButton.setText(isSaving ? "Đang lưu..." : "Lưu thay đổi");
         cancelButton.setEnabled(!isSaving);
@@ -910,6 +907,7 @@ public class EditTripActivity extends AppCompatActivity {
     }
 
     private void restoreState(Bundle state) {
+        maximumDetourInput.setText(state.getString(STATE_MAXIMUM_DETOUR_TEXT, ""));
         hasLoadedTrip = state.getBoolean(STATE_HAS_LOADED, false);
         saveWasInProgressWhenRecreated = state.getBoolean(STATE_SAVE_IN_PROGRESS, false);
         selectedLocationTarget = state.getInt(STATE_LOCATION_TARGET, LOCATION_TARGET_NONE);
@@ -978,6 +976,9 @@ public class EditTripActivity extends AppCompatActivity {
         if (savedInstanceState.containsKey(STATE_NOTE_TEXT)) {
             noteInput.setText(savedInstanceState.getString(STATE_NOTE_TEXT, ""));
         }
+        if (savedInstanceState.containsKey(STATE_MAXIMUM_DETOUR_TEXT)) {
+            maximumDetourInput.setText(savedInstanceState.getString(STATE_MAXIMUM_DETOUR_TEXT, ""));
+        }
 
         if (hasLoadedTrip) {
             updateOriginDisplay();
@@ -993,6 +994,7 @@ public class EditTripActivity extends AppCompatActivity {
         outState.putString(STATE_TRIP_ID, tripId);
         outState.putString(STATE_COST_TEXT, costInput.getText().toString());
         outState.putString(STATE_NOTE_TEXT, noteInput.getText().toString());
+        outState.putString(STATE_MAXIMUM_DETOUR_TEXT, maximumDetourInput.getText().toString());
         outState.putBoolean(STATE_SAVE_IN_PROGRESS, isSaving);
         outState.putBoolean(STATE_HAS_LOADED, hasLoadedTrip);
         outState.putInt(STATE_LOCATION_TARGET, selectedLocationTarget);
