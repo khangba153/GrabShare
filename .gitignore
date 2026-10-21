@@ -19,3 +19,7 @@ local.properties
 # Tai lieu va script chi luu tren may nhom truong
 /docs/
 /scripts/
+
+# Khong luu file test trong project theo quy uoc nhom truong
+/app/src/test/
+/app/src/androidTest/
