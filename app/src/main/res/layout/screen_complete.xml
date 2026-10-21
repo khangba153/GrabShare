@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/background" android:descendantFocusability="blocksDescendants" android:importantForAccessibility="noHideDescendants">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/background">
     <FrameLayout android:id="@+id/header" android:layout_width="match_parent" android:layout_height="64dp" android:paddingHorizontal="12dp" android:visibility="visible">
-        <ImageButton android:id="@+id/header_back" style="@style/IconButton" android:layout_gravity="center_vertical|start" android:src="@drawable/ic_back" android:contentDescription="Quay lại" android:visibility="visible" android:clickable="false" android:focusable="false" />
+        <ImageButton android:id="@+id/header_back" style="@style/IconButton" android:layout_gravity="center_vertical|start" android:src="@drawable/ic_back" android:contentDescription="Quay lại" android:visibility="visible" android:clickable="true" android:focusable="true" />
         <TextView android:id="@+id/header_title" style="@style/Subtitle" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginHorizontal="52dp" android:layout_marginBottom="0dp" android:gravity="center" android:text="Hoàn thành &amp; đánh giá" />
-        <ImageButton android:id="@+id/header_action" style="@style/IconButton" android:layout_gravity="center_vertical|end" android:src="@drawable/ic_bell" android:contentDescription="Thông báo" android:visibility="visible" android:clickable="false" android:focusable="false" />
+        <ImageButton android:id="@+id/header_action" style="@style/IconButton" android:layout_gravity="center_vertical|end" android:src="@drawable/ic_bell" android:contentDescription="Thông báo" android:visibility="gone" android:clickable="false" android:focusable="false" />
     </FrameLayout>
     <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:fillViewport="true" android:clipToPadding="false" android:layout_weight="1">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="8dp" android:paddingBottom="24dp">
@@ -15,17 +15,21 @@
             <include layout="@layout/view_trip_summary" />
             <LinearLayout style="@style/Card">
                 <TextView style="@style/Subtitle" android:text="Bạn thấy chuyến đi thế nào?" />
+                <TextView android:id="@+id/rating_status" style="@style/Caption" android:text="Đang xác nhận đánh giá…" android:accessibilityLiveRegion="polite" />
+                <Button android:id="@+id/rating_retry" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Thử đọc lại" android:visibility="gone" />
                 <RatingBar android:id="@+id/rating" android:layout_width="wrap_content" android:layout_height="wrap_content" android:numStars="5" android:rating="5" android:stepSize="1" android:progressTint="@color/amber" android:layout_gravity="center" android:isIndicator="true" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
                     <TextView style="@style/Caption" android:text="Nhận xét (không bắt buộc)" />
-                    <EditText android:id="@+id/rating_comment" style="@style/Input" android:inputType="textCapSentences" android:hint="Chia sẻ cảm nhận về chuyến đi…" android:importantForAutofill="no" android:focusable="false" android:focusableInTouchMode="false" android:cursorVisible="false" android:longClickable="false" />
+                    <!-- Giữ bản nháp quá dài để báo lỗi tại ô nhập; Activity và repository chặn ghi trên 500 ký tự. -->
+                    <EditText android:id="@+id/rating_comment" style="@style/Input" android:inputType="textCapSentences|textMultiLine" android:hint="Chia sẻ cảm nhận về chuyến đi…" android:importantForAutofill="no" />
+                    <TextView android:id="@+id/rating_comment_counter" style="@style/Caption" android:text="0/500 ký tự" android:labelFor="@id/rating_comment" />
                 </LinearLayout>
                 <TextView style="@style/Caption" android:text="Đúng giờ · Thân thiện · Lái xe an toàn" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
     <LinearLayout android:id="@+id/action_area" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="4dp" android:paddingBottom="12dp" android:background="@color/background" android:visibility="visible">
-        <androidx.appcompat.widget.AppCompatButton android:id="@+id/primary_action" style="@style/ButtonPrimary" android:text="Gửi đánh giá" android:clickable="false" android:focusable="false" />
+        <androidx.appcompat.widget.AppCompatButton android:id="@+id/primary_action" style="@style/ButtonPrimary" android:text="Gửi đánh giá" android:enabled="false" android:clickable="true" android:focusable="true" />
         <androidx.appcompat.widget.AppCompatButton android:id="@+id/secondary_action" style="@style/ButtonSecondary" android:text="Quay lại" android:visibility="gone" android:clickable="false" android:focusable="false" />
     </LinearLayout>
     <LinearLayout android:id="@+id/bottom_nav" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:background="@color/white" android:elevation="6dp" android:visibility="gone">
