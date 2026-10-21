@@ -67,6 +67,10 @@ public class PendingActivity extends AppCompatActivity {
     private String requestId;
     private String currentUserId;
     private boolean hasNavigated = false;
+    private PassengerSessionGuard sessionGuard;
+    private SingleRequestDetails currentDetails;
+    private boolean cancellationInFlight;
+    private Dialog cancelDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,6 +90,12 @@ public class PendingActivity extends AppCompatActivity {
             return;
         }
         currentUserId = currentUser.getUid();
+        if (savedInstanceState != null
+                && !currentUserId.equals(savedInstanceState.getString("passenger_expected_uid"))) {
+            finish();
+            return;
+        }
+        sessionGuard = new PassengerSessionGuard(this);
 
         if (requestId == null || requestId.trim().isEmpty()) {
             Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
@@ -165,16 +175,35 @@ public class PendingActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        startListeningRequest();
+        if (sessionGuard != null && sessionGuard.start(currentUserId)) {
+            cancellationInFlight = false;
+            currentDetails = null;
+            primaryAction.setEnabled(false);
+            startListeningRequest();
+        }
     }
 
     @Override
     protected void onStop() {
-        super.onStop();
+        if (sessionGuard != null) {
+            sessionGuard.stop();
+        }
+        if (cancelDialog != null) {
+            cancelDialog.dismiss();
+            cancelDialog = null;
+        }
         if (singleRequestListener != null) {
             singleRequestListener.remove();
             singleRequestListener = null;
         }
+        super.onStop();
+    }
+
+    /** Giữ UID kỳ vọng qua xoay, không khôi phục thao tác hủy tự động. */
+    @Override
+    protected void onSaveInstanceState(Bundle state) {
+        state.putString("passenger_expected_uid", currentUserId);
+        super.onSaveInstanceState(state);
     }
 
     private void startListeningRequest() {
@@ -186,9 +215,14 @@ public class PendingActivity extends AppCompatActivity {
             singleRequestListener.remove();
         }
 
+        final int sessionToken = sessionGuard.token();
         singleRequestListener = tripsRepository.listenSingleRequest(requestId, new RepositoryCallback<SingleRequestDetails>() {
+            /** Chỉ xử lý cập nhật của đúng phiên và màn đang hiển thị. */
             @Override
             public void onSuccess(SingleRequestDetails details) {
+                if (!sessionGuard.current(sessionToken)) {
+                    return;
+                }
                 if (details == null || details.getRequest() == null) {
                     Toast.makeText(PendingActivity.this, "Không tìm thấy dữ liệu yêu cầu.", Toast.LENGTH_SHORT).show();
                     finish();
@@ -205,6 +239,7 @@ public class PendingActivity extends AppCompatActivity {
                 }
 
                 Trip trip = details.getTrip();
+                currentDetails = details;
                 String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
 
                 // Ưu tiên kiểm tra chuyến đi đã bị hủy bởi chủ xe
@@ -250,10 +285,15 @@ public class PendingActivity extends AppCompatActivity {
 
                 // Nếu vẫn ở PENDING, cập nhật dữ liệu hiển thị
                 bindDetailsToViews(details);
+                primaryAction.setEnabled(!cancellationInFlight && canCancelPending());
             }
 
+            /** Không cập nhật hoặc đóng màn thuộc phiên đã hết hiệu lực. */
             @Override
             public void onError(Exception error) {
+                if (!sessionGuard.current(sessionToken)) {
+                    return;
+                }
                 Toast.makeText(PendingActivity.this, "Không thể tải dữ liệu: " + error.getMessage(), Toast.LENGTH_SHORT).show();
                 finish();
             }
@@ -323,7 +363,14 @@ public class PendingActivity extends AppCompatActivity {
     }
 
     private void showCancelConfirmDialog() {
+        if (!sessionGuard.current(sessionGuard.token()) || cancellationInFlight || !canCancelPending()) {
+            return;
+        }
+        if (cancelDialog != null && cancelDialog.isShowing()) {
+            return;
+        }
         final Dialog dialog = new Dialog(this);
+        cancelDialog = dialog;
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(R.layout.dialog_confirm);
 
@@ -366,21 +413,48 @@ public class PendingActivity extends AppCompatActivity {
     }
 
     private void performCancelRequest() {
+        final int sessionToken = sessionGuard.token();
+        if (!sessionGuard.current(sessionToken) || cancellationInFlight || !canCancelPending()) {
+            return;
+        }
+        cancellationInFlight = true;
         if (primaryAction != null) primaryAction.setEnabled(false);
 
         cancellationRepository.cancelPendingRequest(requestId, currentUserId, new RepositoryCallback<Void>() {
+            /** Chỉ báo thành công và đóng màn của phiên đã yêu cầu hủy. */
             @Override
             public void onSuccess(Void unused) {
+                if (!sessionGuard.current(sessionToken)) {
+                    return;
+                }
+                cancellationInFlight = false;
                 Toast.makeText(PendingActivity.this, "Đã hủy yêu cầu thành công.", Toast.LENGTH_SHORT).show();
                 finish();
             }
 
+            /** Sau lỗi chỉ bật lại nút nếu dữ liệu hiện tại vẫn cho phép hủy. */
             @Override
             public void onError(Exception error) {
-                if (primaryAction != null) primaryAction.setEnabled(true);
+                if (!sessionGuard.current(sessionToken)) {
+                    return;
+                }
+                cancellationInFlight = false;
+                if (primaryAction != null) primaryAction.setEnabled(canCancelPending());
                 Toast.makeText(PendingActivity.this, "Hủy yêu cầu thất bại: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    /** Kiểm tra dữ liệu đang hiển thị trước khi mở/xác nhận dialog; transaction vẫn đọc lại. */
+    private boolean canCancelPending() {
+        if (currentDetails == null || currentDetails.getRequest() == null || currentDetails.getTrip() == null) {
+            return false;
+        }
+        TripRequest request = currentDetails.getRequest();
+        Trip trip = currentDetails.getTrip();
+        return currentUserId.equals(request.getPassengerId()) && "PENDING".equals(request.getStatus())
+                && ("OPEN".equals(trip.getStatus()) || "FULL".equals(trip.getStatus()))
+                && trip.getDepartureAt() != null && trip.getDepartureAt().toDate().after(new Date());
     }
 
     private String formatTimestamp(Timestamp timestamp) {

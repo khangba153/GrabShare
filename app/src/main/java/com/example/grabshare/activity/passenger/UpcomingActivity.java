@@ -69,6 +69,9 @@ public class UpcomingActivity extends AppCompatActivity {
     private String currentUserId;
     private SingleRequestDetails currentDetails;
     private boolean hasNavigated = false;
+    private PassengerSessionGuard sessionGuard;
+    private boolean cancellationInFlight;
+    private AlertDialog cancelDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +91,12 @@ public class UpcomingActivity extends AppCompatActivity {
             return;
         }
         currentUserId = currentUser.getUid();
+        if (savedInstanceState != null
+                && !currentUserId.equals(savedInstanceState.getString("passenger_expected_uid"))) {
+            finish();
+            return;
+        }
+        sessionGuard = new PassengerSessionGuard(this);
 
         if (requestId == null || requestId.trim().isEmpty()) {
             Toast.makeText(this, "Yêu cầu không hợp lệ hoặc thiếu mã nhận dạng.", Toast.LENGTH_SHORT).show();
@@ -184,16 +193,37 @@ public class UpcomingActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        startListeningRequest();
+        if (sessionGuard != null && sessionGuard.start(currentUserId)) {
+            cancellationInFlight = false;
+            currentDetails = null;
+            if (secondaryAction != null) {
+                secondaryAction.setEnabled(false);
+            }
+            startListeningRequest();
+        }
     }
 
     @Override
     protected void onStop() {
-        super.onStop();
+        if (sessionGuard != null) {
+            sessionGuard.stop();
+        }
+        if (cancelDialog != null) {
+            cancelDialog.dismiss();
+            cancelDialog = null;
+        }
         if (singleRequestListener != null) {
             singleRequestListener.remove();
             singleRequestListener = null;
         }
+        super.onStop();
+    }
+
+    /** Giữ UID kỳ vọng qua xoay và không tự gửi lại lệnh hủy. */
+    @Override
+    protected void onSaveInstanceState(Bundle state) {
+        state.putString("passenger_expected_uid", currentUserId);
+        super.onSaveInstanceState(state);
     }
 
     /**
@@ -208,9 +238,14 @@ public class UpcomingActivity extends AppCompatActivity {
             singleRequestListener.remove();
         }
 
+        final int sessionToken = sessionGuard.token();
         singleRequestListener = tripsRepository.listenSingleRequest(requestId, new RepositoryCallback<SingleRequestDetails>() {
+            /** Chỉ nhận dữ liệu cho đúng UID và thế hệ màn đang hoạt động. */
             @Override
             public void onSuccess(SingleRequestDetails details) {
+                if (!sessionGuard.current(sessionToken)) {
+                    return;
+                }
                 if (details == null || details.getRequest() == null) {
                     Toast.makeText(UpcomingActivity.this, "Không tìm thấy thông tin chuyến đi.", Toast.LENGTH_SHORT).show();
                     finish();
@@ -228,10 +263,17 @@ public class UpcomingActivity extends AppCompatActivity {
 
                 currentDetails = details;
                 updateUiForDetails(details);
+                if (cancellationInFlight && secondaryAction != null) {
+                    secondaryAction.setEnabled(false);
+                }
             }
 
+            /** Bỏ lỗi của listener đã dừng hoặc tài khoản cũ. */
             @Override
             public void onError(Exception error) {
+                if (!sessionGuard.current(sessionToken)) {
+                    return;
+                }
                 Toast.makeText(UpcomingActivity.this, "Không thể tải dữ liệu: " + error.getMessage(), Toast.LENGTH_SHORT).show();
                 finish();
             }
@@ -466,6 +508,12 @@ public class UpcomingActivity extends AppCompatActivity {
      * Nút hủy tham gia (secondaryAction) chỉ cho phép khi predicate hợp lệ và còn trước giờ đi.
      */
     private void handleSecondaryAction() {
+        if (!sessionGuard.current(sessionGuard.token()) || cancellationInFlight) {
+            return;
+        }
+        if (cancelDialog != null && cancelDialog.isShowing()) {
+            return;
+        }
         if (currentDetails == null || currentDetails.getTrip() == null || currentDetails.getRequest() == null) {
             return;
         }
@@ -480,16 +528,17 @@ public class UpcomingActivity extends AppCompatActivity {
         }
 
         // Kiểm tra lại thời gian tại thời điểm bấm nút
-        if (trip.getDepartureAt() != null && trip.getDepartureAt().toDate().before(new Date())) {
+        if (trip.getDepartureAt() == null || !trip.getDepartureAt().toDate().after(new Date())) {
             Toast.makeText(this, "Đã quá giờ khởi hành, không thể hủy tham gia.", Toast.LENGTH_SHORT).show();
             return;
         }
 
         // Mở dialog xác nhận hủy
-        new AlertDialog.Builder(this)
+        cancelDialog = new AlertDialog.Builder(this)
                 .setTitle("Xác nhận hủy tham gia")
                 .setMessage("Bạn có chắc chắn muốn hủy tham gia chuyến đi này? Chỗ ngồi sẽ được nhường lại cho người khác.")
                 .setPositiveButton("Xác nhận hủy", new DialogInterface.OnClickListener() {
+                    /** Xác nhận chỉ chạy khi màn và phiên vẫn còn hợp lệ. */
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         executeCancellation();
@@ -503,27 +552,56 @@ public class UpcomingActivity extends AppCompatActivity {
      * Thực thi hủy ACCEPTED request qua RequestCancellationRepository.
      */
     private void executeCancellation() {
+        final int sessionToken = sessionGuard.token();
+        if (!sessionGuard.current(sessionToken) || cancellationInFlight || !canCancelAccepted()) {
+            return;
+        }
+        cancellationInFlight = true;
         if (secondaryAction != null) secondaryAction.setEnabled(false);
 
         cancellationRepository.cancelAcceptedRequest(requestId, currentUserId, new RepositoryCallback<Void>() {
+            /** Không báo thành công hoặc đóng màn thuộc phiên cũ. */
             @Override
             public void onSuccess(Void result) {
+                if (!sessionGuard.current(sessionToken)) {
+                    return;
+                }
+                cancellationInFlight = false;
                 Toast.makeText(UpcomingActivity.this, "Đã hủy tham gia chuyến đi thành công.", Toast.LENGTH_SHORT).show();
                 finish();
             }
 
+            /** Chỉ mở lại hủy nếu state hiện tại còn cho phép, không dựa vào state trước gửi. */
             @Override
             public void onError(Exception error) {
-                if (secondaryAction != null) secondaryAction.setEnabled(true);
+                if (!sessionGuard.current(sessionToken)) {
+                    return;
+                }
+                cancellationInFlight = false;
+                if (secondaryAction != null) secondaryAction.setEnabled(canCancelAccepted());
                 Toast.makeText(UpcomingActivity.this, "Không thể hủy chuyến: " + error.getMessage(), Toast.LENGTH_LONG).show();
             }
         });
+    }
+
+    /** Kiểm tra lại pointer và giờ ngay lúc xác nhận; transaction vẫn là nguồn quyết định. */
+    private boolean canCancelAccepted() {
+        if (currentDetails == null || currentDetails.getRequest() == null || currentDetails.getTrip() == null) {
+            return false;
+        }
+        TripRequest request = currentDetails.getRequest();
+        Trip trip = currentDetails.getTrip();
+        return currentUserId.equals(request.getPassengerId()) && isAcceptedRideValid(request, trip)
+                && trip.getDepartureAt() != null && trip.getDepartureAt().toDate().after(new Date());
     }
 
     /**
      * Nút hành động chính (primaryAction).
      */
     private void handlePrimaryAction() {
+        if (!sessionGuard.current(sessionGuard.token())) {
+            return;
+        }
         if (currentDetails == null) {
             finish();
             return;
