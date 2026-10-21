@@ -1,6 +1,6 @@
 package com.example.grabshare.model;
 
-/** Địa điểm dùng chung cho điểm đi, điểm đến và điểm đón. */
+/** Địa điểm dùng chung cho điểm đi, điểm đến, điểm đón và điểm xuống. */
 public class Place {
     private String name;
     private Double latitude;

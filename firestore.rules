@@ -251,12 +251,16 @@ service cloud.firestore {
     }
 
     function requestData(r, rid) {
-      return exact(r, ['tripId', 'passengerId', 'driverId', 'pickup', 'message',
+      // Cho update yêu cầu cũ thiếu dropoff; create kiểm tra C riêng phía dưới.
+      return r.keys().hasAll(['tripId', 'passengerId', 'driverId', 'pickup', 'message',
+          'status', 'createdAt', 'updatedAt'])
+        && r.keys().hasOnly(['tripId', 'passengerId', 'driverId', 'pickup', 'dropoff', 'message',
           'status', 'createdAt', 'updatedAt'])
         && id(r.tripId) && id(r.passengerId) && id(r.driverId)
         && r.passengerId != r.driverId
         && rid == r.tripId + '_' + r.passengerId
         && place(r.pickup) && text(r.message, 500)
+        && (!r.keys().hasAny(['dropoff']) || place(r.dropoff))
         && r.status in ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED']
         && r.createdAt is timestamp && r.updatedAt is timestamp
         && r.updatedAt == request.time;
@@ -264,6 +268,9 @@ service cloud.firestore {
     function createRequest(rid, r) {
       let t = get(tripPath(r.tripId)).data;
       return owner(r.passengerId) && r.driverId == t.driverId
+        // Yêu cầu mới bắt buộc P/C khác tọa độ; C=D vẫn hợp lệ.
+        && r.keys().hasAll(['dropoff']) && place(r.dropoff)
+        && differentPlaces(r.pickup, r.dropoff)
         && r.status == 'PENDING' && r.createdAt == request.time
         && openTrip(t) && t.departureAt > request.time
         && getAfter(tripPath(r.tripId)).data == t
@@ -295,6 +302,7 @@ service cloud.firestore {
       let t = get(tripPath(old.tripId)).data;
       let next = getAfter(tripPath(old.tripId)).data;
       return old.driverId == t.driverId && t.departureAt > request.time
+        // P/C và các field định danh bất biến, kể cả thêm/xóa C ở yêu cầu cũ.
         && data.diff(old).affectedKeys().hasOnly(['status', 'updatedAt'])
         && (acceptRequest(rid, old, data, t, next)
           || rejectRequest(rid, old, data, t, next)
