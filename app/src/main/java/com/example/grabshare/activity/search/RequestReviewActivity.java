@@ -101,7 +101,7 @@ public class RequestReviewActivity extends AppCompatActivity {
                                 if (!SearchTripPolicy.validPlace(place)) {
                                     showError(
                                             "Tên điểm đón tối đa 200 ký tự và phải có tọa độ hợp"
-                                                + " lệ.");
+                                                    + " lệ.");
                                     return;
                                 }
                                 requestViewModel.pickup = place;
@@ -113,6 +113,7 @@ public class RequestReviewActivity extends AppCompatActivity {
         }
         if (sameUser() && passengerSearchRoute != null) {
             requestViewModel.pickup = passengerSearchRoute.getPickup();
+            requestViewModel.dropoff = passengerSearchRoute.getDropoff();
         }
         messageInput = findViewById(R.id.review_message);
         if (sameUser()) {
