@@ -11,6 +11,9 @@ public class TripRequest {
     private String passengerId;
     private String driverId;
     private Place pickup;
+    private Place dropoff;
+    // Phân biệt yêu cầu cũ thiếu field với dữ liệu có dropoff nhưng sai/null.
+    private boolean dropoffFieldPresent;
     private String message;
     private String status;
     private Timestamp createdAt;
@@ -20,12 +23,37 @@ public class TripRequest {
     public TripRequest() {
     }
 
-    /** Tạo đối tượng từ các field dữ liệu dùng chung. */
+    /** Tương thích dữ liệu cũ chưa có điểm xuống; không dùng để tạo yêu cầu mới. */
+    @Deprecated
     public TripRequest(String tripId, String passengerId, String driverId, Place pickup, String message, String status, Timestamp createdAt, Timestamp updatedAt) {
         this.tripId = tripId;
         this.passengerId = passengerId;
         this.driverId = driverId;
         this.pickup = pickup;
+        this.message = message;
+        this.status = status;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
+
+    /** Tạo dữ liệu bốn điểm; repository vẫn phải kiểm tra P/C trước khi ghi. */
+    public TripRequest(
+            String tripId,
+            String passengerId,
+            String driverId,
+            Place pickup,
+            Place dropoff,
+            String message,
+            String status,
+            Timestamp createdAt,
+            Timestamp updatedAt
+    ) {
+        this.tripId = tripId;
+        this.passengerId = passengerId;
+        this.driverId = driverId;
+        this.pickup = pickup;
+        this.dropoff = dropoff;
+        this.dropoffFieldPresent = true;
         this.message = message;
         this.status = status;
         this.createdAt = createdAt;
@@ -81,6 +109,23 @@ public class TripRequest {
     /** Gán điểm đón. */
     public void setPickup(Place pickup) {
         this.pickup = pickup;
+    }
+
+    /** Lấy C đã lưu; null không tự động có nghĩa là yêu cầu legacy hợp lệ. */
+    public Place getDropoff() {
+        return dropoff;
+    }
+
+    /** Firestore gọi setter cả khi field tồn tại nhưng có giá trị null. */
+    public void setDropoff(Place dropoff) {
+        this.dropoff = dropoff;
+        this.dropoffFieldPresent = true;
+    }
+
+    /** Cờ chỉ dùng trong bộ nhớ; không tạo thêm field trong document requests. */
+    @Exclude
+    public boolean hasDropoffField() {
+        return dropoffFieldPresent;
     }
 
     /** Lấy lời nhắn. */
