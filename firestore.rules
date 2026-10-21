@@ -107,7 +107,8 @@ service cloud.firestore {
       return !t.keys().hasAny(fields)
         || (t.keys().hasAll(fields)
           && t.maxDetourMeters is int
-          && t.maxDetourMeters in [0, 2000, 5000, 10000]
+          && t.maxDetourMeters >= 0 && t.maxDetourMeters <= 10000
+          && t.maxDetourMeters % 100 == 0
           && t.baseDistanceMeters is int
           && t.baseDistanceMeters >= 0);
     }

@@ -1,6 +1,7 @@
 package com.example.grabshare.repository.search;
 
 import com.example.grabshare.model.Place;
+import com.example.grabshare.contract.DetourLimit;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
 import com.google.firebase.Timestamp;
@@ -24,8 +25,6 @@ public final class EnRouteSearch {
     public static final int MAXIMUM_HTTP_REQUESTS_PER_ACTION = 60;
 
     public static final long ACTION_TIMEOUT_MILLISECONDS = 75000;
-
-    public static final double TOLERANCE_METERS = 300;
 
     public static final long MAXIMUM_DRIVER_DELAY_MILLISECONDS = 60 * 60 * 1000;
 
@@ -177,11 +176,7 @@ public final class EnRouteSearch {
             Long maximumDetourMeters = trip.getMaxDetourMeters();
             if (storedBaselineMeters == null
                     || storedBaselineMeters <= 0
-                    || maximumDetourMeters == null
-                    || (maximumDetourMeters != 0
-                            && maximumDetourMeters != 2000
-                            && maximumDetourMeters != 5000
-                            && maximumDetourMeters != 10000)) {
+                    || !DetourLimit.isValidMeters(maximumDetourMeters)) {
                 result.missingMetadata = result.missingMetadata + 1;
                 continue;
             }
