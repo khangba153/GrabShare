@@ -8,13 +8,13 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.DatePicker;
@@ -36,6 +36,7 @@ import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.contract.DetourLimit;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.repository.driver.DriverTripRepository;
 import com.google.firebase.Timestamp;
@@ -79,6 +80,7 @@ public class PostTripActivity extends AppCompatActivity {
             "selected_location_target";
     private static final String STATE_TRIP_DOCUMENT_ID =
             "pending_trip_document_id";
+    private static final String STATE_MAXIMUM_DETOUR_TEXT = "post_maximum_detour_text";
     private static final String STATE_HAS_ORIGIN = "has_selected_origin";
     private static final String STATE_ORIGIN_NAME = "selected_origin_name";
     private static final String STATE_ORIGIN_LATITUDE = "selected_origin_latitude";
@@ -107,7 +109,7 @@ public class PostTripActivity extends AppCompatActivity {
     private CheckBox freeContributionCheckBox;
     private AppCompatButton postTripButton;
     private AppCompatButton useSuggestedCostButton;
-    private RadioGroup maxDetourGroup;
+    private EditText maximumDetourInput;
 
     private DriverTripRepository tripRepository;
     private final VietnamRoutingClient routingClient =
@@ -192,7 +194,13 @@ public class PostTripActivity extends AppCompatActivity {
         freeContributionCheckBox = findViewById(R.id.post_free);
         postTripButton = findViewById(R.id.primary_action);
         useSuggestedCostButton = findViewById(R.id.use_suggested_cost);
-        maxDetourGroup = findViewById(R.id.max_detour_group);
+        maximumDetourInput = findViewById(R.id.max_detour_input);
+        // Hiện bàn phím số nhưng giữ nguyên chuỗi dán để validation không mất dấu âm/chữ.
+        maximumDetourInput.setRawInputType(
+                InputType.TYPE_CLASS_NUMBER
+                        | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        | InputType.TYPE_NUMBER_FLAG_SIGNED
+        );
     }
 
     /**
@@ -228,12 +236,18 @@ public class PostTripActivity extends AppCompatActivity {
      */
     private void restoreFormState(Bundle savedInstanceState) {
         if (savedInstanceState == null) {
+            maximumDetourInput.setText(DetourLimit.formatKilometers(DetourLimit.DEFAULT_METERS));
             hasSelectedDepartureDate = false;
             hasSelectedDepartureTime = false;
             selectedLocationTarget = LOCATION_TARGET_NONE;
             tripDocumentId = null;
             return;
         }
+
+        maximumDetourInput.setText(savedInstanceState.getString(
+                STATE_MAXIMUM_DETOUR_TEXT,
+                DetourLimit.formatKilometers(DetourLimit.DEFAULT_METERS)
+        ));
 
         hasSelectedDepartureDate = savedInstanceState.getBoolean(
                 STATE_HAS_SELECTED_DATE,
@@ -281,6 +295,10 @@ public class PostTripActivity extends AppCompatActivity {
      */
     @Override
     protected void onSaveInstanceState(@NonNull Bundle savedInstanceState) {
+        savedInstanceState.putString(
+                STATE_MAXIMUM_DETOUR_TEXT,
+                maximumDetourInput.getText().toString()
+        );
         savedInstanceState.putBoolean(
                 STATE_HAS_SELECTED_DATE,
                 hasSelectedDepartureDate
@@ -940,8 +958,7 @@ public class PostTripActivity extends AppCompatActivity {
             showMessage("Vui lòng đợi hoặc tính lại quãng đường hợp lệ trước khi đăng chuyến.");
             return false;
         }
-        if (getSelectedMaxDetourMeters() == null) {
-            showMessage("Vui lòng chọn mức đi thêm tối đa.");
+        if (!validateMaximumDetour()) {
             return false;
         }
 
@@ -1045,22 +1062,25 @@ public class PostTripActivity extends AppCompatActivity {
         return selectedDepartureCalendar.after(currentCalendar);
     }
 
-    /** Lấy mức đi thêm đã chọn theo đơn vị mét, phù hợp hợp đồng Firestore. */
-    private Long getSelectedMaxDetourMeters() {
-        int selectedId = maxDetourGroup.getCheckedRadioButtonId();
-        if (selectedId == R.id.detour_0) {
-            return 0L;
+    /** Chuyển số km nhập tay thành mét; nhập sai trả null, không tự đổi thành 0. */
+    private Long getMaximumDetourMeters() {
+        return DetourLimit.parseKilometers(maximumDetourInput.getText().toString());
+    }
+
+    /** Báo lỗi ngay tại ô nhập, giữ nguyên dữ liệu để chủ xe sửa và gửi lại. */
+    private boolean validateMaximumDetour() {
+        maximumDetourInput.setError(null);
+        if (getMaximumDetourMeters() != null) {
+            return true;
         }
-        if (selectedId == R.id.detour_2000) {
-            return 2000L;
+        String message = getString(R.string.detour_limit_invalid);
+        if (maximumDetourInput.getText().toString().trim().isEmpty()) {
+            message = getString(R.string.detour_limit_required);
         }
-        if (selectedId == R.id.detour_5000) {
-            return 5000L;
-        }
-        if (selectedId == R.id.detour_10000) {
-            return 10000L;
-        }
-        return null;
+        maximumDetourInput.setError(message);
+        maximumDetourInput.requestFocus();
+        showMessage(message);
+        return false;
     }
 
     /**
@@ -1092,7 +1112,7 @@ public class PostTripActivity extends AppCompatActivity {
         );
         final Long requestedCostVnd = validatedContributionAmount;
         final Long requestedBaseDistanceMeters = baseDistanceMeters;
-        final Long requestedMaxDetourMeters = getSelectedMaxDetourMeters();
+        final Long requestedMaxDetourMeters = getMaximumDetourMeters();
         final String requestedNote = noteInput.getText().toString().trim();
 
         setSubmitting(true);
@@ -1241,9 +1261,7 @@ public class PostTripActivity extends AppCompatActivity {
         );
         useSuggestedCostButton.setEnabled(!submitting && suggestedCostVnd != null);
         retryRouteEstimateButton.setEnabled(!submitting);
-        for (int index = 0; index < maxDetourGroup.getChildCount(); index++) {
-            maxDetourGroup.getChildAt(index).setEnabled(!submitting);
-        }
+        maximumDetourInput.setEnabled(!submitting);
         noteInput.setEnabled(!submitting);
         backButton.setEnabled(!submitting);
         postTripButton.setEnabled(!submitting);

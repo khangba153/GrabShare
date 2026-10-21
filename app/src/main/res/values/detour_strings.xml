@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detour_limit_label">Mức đi thêm tối đa chấp nhận (km)</string>
+    <string name="detour_limit_hint">Ví dụ: 2,5</string>
+    <string name="detour_limit_help">Nhập từ 0 đến 10 km, tối đa 1 chữ số thập phân. Có thể dùng dấu phẩy hoặc dấu chấm. Nhập 0 nếu không chấp nhận đi thêm.</string>
+    <string name="detour_limit_required">Vui lòng nhập mức đi thêm tối đa.</string>
+    <string name="detour_limit_invalid">Nhập số từ 0 đến 10 km, tối đa 1 chữ số thập phân, ví dụ 2,5 hoặc 2.5.</string>
+</resources>
