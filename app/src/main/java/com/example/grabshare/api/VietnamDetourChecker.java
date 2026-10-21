@@ -31,17 +31,21 @@ public final class VietnamDetourChecker implements DetourChecker, AutoCloseable 
     /** Tính A→D bằng cùng provider, xe máy và policy với kiểm tra đường vòng. */
     @Override
     public void calculateBaseDistance(
-            final Place origin, final Place destination, RepositoryCallback<Long> callback) {
+            Place origin, Place destination, RepositoryCallback<Long> callback) {
+        final Place requestedOrigin = copyPlace(origin);
+        final Place requestedDestination = copyPlace(destination);
         execute(
                 new Calculation<Long>() {
                     /** Sai tọa độ hoặc không có đường là lỗi, không thay bằng khoảng cách 0. */
                     @Override
                     public Long calculate(VietnamRoutingClient client) throws Exception {
-                        requirePlace(origin);
-                        requirePlace(destination);
+                        requirePlace(requestedOrigin);
+                        requirePlace(requestedDestination);
                         VietnamRoutingClient.Route route =
                                 client.findRoute(
-                                        Arrays.asList(point(origin), point(destination)),
+                                        Arrays.asList(
+                                                point(requestedOrigin),
+                                                point(requestedDestination)),
                                         cancellation());
                         long distanceMeters = (long) Math.ceil(route.distanceMeters);
                         if (distanceMeters <= 0) {
@@ -53,50 +57,38 @@ public final class VietnamDetourChecker implements DetourChecker, AutoCloseable 
                 callback);
     }
 
-    /** Giữ chữ ký ba điểm để Thuần tích hợp mà không sửa contract/model dùng chung. */
+    /** Kiểm tra đủ A/P/C/D theo hợp đồng chung; caller cũ dùng adapter C=D của interface. */
     @Override
     public void checkDetour(
-            final Place origin,
-            final Place pickup,
-            final Place destination,
+            Place origin,
+            Place pickup,
+            Place dropoff,
+            Place destination,
             final long maxDetourMeters,
             RepositoryCallback<DetourCheckResult> callback) {
-        checkEnRoute(origin, pickup, null, destination, maxDetourMeters, callback);
-    }
-
-    /** Kế hoạch Thành đã xác nhận dùng thêm điểm xuống; null chỉ dành cho contract ba điểm. */
-    public void checkEnRoute(
-            final Place origin,
-            final Place pickup,
-            final Place dropoff,
-            final Place destination,
-            final long maxDetourMeters,
-            RepositoryCallback<DetourCheckResult> callback) {
+        final Place requestedOrigin = copyPlace(origin);
+        final Place requestedPickup = copyPlace(pickup);
+        final Place requestedDropoff = copyPlace(dropoff);
+        final Place requestedDestination = copyPlace(destination);
         execute(
                 new Calculation<DetourCheckResult>() {
                     /** Baseline và tuyến ghép được đo mới trong cùng một phương án định tuyến. */
                     @Override
                     public DetourCheckResult calculate(VietnamRoutingClient client)
                             throws Exception {
-                        requirePlace(origin);
-                        requirePlace(pickup);
-                        requirePlace(destination);
+                        requirePlace(requestedOrigin);
+                        requirePlace(requestedPickup);
+                        requirePlace(requestedDropoff);
+                        requirePlace(requestedDestination);
                         if (!DetourLimit.isValidMeters(maxDetourMeters)) {
                             throw new IllegalArgumentException("Giới hạn đi vòng không hợp lệ.");
                         }
-                        java.util.List<VietnamRoutingClient.Point> points;
-                        if (dropoff == null) {
-                            points =
-                                    Arrays.asList(point(origin), point(pickup), point(destination));
-                        } else {
-                            requirePlace(dropoff);
-                            points =
-                                    Arrays.asList(
-                                            point(origin),
-                                            point(pickup),
-                                            point(dropoff),
-                                            point(destination));
-                        }
+                        java.util.List<VietnamRoutingClient.Point> points =
+                                Arrays.asList(
+                                        point(requestedOrigin),
+                                        point(requestedPickup),
+                                        point(requestedDropoff),
+                                        point(requestedDestination));
                         // Chữ ký chung không nhận baseline lưu; giá trị tham chiếu không tham gia
                         // quyết định.
                         VietnamRoutingClient.MatchRoute routes =
@@ -178,6 +170,14 @@ public final class VietnamDetourChecker implements DetourChecker, AutoCloseable 
         if (!SearchTripPolicy.validPlace(place)) {
             throw new IllegalArgumentException("Địa điểm cần có tên và tọa độ hợp lệ.");
         }
+    }
+
+    /** Chụp đầu vào trước khi xếp worker, tránh caller đổi Place trong lúc chờ API. */
+    private static Place copyPlace(Place place) {
+        if (place == null) {
+            return null;
+        }
+        return new Place(place.getName(), place.getLatitude(), place.getLongitude());
     }
 
     /** Chỉ chuyển kiểu sau khi đã kiểm tra Place. */

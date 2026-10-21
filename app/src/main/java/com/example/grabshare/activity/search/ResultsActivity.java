@@ -1,17 +1,13 @@
 package com.example.grabshare.activity.search;
 
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
-import android.text.InputType;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
@@ -110,7 +106,7 @@ public class ResultsActivity extends AppCompatActivity {
                         this,
                         android.R.layout.simple_spinner_dropdown_item,
                         new String[] {
-                            "Đề xuất: ít lệch → gần điểm đón → giá",
+                            "Đề xuất",
                             "Giá thấp nhất",
                             "Tài xế xuất phát gần điểm đón nhất",
                             "Ít lệch đường nhất"
@@ -152,16 +148,6 @@ public class ResultsActivity extends AppCompatActivity {
                                 resultsViewModel.refresh();
                             }
                         });
-        findViewById(R.id.open_filters)
-                .setOnClickListener(
-                        new View.OnClickListener() {
-
-                            /** Giới hạn giá chỉ áp dụng danh sách đã có metric. */
-                            @Override
-                            public void onClick(View view) {
-                                showPriceFilter();
-                            }
-                        });
         try {
             criteria = readCriteria(savedInstanceState);
             ((TextView) findViewById(R.id.route_start)).setText(criteria.pickup.getName());
@@ -170,24 +156,12 @@ public class ResultsActivity extends AppCompatActivity {
                     new SimpleDateFormat("dd/MM/yyyy · HH:mm", new Locale("vi", "VN"));
             format.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
             ((TextView) findViewById(R.id.search_summary))
-                    .setText(
-                            "Bạn muốn đi: "
-                                    + format.format(criteria.requestedAt)
-                                    + "\nChỉ tìm chuyến khởi hành từ giờ này đến "
-                                    + format.format(
-                                            criteria.requestedAt
-                                                    + EnRouteSearch
-                                                            .MAXIMUM_DRIVER_DELAY_MILLISECONDS)
-                                    + " (giờ Việt Nam).");
+                    .setText(format.format(criteria.requestedAt));
             if (savedInstanceState != null && resultsViewModel.getState().getValue() == null) {
                 int selection = savedInstanceState.getInt("results_sort", 0);
                 if (selection >= 0 && selection < EnRouteSearch.Sort.values().length) {
                     resultsViewModel.setSort(EnRouteSearch.Sort.values()[selection]);
                     sortSpinner.setSelection(selection);
-                }
-                if (savedInstanceState.containsKey("results_max_price")) {
-                    resultsViewModel.setMaximumPriceVnd(
-                            savedInstanceState.getLong("results_max_price"));
                 }
             }
             resultsViewModel
@@ -208,7 +182,6 @@ public class ResultsActivity extends AppCompatActivity {
                     .setText("Thiếu hoặc sai điều kiện. Quay lại Home để chọn điểm và thời gian.");
             findViewById(R.id.en_route_more).setEnabled(false);
             findViewById(R.id.en_route_refresh).setEnabled(false);
-            findViewById(R.id.open_filters).setEnabled(false);
             sortSpinner.setEnabled(false);
         }
     }
@@ -222,7 +195,7 @@ public class ResultsActivity extends AppCompatActivity {
         }
     }
 
-    /** Giữ điều kiện và lựa chọn lọc qua process death, không serialize Trip. */
+    /** Giữ điều kiện và cách sắp xếp qua process death, không serialize Trip. */
     @Override
     protected void onSaveInstanceState(Bundle state) {
         if (criteria != null) {
@@ -237,9 +210,6 @@ public class ResultsActivity extends AppCompatActivity {
             ResultsViewModel.State value = resultsViewModel.getState().getValue();
             if (value != null) {
                 state.putInt("results_sort", value.sort.ordinal());
-                if (value.maximumPriceVnd != null) {
-                    state.putLong("results_max_price", value.maximumPriceVnd);
-                }
             }
         }
         super.onSaveInstanceState(state);
@@ -280,10 +250,11 @@ public class ResultsActivity extends AppCompatActivity {
                 userIdentifier);
     }
 
-    /** Trình bày rõ phạm vi đã kiểm tra và không giấu kết quả đang có lúc lấy thêm. */
+    /** Hiện số chuyến sau lọc và giữ kết quả đang có khi tải thêm. */
     private void render(ResultsViewModel.State state) {
         adapter.setTrips(state.matches);
-        ((TextView) findViewById(R.id.status_text)).setText(state.message);
+        ((TextView) findViewById(R.id.status_text))
+                .setText("Chuyến xe phù hợp: " + state.matches.size());
         if (state.busy) {
             findViewById(R.id.en_route_progress).setVisibility(View.VISIBLE);
         } else {
@@ -292,66 +263,9 @@ public class ResultsActivity extends AppCompatActivity {
         findViewById(R.id.en_route_more)
                 .setEnabled(state.sessionValid && !state.busy && state.hasMore);
         findViewById(R.id.en_route_refresh).setEnabled(state.sessionValid);
-        findViewById(R.id.open_filters).setEnabled(state.sessionValid);
         sortSpinner.setEnabled(state.sessionValid);
         if (sortSpinner.getSelectedItemPosition() != state.sort.ordinal()) {
             sortSpinner.setSelection(state.sort.ordinal());
         }
-        if (state.maximumPriceVnd == null) {
-            ((TextView) findViewById(R.id.open_filters)).setText("Giá dự kiến: không giới hạn");
-        } else {
-            ((TextView) findViewById(R.id.open_filters))
-                    .setText(
-                            String.format(
-                                    new Locale("vi", "VN"),
-                                    "Giá dự kiến tối đa: %,dđ",
-                                    state.maximumPriceVnd));
-        }
-    }
-
-    /** Nhập số nguyên VNĐ; để trống gỡ lọc, giữ dialog mở nếu dữ liệu không hợp lệ. */
-    private void showPriceFilter() {
-        final EditText maximumPriceInput = new EditText(this);
-        maximumPriceInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        maximumPriceInput.setHint("Để trống để bỏ giới hạn");
-        ResultsViewModel.State value = resultsViewModel.getState().getValue();
-        if (value != null && value.maximumPriceVnd != null) {
-            maximumPriceInput.setText(String.valueOf(value.maximumPriceVnd));
-        }
-        final AlertDialog dialog =
-                new AlertDialog.Builder(this)
-                        .setTitle("Giá dự kiến tối đa (VNĐ)")
-                        .setView(maximumPriceInput)
-                        .setNegativeButton("Hủy", null)
-                        .setPositiveButton("Áp dụng", null)
-                        .create();
-        dialog.show();
-        dialog.getButton(DialogInterface.BUTTON_POSITIVE)
-                .setOnClickListener(
-                        new View.OnClickListener() {
-
-                            /** Kiểm tra tràn số trước khi lọc trên RAM. */
-                            @Override
-                            public void onClick(View view) {
-                                String enteredMaximumPrice =
-                                        maximumPriceInput.getText().toString().trim();
-                                try {
-                                    Long maximum;
-                                    if (enteredMaximumPrice.isEmpty()) {
-                                        maximum = null;
-                                    } else {
-                                        maximum = Long.valueOf(enteredMaximumPrice);
-                                    }
-                                    if (maximum != null && maximum < 0) {
-                                        throw new NumberFormatException();
-                                    }
-                                    resultsViewModel.setMaximumPriceVnd(maximum);
-                                    dialog.dismiss();
-                                } catch (NumberFormatException invalid) {
-                                    maximumPriceInput.setError(
-                                            "Nhập số nguyên VNĐ hợp lệ, không âm.");
-                                }
-                            }
-                        });
     }
 }

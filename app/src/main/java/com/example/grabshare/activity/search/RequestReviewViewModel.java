@@ -10,7 +10,9 @@ import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.repository.search.RequestCreationRepository;
 import com.example.grabshare.repository.search.RequestCreationRepository.Result;
+import com.example.grabshare.repository.search.RequestJourney;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestoreException;
 
 /** Giữ tác vụ gửi và bản nháp qua xoay, không giữ Activity trong callback. */
 public class RequestReviewViewModel extends AndroidViewModel {
@@ -107,6 +109,7 @@ public class RequestReviewViewModel extends AndroidViewModel {
                         if (result == null) {
                             state.setValue(new State(false, true, result, ""));
                         } else {
+                            restoreJourney(result);
                             state.setValue(
                                     new State(
                                             false,
@@ -140,6 +143,12 @@ public class RequestReviewViewModel extends AndroidViewModel {
         if (value == null || value.busy || !value.checked || value.result != null) {
             return;
         }
+        try {
+            RequestJourney.forNewRequest(pickup, dropoff);
+        } catch (IllegalArgumentException invalid) {
+            state.setValue(new State(false, true, null, invalid.getMessage()));
+            return;
+        }
         state.setValue(
                 new State(true, true, null, "Đang kiểm tra lại đường đón/trả trước khi gửi…"));
         repository.create(
@@ -157,6 +166,7 @@ public class RequestReviewViewModel extends AndroidViewModel {
                             sessionChanged();
                             return;
                         }
+                        restoreJourney(result);
                         navigate = true;
                         if (result.existing) {
                             state.setValue(new State(false, true, result, "Yêu cầu đã tồn tại."));
@@ -184,6 +194,12 @@ public class RequestReviewViewModel extends AndroidViewModel {
                 });
     }
 
+    /** Request đã tồn tại phải phục hồi P/C từ server, không dùng lại Bundle tìm kiếm. */
+    private void restoreJourney(Result result) {
+        pickup = result.getPickup();
+        dropoff = result.getDropoff();
+    }
+
     /** Không tiêu thụ kết quả điều hướng khi Activity đang dừng. */
     public boolean shouldNavigate() {
         return navigate && current();
@@ -208,6 +224,26 @@ public class RequestReviewViewModel extends AndroidViewModel {
 
     /** Hiển thị lỗi mà không ghi dữ liệu riêng vào log. */
     private String explain(Exception error) {
+        Throwable cause = error;
+        while (cause != null) {
+            if (cause instanceof FirebaseFirestoreException) {
+                FirebaseFirestoreException firestoreError = (FirebaseFirestoreException) cause;
+                switch (firestoreError.getCode()) {
+                    case PERMISSION_DENIED:
+                        return "Máy chủ chưa cho phép thao tác này. Vui lòng thử lại sau hoặc báo"
+                                   + " nhóm hỗ trợ.";
+                    case UNAUTHENTICATED:
+                        return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                    case UNAVAILABLE:
+                    case DEADLINE_EXCEEDED:
+                        return "Chưa xác nhận được yêu cầu do kết nối. Vui lòng kiểm tra lại trước"
+                                   + " khi gửi tiếp.";
+                    default:
+                        break;
+                }
+            }
+            cause = cause.getCause();
+        }
         if (error.getMessage() == null) {
             return "Không xác nhận được yêu cầu. Kiểm tra mạng và thử lại.";
         } else {

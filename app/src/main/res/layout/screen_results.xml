@@ -19,17 +19,14 @@
                 <include layout="@layout/view_route" />
                 <TextView android:id="@+id/search_summary" style="@style/Caption" />
             </LinearLayout>
-            <TextView style="@style/Body" android:text="Sắp xếp kết quả đã kiểm tra" android:labelFor="@id/en_route_sort" />
             <Spinner android:id="@+id/en_route_sort" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:minHeight="48dp"
                 android:contentDescription="Sắp xếp kết quả" />
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/open_filters"
-                style="@style/ButtonSecondary" android:text="Giá dự kiến: không giới hạn" />
             <ProgressBar android:id="@+id/en_route_progress" style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:indeterminate="true" android:visibility="gone" />
             <TextView android:id="@+id/status_text" style="@style/Body" android:accessibilityLiveRegion="polite"
-                android:text="Đang chuẩn bị tìm chuyến…" android:paddingVertical="12dp" />
+                android:text="Chuyến xe phù hợp: 0" android:paddingVertical="12dp" />
             <androidx.recyclerview.widget.RecyclerView android:id="@+id/ride_list"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false" />
@@ -37,8 +34,6 @@
                 style="@style/ButtonPrimary" android:text="Xem thêm ứng viên" android:enabled="false" />
             <androidx.appcompat.widget.AppCompatButton android:id="@+id/en_route_refresh"
                 style="@style/ButtonSecondary" android:text="Làm mới từ máy chủ" />
-            <TextView style="@style/Hint"
-                android:text="Đề xuất trong tập đã kiểm tra, có lọc sơ bộ bằng tọa độ nên có thể bỏ sót. Khoảng cách được tính bằng Geoapify / OpenStreetMap. Chọn chuyến để xem dữ liệu hiện tại." />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

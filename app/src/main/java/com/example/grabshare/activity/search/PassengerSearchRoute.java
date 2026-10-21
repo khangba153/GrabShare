@@ -55,11 +55,6 @@ public final class PassengerSearchRoute {
         return new PassengerSearchRoute(route);
     }
 
-    /** Truyền bản sao sang màn kế tiếp mà không serialize đối tượng Place. */
-    public void forwardTo(Intent intent) {
-        intent.putExtra(ROUTE_ARGUMENT, new Bundle(routeArguments));
-    }
-
     /** Giữ tuyến khi xoay màn hoặc Android hủy tiến trình. */
     public void saveTo(Bundle savedState) {
         savedState.putBundle(ROUTE_ARGUMENT, new Bundle(routeArguments));
@@ -77,16 +72,27 @@ public final class PassengerSearchRoute {
 
     /** Hiện lộ trình người đi nhờ dưới lộ trình chủ xe, chỉ trong phiên phù hợp. */
     public static void bind(Activity activity, PassengerSearchRoute route, boolean sameUser) {
+        if (route == null) {
+            bind(activity, null, null, false);
+            return;
+        }
+        bind(activity, route.getPickup(), route.getDropoff(), sameUser);
+    }
+
+    /** Hiện P/C của request server mà không gắn nhãn đây là bản nháp từ lần tìm kiếm. */
+    public static void bind(Activity activity, Place pickup, Place dropoff, boolean sameUser) {
         View routeCard = activity.findViewById(R.id.passenger_search_route);
-        if (route == null || !sameUser) {
+        if (!sameUser
+                || !SearchTripPolicy.validPlace(pickup)
+                || !SearchTripPolicy.validPlace(dropoff)) {
             routeCard.setVisibility(View.GONE);
             return;
         }
         routeCard.setVisibility(View.VISIBLE);
         TextView pickupTextView = activity.findViewById(R.id.passenger_search_pickup);
         TextView dropoffTextView = activity.findViewById(R.id.passenger_search_dropoff);
-        pickupTextView.setText(route.getPickup().getName());
-        dropoffTextView.setText(route.getDropoff().getName());
+        pickupTextView.setText(pickup.getName());
+        dropoffTextView.setText(dropoff.getName());
     }
 
     /** Chỉ ghi kiểu nguyên thủy vào Bundle riêng của gói tìm chuyến. */
