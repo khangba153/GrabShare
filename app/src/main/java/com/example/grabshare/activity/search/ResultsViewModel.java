@@ -53,10 +53,6 @@ public class ResultsViewModel extends ViewModel {
 
         public final EnRouteSearch.Sort sort;
 
-        public final Long maximumPriceVnd;
-
-        public final int httpRequests;
-
         public final String message;
 
         /** Giữ dữ liệu hiển thị riêng với hàng đợi đang được worker xử lý. */
@@ -66,16 +62,12 @@ public class ResultsViewModel extends ViewModel {
                 boolean hasMore,
                 boolean sessionValid,
                 EnRouteSearch.Sort sort,
-                Long maximumPriceVnd,
-                int httpRequests,
                 String message) {
             this.matches = Collections.unmodifiableList(matches);
             this.busy = busy;
             this.hasMore = hasMore;
             this.sessionValid = sessionValid;
             this.sort = sort;
-            this.maximumPriceVnd = maximumPriceVnd;
-            this.httpRequests = httpRequests;
             this.message = message;
         }
     }
@@ -88,8 +80,6 @@ public class ResultsViewModel extends ViewModel {
         Match match;
 
         boolean deferred;
-
-        boolean failed;
 
         String error = "";
 
@@ -134,22 +124,6 @@ public class ResultsViewModel extends ViewModel {
     private Criteria criteria;
 
     private EnRouteSearch.Sort sort = EnRouteSearch.Sort.RECOMMENDED;
-
-    private Long maximumPriceVnd;
-
-    private int checked;
-
-    private int failed;
-
-    private int missing;
-
-    private int invalid;
-
-    private int preliminary;
-
-    private int totalCandidates;
-
-    private int httpRequestCount;
 
     private String notice = "";
 
@@ -210,7 +184,6 @@ public class ResultsViewModel extends ViewModel {
         profiles.clear();
         requestedProfiles.clear();
         verifiedBaselines = new ConcurrentHashMap<String, Double>();
-        checked = failed = missing = invalid = preliminary = totalCandidates = httpRequestCount = 0;
         busy = true;
         notice = "Đang tìm chuyến từ giờ bạn chọn đến tối đa một giờ sau…";
         publish();
@@ -246,12 +219,6 @@ public class ResultsViewModel extends ViewModel {
                                                     return;
                                                 }
                                                 pending.addAll(prepared.candidates);
-                                                totalCandidates = pending.size();
-                                                missing = prepared.missingMetadata;
-                                                invalid =
-                                                        prepared.invalid
-                                                                + snapshot.invalidDocuments;
-                                                preliminary = prepared.preliminaryRejected;
                                             }
                                             runAction(requestGeneration, criteriaSnapshot);
                                         }
@@ -300,12 +267,6 @@ public class ResultsViewModel extends ViewModel {
     /** Đổi tiêu chí trên metric đã tải; không query Firestore hoặc Routing. */
     public synchronized void setSort(EnRouteSearch.Sort value) {
         sort = value;
-        publish();
-    }
-
-    /** Lọc ngân sách trên giá dự kiến của chuyến, chưa phải giá thương lượng. */
-    public synchronized void setMaximumPriceVnd(Long value) {
-        maximumPriceVnd = value;
         publish();
     }
 
@@ -401,10 +362,6 @@ public class ResultsViewModel extends ViewModel {
                         if (result.deferred) {
                             deferred.add(result.candidate);
                         } else {
-                            checked = checked + 1;
-                            if (result.failed) {
-                                failed = failed + 1;
-                            }
                             if (result.match != null) {
                                 matches.add(result.match);
                                 newMatches = newMatches + 1;
@@ -442,7 +399,6 @@ public class ResultsViewModel extends ViewModel {
         } finally {
             synchronized (this) {
                 if (current(requestGeneration)) {
-                    httpRequestCount = httpRequestCount + (budget.getUsedRequestCount());
                     busy = false;
                     if (!budget.getStopReason().isEmpty()) {
                         notice = budget.getStopReason();
@@ -514,12 +470,9 @@ public class ResultsViewModel extends ViewModel {
                         || error.failure == VietnamRoutingClient.Failure.ACCESS) {
                     budget.stop(error.getMessage());
                     result.deferred = true;
-                } else {
-                    result.failed = true;
                 }
             }
         } catch (IOException | RuntimeException error) {
-            result.failed = true;
             result.error = "Một số chuyến chưa đánh giá được đường bộ. Làm mới để thử lại.";
         } finally {
             synchronized (this) {
@@ -621,63 +574,18 @@ public class ResultsViewModel extends ViewModel {
         return requestGeneration == generation && !closed && sameUser();
     }
 
-    /** Kết quả đã kiểm tra được giữ qua đổi sắp xếp; thống kê nêu rõ phạm vi tìm. */
+    /** Công bố kết quả đã kiểm tra, trạng thái tải và thông báo của lượt hiện tại. */
     private void publish() {
         if (closed || criteria == null) {
             return;
         }
         List<Match> visible;
         if (sameUser()) {
-            visible =
-                    EnRouteSearch.sorted(
-                            matches, sort, maximumPriceVnd, System.currentTimeMillis());
+            visible = EnRouteSearch.sorted(matches, sort, System.currentTimeMillis());
         } else {
             visible = new ArrayList<Match>();
         }
-        String message =
-                visible.size()
-                        + " kết quả đang hiển thị · Đã xử lý "
-                        + checked
-                        + "/"
-                        + totalCandidates
-                        + " ứng viên · Còn chờ "
-                        + pending.size()
-                        + ".";
-        if (matches.isEmpty() && !busy && pending.isEmpty()) {
-            message = message + (" Chưa có kết quả trong tập đã kiểm tra.");
-        }
-        if (!matches.isEmpty() && visible.isEmpty()) {
-            message = message + (" Thử bỏ giới hạn giá hoặc làm mới nếu chuyến đã đến giờ.");
-        }
-        if (missing > 0) {
-            message =
-                    message
-                            + (" "
-                                    + missing
-                                    + " chuyến thiếu cấu hình đường vòng chưa được đánh giá.");
-        }
-        if (invalid > 0) {
-            message = message + (" " + invalid + " chuyến có dữ liệu không hợp lệ.");
-        }
-        if (failed > 0) {
-            message = message + (" " + failed + " chuyến lỗi Routing, chưa kết luận phù hợp.");
-        }
-        if (preliminary > 0) {
-            message = message + (" " + preliminary + " chuyến được loại sơ bộ bằng tọa độ.");
-        }
-        if (!notice.isEmpty()) {
-            message = message + ("\n" + notice);
-        }
-        state.postValue(
-                new State(
-                        visible,
-                        busy,
-                        !pending.isEmpty(),
-                        sameUser(),
-                        sort,
-                        maximumPriceVnd,
-                        httpRequestCount,
-                        message));
+        state.postValue(new State(visible, busy, !pending.isEmpty(), sameUser(), sort, notice));
     }
 
     /** Hủy HTTP và future cũ; token ngăn snapshot Firebase trễ khởi động lượt khác. */

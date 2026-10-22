@@ -272,12 +272,10 @@ public final class EnRouteSearch {
     public static List<Match> sorted(
             List<Match> matches,
             final Sort sort,
-            Long maximumPriceVnd,
             long currentTimeMilliseconds) {
         List<Match> result = new ArrayList<Match>();
         for (Match match : matches) {
-            if (match.trip.getDepartureAt().toDate().getTime() > currentTimeMilliseconds
-                    && (maximumPriceVnd == null || match.trip.getCostVnd() <= maximumPriceVnd)) {
+            if (match.trip.getDepartureAt().toDate().getTime() > currentTimeMilliseconds) {
                 result.add(match);
             }
         }

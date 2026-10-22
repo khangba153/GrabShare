@@ -14,11 +14,28 @@
                 <TextView style="@style/Subtitle" android:text="Chuyến của chủ xe" />
                 <include layout="@layout/view_search_trip" />
             </LinearLayout>
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/detail_favorite"
+                style="@style/ButtonSecondary" android:text="Tải trạng thái yêu thích"
+                android:enabled="false" />
+            <TextView android:id="@+id/detail_favorite_status" style="@style/Caption"
+                android:layout_width="match_parent" android:accessibilityLiveRegion="polite" />
             <include layout="@layout/view_passenger_search_route" />
+            <LinearLayout android:id="@+id/review_form" style="@style/Card">
+                <TextView android:id="@+id/review_pickup_label" style="@style/Caption" android:text="Điểm đón" />
+                <androidx.appcompat.widget.AppCompatButton android:id="@+id/review_pickup" style="@style/ButtonSecondary" android:text="Chọn điểm đón" />
+                <TextView android:id="@+id/review_pickup_value" style="@style/Body" android:layout_width="match_parent" android:text="Chưa chọn điểm đón" />
+                <TextView android:id="@+id/review_dropoff_label" style="@style/Caption" android:layout_marginTop="12dp" android:text="Điểm xuống" />
+                <androidx.appcompat.widget.AppCompatButton android:id="@+id/review_dropoff" style="@style/ButtonSecondary" android:text="Chọn điểm xuống" />
+                <TextView android:id="@+id/review_dropoff_value" style="@style/Body" android:layout_width="match_parent" android:text="Chưa chọn điểm xuống" />
+                <TextView style="@style/Body" android:layout_marginTop="12dp" android:text="Số người: 1 người" />
+                <TextView style="@style/Caption" android:layout_marginTop="12dp" android:text="Lời nhắn (không bắt buộc)" />
+                <EditText android:id="@+id/review_message" style="@style/Input" android:hint="Lời nhắn cho chủ xe, tối đa 500 ký tự" android:inputType="textCapSentences|textMultiLine" android:singleLine="false" android:minLines="2" android:maxLength="500" android:importantForAutofill="no" />
+            </LinearLayout>
+            <TextView android:id="@+id/review_status" style="@style/Body" android:layout_width="match_parent" android:accessibilityLiveRegion="polite" android:text="" />
         </LinearLayout>
     </ScrollView>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingBottom="12dp">
         <TextView android:id="@+id/search_action_hint" style="@style/Caption" android:layout_width="match_parent" android:text="" />
-        <androidx.appcompat.widget.AppCompatButton android:id="@+id/primary_action" style="@style/ButtonPrimary" android:text="Đi nhờ chuyến này" android:enabled="false" />
+        <androidx.appcompat.widget.AppCompatButton android:id="@+id/primary_action" style="@style/ButtonPrimary" android:text="Gửi yêu cầu" android:enabled="false" />
     </LinearLayout>
 </LinearLayout>

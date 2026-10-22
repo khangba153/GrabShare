@@ -129,15 +129,11 @@ public class VietnamRoutingClient {
 
         public final boolean baselineAdjusted;
 
-        /** Giữ baseline cũ khi khớp số liệu hiện tại trong sai số làm tròn nhỏ. */
+        /** Quyết định luôn dùng baseline vừa đo cùng policy; số lưu chỉ để báo thay đổi. */
         private MatchRoute(Route route, double freshBaseline, long storedBaseline) {
             this.route = route;
             baselineAdjusted = Math.abs(freshBaseline - storedBaseline) > 50;
-            if (baselineAdjusted) {
-                baselineMeters = freshBaseline;
-            } else {
-                baselineMeters = storedBaseline;
-            }
+            baselineMeters = freshBaseline;
         }
 
         /** Tính mức đi thêm không âm từ hai tuyến đã được kiểm tra tương thích. */
@@ -251,12 +247,14 @@ public class VietnamRoutingClient {
             Map<String, Double> verifiedBaselines)
             throws IOException {
         if (requiredPoints == null
-                || requiredPoints.size() != 4
+                || requiredPoints.size() < 3
+                || requiredPoints.size() > 4
                 || requiredPoints.contains(null)
                 || storedBaseline <= 0) {
-            throw new IllegalArgumentException("Thiếu bốn điểm hoặc tuyến gốc.");
+            throw new IllegalArgumentException("Thiếu điểm đón/trả hoặc tuyến gốc.");
         }
-        List<Point> driverEndpoints = Arrays.asList(requiredPoints.get(0), requiredPoints.get(3));
+        List<Point> driverEndpoints =
+                Arrays.asList(requiredPoints.get(0), requiredPoints.get(requiredPoints.size() - 1));
         Plan directBase = plan(driverEndpoints, false);
         Plan guidedBase = plan(driverEndpoints, true);
         int requestCount = 0;
@@ -350,7 +348,7 @@ public class VietnamRoutingClient {
         Plan result = new Plan();
         result.points.add(required.get(0));
         Point segmentStartPoint = required.get(0);
-        Point segmentEndPoint = required.get(3);
+        Point segmentEndPoint = required.get(required.size() - 1);
         double latitudeSpan = segmentEndPoint.latitude - segmentStartPoint.latitude;
         int corridorPointIndex = 1;
         double previousProgress = 0;
@@ -358,7 +356,7 @@ public class VietnamRoutingClient {
                 requiredLegIndex < required.size();
                 requiredLegIndex = requiredLegIndex + 1) {
             double progress;
-            if (requiredLegIndex == 3) {
+            if (requiredLegIndex == required.size() - 1) {
                 progress = 1;
             } else {
                 if (latitudeSpan == 0) {

@@ -1,34 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:background="@color/background">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:paddingHorizontal="12dp">
-        <ImageButton android:id="@+id/header_back" style="@style/IconButton" android:src="@drawable/ic_back" android:contentDescription="Quay lại" />
-        <TextView style="@style/Subtitle" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="12dp" android:layout_marginBottom="0dp" android:paddingVertical="16dp" android:text="Kiểm tra yêu cầu" />
-    </LinearLayout>
-    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:fillViewport="true">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
-            <TextView android:id="@+id/search_status" style="@style/Body" android:layout_width="match_parent" android:accessibilityLiveRegion="polite" android:text="Đang tải chuyến…" />
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/search_retry" style="@style/ButtonSecondary" android:text="Tải lại thông tin" />
-            <LinearLayout android:id="@+id/search_trip_content" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone" android:layout_marginTop="16dp">
-                <TextView style="@style/Subtitle" android:text="Chuyến của chủ xe" />
-                <include layout="@layout/view_search_trip" />
-            </LinearLayout>
-            <include layout="@layout/view_passenger_search_route" />
-            <LinearLayout android:id="@+id/review_form" style="@style/Card">
-                <TextView android:id="@+id/review_pickup_label" style="@style/Caption" android:text="Điểm đón" />
-                <androidx.appcompat.widget.AppCompatButton android:id="@+id/review_pickup" style="@style/ButtonSecondary" android:text="Chọn điểm đón" />
-                <TextView android:id="@+id/review_pickup_value" style="@style/Body" android:layout_width="match_parent" android:text="Chưa chọn điểm đón" />
-                <TextView style="@style/Body" android:layout_marginTop="12dp" android:text="Số người: 1 người" />
-                <TextView style="@style/Caption" android:layout_marginTop="12dp" android:text="Lời nhắn (không bắt buộc)" />
-                <EditText android:id="@+id/review_message" style="@style/Input" android:hint="Lời nhắn cho chủ xe, tối đa 500 ký tự" android:inputType="textCapSentences|textMultiLine" android:singleLine="false" android:minLines="2" android:maxLength="500" android:importantForAutofill="no" />
-            </LinearLayout>
-            <TextView android:id="@+id/review_status" style="@style/Body" android:layout_width="match_parent" android:accessibilityLiveRegion="polite" android:text="" />
-            <TextView style="@style/Hint" android:layout_width="match_parent" android:text="Gửi yêu cầu chưa giữ chỗ. Chỉ tham gia khi chủ xe chấp nhận." />
-        </LinearLayout>
-    </ScrollView>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingBottom="12dp">
-        <TextView android:id="@+id/search_action_hint" style="@style/Caption" android:layout_width="match_parent" android:text="" />
-        <androidx.appcompat.widget.AppCompatButton android:id="@+id/primary_action" style="@style/ButtonPrimary" android:text="Gửi yêu cầu" android:enabled="false" />
-    </LinearLayout>
-</LinearLayout>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <include layout="@layout/screen_detail" />
+</FrameLayout>

@@ -98,16 +98,6 @@
                 android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false" />
 
-            <!-- Yêu cầu Attribution từ LocationIQ / OpenStreetMap -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:gravity="center"
-                style="@style/Caption"
-                android:textColor="@color/muted"
-                android:text="Dữ liệu địa điểm cung cấp bởi LocationIQ.com\n© OpenStreetMap contributors" />
-
         </LinearLayout>
     </ScrollView>
 
