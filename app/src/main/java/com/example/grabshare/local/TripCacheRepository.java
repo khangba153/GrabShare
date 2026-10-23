@@ -42,49 +42,59 @@ public class TripCacheRepository implements TripCacheStore {
             return;
         }
 
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(TripCacheDbHelper.COLUMN_USER_ID, userId);
-        values.put(TripCacheDbHelper.COLUMN_TRIP_ID, trip.getId());
-
-        if (trip.getOrigin() != null) {
-            values.put(TripCacheDbHelper.COLUMN_ORIGIN_NAME, trip.getOrigin().getName());
-            values.put(TripCacheDbHelper.COLUMN_ORIGIN_LAT, trip.getOrigin().getLatitude());
-            values.put(TripCacheDbHelper.COLUMN_ORIGIN_LNG, trip.getOrigin().getLongitude());
+        // Chặn race condition nếu tài khoản đã đăng xuất hoặc thay đổi trước khi callback hoàn tất
+        com.google.firebase.auth.FirebaseUser currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null || !userId.equals(currentUser.getUid())) {
+            return;
         }
 
-        if (trip.getDestination() != null) {
-            values.put(TripCacheDbHelper.COLUMN_DEST_NAME, trip.getDestination().getName());
-            values.put(TripCacheDbHelper.COLUMN_DEST_LAT, trip.getDestination().getLatitude());
-            values.put(TripCacheDbHelper.COLUMN_DEST_LNG, trip.getDestination().getLongitude());
+        try {
+            SQLiteDatabase db = dbHelper.getWritableDatabase();
+            ContentValues values = new ContentValues();
+            values.put(TripCacheDbHelper.COLUMN_USER_ID, userId);
+            values.put(TripCacheDbHelper.COLUMN_TRIP_ID, trip.getId());
+
+            if (trip.getOrigin() != null) {
+                values.put(TripCacheDbHelper.COLUMN_ORIGIN_NAME, trip.getOrigin().getName());
+                values.put(TripCacheDbHelper.COLUMN_ORIGIN_LAT, trip.getOrigin().getLatitude());
+                values.put(TripCacheDbHelper.COLUMN_ORIGIN_LNG, trip.getOrigin().getLongitude());
+            }
+
+            if (trip.getDestination() != null) {
+                values.put(TripCacheDbHelper.COLUMN_DEST_NAME, trip.getDestination().getName());
+                values.put(TripCacheDbHelper.COLUMN_DEST_LAT, trip.getDestination().getLatitude());
+                values.put(TripCacheDbHelper.COLUMN_DEST_LNG, trip.getDestination().getLongitude());
+            }
+
+            values.put(TripCacheDbHelper.COLUMN_DRIVER_ID, trip.getDriverId());
+            values.put(TripCacheDbHelper.COLUMN_COST_VND, trip.getCostVnd());
+            values.put(TripCacheDbHelper.COLUMN_AVAILABLE_SEATS, trip.getAvailableSeats());
+            values.put(TripCacheDbHelper.COLUMN_NOTE, trip.getNote());
+            values.put(TripCacheDbHelper.COLUMN_STATUS, trip.getStatus());
+
+            if (trip.getDepartureAt() != null) {
+                values.put(TripCacheDbHelper.COLUMN_DEPARTURE_AT, trip.getDepartureAt().toDate().getTime());
+            }
+
+            if (profile != null) {
+                values.put(TripCacheDbHelper.COLUMN_DRIVER_NAME, profile.getDisplayName());
+                values.put(TripCacheDbHelper.COLUMN_VEHICLE_NAME, profile.getVehicleName());
+            } else {
+                values.put(TripCacheDbHelper.COLUMN_DRIVER_NAME, "");
+                values.put(TripCacheDbHelper.COLUMN_VEHICLE_NAME, "");
+            }
+
+            values.put(TripCacheDbHelper.COLUMN_SAVED_AT, System.currentTimeMillis());
+
+            db.insertWithOnConflict(
+                    TripCacheDbHelper.TABLE_VIEWED_TRIPS,
+                    null,
+                    values,
+                    SQLiteDatabase.CONFLICT_REPLACE
+            );
+        } catch (Exception ignored) {
+            // Lỗi thao tác cơ sở dữ liệu không làm dừng luồng ứng dụng
         }
-
-        values.put(TripCacheDbHelper.COLUMN_DRIVER_ID, trip.getDriverId());
-        values.put(TripCacheDbHelper.COLUMN_COST_VND, trip.getCostVnd());
-        values.put(TripCacheDbHelper.COLUMN_AVAILABLE_SEATS, trip.getAvailableSeats());
-        values.put(TripCacheDbHelper.COLUMN_NOTE, trip.getNote());
-        values.put(TripCacheDbHelper.COLUMN_STATUS, trip.getStatus());
-
-        if (trip.getDepartureAt() != null) {
-            values.put(TripCacheDbHelper.COLUMN_DEPARTURE_AT, trip.getDepartureAt().toDate().getTime());
-        }
-
-        if (profile != null) {
-            values.put(TripCacheDbHelper.COLUMN_DRIVER_NAME, profile.getDisplayName());
-            values.put(TripCacheDbHelper.COLUMN_VEHICLE_NAME, profile.getVehicleName());
-        } else {
-            values.put(TripCacheDbHelper.COLUMN_DRIVER_NAME, "");
-            values.put(TripCacheDbHelper.COLUMN_VEHICLE_NAME, "");
-        }
-
-        values.put(TripCacheDbHelper.COLUMN_SAVED_AT, System.currentTimeMillis());
-
-        db.insertWithOnConflict(
-                TripCacheDbHelper.TABLE_VIEWED_TRIPS,
-                null,
-                values,
-                SQLiteDatabase.CONFLICT_REPLACE
-        );
     }
 
     /**
@@ -191,9 +201,13 @@ public class TripCacheRepository implements TripCacheStore {
             return;
         }
 
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        String whereClause = TripCacheDbHelper.COLUMN_USER_ID + " = ?";
-        String[] whereArgs = new String[]{userId};
-        db.delete(TripCacheDbHelper.TABLE_VIEWED_TRIPS, whereClause, whereArgs);
+        try {
+            SQLiteDatabase db = dbHelper.getWritableDatabase();
+            String whereClause = TripCacheDbHelper.COLUMN_USER_ID + " = ?";
+            String[] whereArgs = new String[]{userId};
+            db.delete(TripCacheDbHelper.TABLE_VIEWED_TRIPS, whereClause, whereArgs);
+        } catch (Exception ignored) {
+            // Đảm bảo không ném ngoại lệ khi cơ sở dữ liệu đã bị đóng hoặc lỗi khóa
+        }
     }
 }
