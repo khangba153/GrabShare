@@ -34,7 +34,7 @@ public class GrabShareApplication extends Application {
                     return;
                 }
 
-                fcmTokenRepository.syncTokenForUser(currentUser.getUid());
+                fcmInstallationRepository.syncInstallationForUser(currentUser.getUid());
             }
         };
 
