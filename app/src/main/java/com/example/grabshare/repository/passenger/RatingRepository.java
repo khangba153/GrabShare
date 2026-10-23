@@ -67,16 +67,28 @@ public class RatingRepository {
                                 callback.onError(new IllegalStateException("Phiên đăng nhập đã thay đổi."));
                                 return;
                             }
+                            if (documentSnapshot == null) {
+                                callback.onError(new IllegalStateException("Không đọc được đánh giá trên máy chủ."));
+                                return;
+                            }
                             if (documentSnapshot.getMetadata().isFromCache()
                                     || documentSnapshot.getMetadata().hasPendingWrites()) {
                                 callback.onError(new IllegalStateException("Chưa xác nhận được đánh giá trên máy chủ."));
                                 return;
                             }
-                            if (documentSnapshot != null && documentSnapshot.exists()) {
-                                Rating rating = documentSnapshot.toObject(Rating.class);
-                                if (rating != null) {
-                                    rating.setId(documentSnapshot.getId());
+                            if (documentSnapshot.exists()) {
+                                Rating rating;
+                                try {
+                                    rating = documentSnapshot.toObject(Rating.class);
+                                } catch (RuntimeException conversionError) {
+                                    callback.onError(conversionError);
+                                    return;
                                 }
+                                if (rating == null) {
+                                    callback.onError(new IllegalStateException("Dữ liệu đánh giá không hợp lệ."));
+                                    return;
+                                }
+                                rating.setId(documentSnapshot.getId());
                                 callback.onSuccess(rating);
                             } else {
                                 callback.onSuccess(null);
