@@ -491,9 +491,17 @@ public class UpcomingActivity extends AppCompatActivity {
                 mapEndLabel.setText(trip.getDestination().getName() != null ? trip.getDestination().getName() : "Điểm đến");
             }
 
-            if (tripCost != null && trip.getCostVnd() != null) {
-                DecimalFormat df = new DecimalFormat("#,###");
-                tripCost.setText(df.format(trip.getCostVnd()) + "đ");
+            if (tripCost != null) {
+                if (trip.getCostVnd() != null) {
+                    if (trip.getCostVnd() == 0) {
+                        tripCost.setText("Miễn phí");
+                    } else {
+                        DecimalFormat decimalFormat = new DecimalFormat("#,###");
+                        tripCost.setText(decimalFormat.format(trip.getCostVnd()) + "đ");
+                    }
+                } else {
+                    tripCost.setText("Chưa có chi phí");
+                }
             }
         }
 
@@ -629,14 +637,14 @@ public class UpcomingActivity extends AppCompatActivity {
     private String formatTimestamp(Timestamp timestamp) {
         if (timestamp == null) return "Hôm nay";
         Date date = timestamp.toDate();
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd/MM · HH:mm", new Locale("vi", "VN"));
-        return sdf.format(date);
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd/MM · HH:mm", new Locale("vi", "VN"));
+        return dateFormat.format(date);
     }
 
     private String formatTimeOnly(Timestamp timestamp) {
         if (timestamp == null) return "giờ hẹn";
         Date date = timestamp.toDate();
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", new Locale("vi", "VN"));
-        return sdf.format(date);
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", new Locale("vi", "VN"));
+        return timeFormat.format(date);
     }
 }

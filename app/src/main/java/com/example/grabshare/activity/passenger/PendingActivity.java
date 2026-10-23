@@ -443,9 +443,17 @@ public class PendingActivity extends AppCompatActivity {
                 mapEndLabel.setText(trip.getDestination().getName() != null ? trip.getDestination().getName() : "Điểm đến");
             }
 
-            if (tripCost != null && trip.getCostVnd() != null) {
-                DecimalFormat df = new DecimalFormat("#,###");
-                tripCost.setText(df.format(trip.getCostVnd()) + "đ");
+            if (tripCost != null) {
+                if (trip.getCostVnd() != null) {
+                    if (trip.getCostVnd() == 0) {
+                        tripCost.setText("Miễn phí");
+                    } else {
+                        DecimalFormat decimalFormat = new DecimalFormat("#,###");
+                        tripCost.setText(decimalFormat.format(trip.getCostVnd()) + "đ");
+                    }
+                } else {
+                    tripCost.setText("Chưa có chi phí");
+                }
             }
         }
 
@@ -486,7 +494,7 @@ public class PendingActivity extends AppCompatActivity {
             btnCancel.setFocusable(true);
             btnCancel.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     dialog.dismiss();
                 }
             });
@@ -497,7 +505,7 @@ public class PendingActivity extends AppCompatActivity {
             btnConfirm.setFocusable(true);
             btnConfirm.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     dialog.dismiss();
                     performCancelRequest();
                 }
@@ -563,7 +571,7 @@ public class PendingActivity extends AppCompatActivity {
     private String formatTimestamp(Timestamp timestamp) {
         if (timestamp == null) return "Hôm nay";
         Date date = timestamp.toDate();
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd/MM · HH:mm", new Locale("vi", "VN"));
-        return sdf.format(date);
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd/MM · HH:mm", new Locale("vi", "VN"));
+        return dateFormat.format(date);
     }
 }

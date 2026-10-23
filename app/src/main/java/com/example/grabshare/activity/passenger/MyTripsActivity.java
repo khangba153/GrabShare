@@ -106,7 +106,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         if (btnRetry != null) {
             btnRetry.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     startListeningTrips();
                 }
             });
@@ -116,7 +116,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         if (roleDriver != null) {
             roleDriver.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     Intent intent = new Intent(MyTripsActivity.this, DriverTripsActivity.class);
                     startActivity(intent);
                     finish();
@@ -128,7 +128,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         if (navHome != null) {
             navHome.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     // Quay về Home đang có để giữ form và tránh tạo màn trùng.
                     Intent intent = new Intent(
                             MyTripsActivity.this,
@@ -148,7 +148,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         if (navAccount != null) {
             navAccount.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     Intent intent = new Intent(
                             MyTripsActivity.this,
                             AccountActivity.class);
@@ -212,7 +212,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             }
 
             @Override
-            public void onError(Exception e) {
+            public void onError(Exception exception) {
                 if (!sessionGuard.current(sessionToken) || generation != loadGeneration) return;
                 showErrorState();
             }
