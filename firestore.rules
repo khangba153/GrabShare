@@ -414,16 +414,16 @@ service cloud.firestore {
         && ((n.type == 'TRIP_CANCELLED' && next.status == 'CANCELLED')
           || (n.type == 'TRIP_COMPLETED' && next.status == 'COMPLETED'));
     }
-    // FCM token riêng tư: client chỉ được quản lý token của chính UID.
-    // Cloud Functions dùng Admin SDK nên không phụ thuộc vào các quyền client này.
-    match /fcmTokens/{uid} {
+    // FID riêng tư: client chỉ được quản lý bản ghi của chính UID.
+    // Cloud Functions dùng Admin SDK nên không phụ thuộc vào quyền client.
+    match /fcmInstallations/{uid} {
       allow get: if owner(uid);
       allow list: if false;
       allow create, update: if owner(uid)
-        && request.resource.data.keys().hasAll(['token', 'updatedAt'])
-        && request.resource.data.keys().hasOnly(['token', 'updatedAt'])
-        && request.resource.data.token is string
-        && request.resource.data.token.size() > 0
+        && request.resource.data.keys().hasAll(['fid', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['fid', 'updatedAt'])
+        && request.resource.data.fid is string
+        && request.resource.data.fid.size() > 0
         && request.resource.data.updatedAt is timestamp
         && request.resource.data.updatedAt == request.time;
       allow delete: if owner(uid);
