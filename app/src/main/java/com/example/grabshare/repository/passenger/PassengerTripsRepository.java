@@ -8,6 +8,7 @@ import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.MetadataChanges;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
@@ -368,7 +369,8 @@ public class PassengerTripsRepository {
         private void startListeningRequest() {
             requestListener = firestore.collection("requests")
                     .document(requestId)
-                    .addSnapshotListener(new EventListener<DocumentSnapshot>() {
+                    .addSnapshotListener(MetadataChanges.INCLUDE, new EventListener<DocumentSnapshot>() {
+                        /** Cache chưa có request không phải xác nhận máy chủ rằng request đã mất. */
                         @Override
                         public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
                             if (!active) return;
@@ -378,7 +380,13 @@ public class PassengerTripsRepository {
                                 return;
                             }
 
-                            if (doc == null || !doc.exists()) {
+                            if (doc == null) {
+                                return;
+                            }
+                            if (!doc.exists() && doc.getMetadata().isFromCache()) {
+                                return;
+                            }
+                            if (!doc.exists()) {
                                 currentRequest = null;
                                 resetTripAndProfileListeners();
                                 if (callback != null) {
@@ -402,13 +410,15 @@ public class PassengerTripsRepository {
                                 }
                             } else {
                                 resetTripAndProfileListeners();
-                                notifyCallback();
+                                if (callback != null) {
+                                    callback.onError(new IllegalStateException("Dữ liệu yêu cầu thiếu mã chuyến đi."));
+                                }
                             }
                         }
                     });
         }
 
-        private void startListeningTrip(String tripId) {
+        private void startListeningTrip(final String tripId) {
             if (!active) return;
 
             resetTripAndProfileListeners();
@@ -416,10 +426,13 @@ public class PassengerTripsRepository {
 
             tripListener = firestore.collection("trips")
                     .document(tripId)
-                    .addSnapshotListener(new EventListener<DocumentSnapshot>() {
+                    .addSnapshotListener(MetadataChanges.INCLUDE, new EventListener<DocumentSnapshot>() {
+                        /** Chờ chuyến từ server khi cache trống, bỏ callback của tuyến đã tháo. */
                         @Override
                         public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
-                            if (!active) return;
+                            if (!active || !tripId.equals(listenedTripId)) {
+                                return;
+                            }
 
                             if (error != null) {
                                 currentTrip = null;
@@ -430,7 +443,13 @@ public class PassengerTripsRepository {
                                 return;
                             }
 
-                            if (doc != null && doc.exists()) {
+                            if (doc == null) {
+                                return;
+                            }
+                            if (!doc.exists() && doc.getMetadata().isFromCache()) {
+                                return;
+                            }
+                            if (doc.exists()) {
                                 Trip trip = doc.toObject(Trip.class);
                                 if (trip != null) {
                                     trip.setId(doc.getId());
@@ -446,18 +465,22 @@ public class PassengerTripsRepository {
                                     }
                                 } else {
                                     resetProfileListener();
-                                    notifyCallback();
+                                    if (callback != null) {
+                                        callback.onError(new IllegalStateException("Dữ liệu chuyến đi thiếu chủ xe."));
+                                    }
                                 }
                             } else {
                                 currentTrip = null;
                                 resetProfileListener();
-                                notifyCallback();
+                                if (callback != null) {
+                                    callback.onError(new IllegalStateException("Không tìm thấy chuyến đi trên máy chủ."));
+                                }
                             }
                         }
                     });
         }
 
-        private void startListeningProfile(String driverId) {
+        private void startListeningProfile(final String driverId) {
             if (!active) return;
 
             resetProfileListener();
@@ -468,7 +491,9 @@ public class PassengerTripsRepository {
                     .addSnapshotListener(new EventListener<DocumentSnapshot>() {
                         @Override
                         public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
-                            if (!active) return;
+                            if (!active || !driverId.equals(listenedDriverId)) {
+                                return;
+                            }
 
                             if (error != null) {
                                 currentProfile = null;
@@ -512,7 +537,7 @@ public class PassengerTripsRepository {
         private void notifyCallback() {
             if (!active) return;
 
-            if (callback != null && currentRequest != null) {
+            if (callback != null && currentRequest != null && currentTrip != null) {
                 callback.onSuccess(new SingleRequestDetails(currentRequest, currentTrip, currentProfile));
             }
         }
