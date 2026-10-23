@@ -48,7 +48,7 @@ Required data fields (all values must be strings):
 }
 ```
 
-Use Android high priority for these user-visible, time-sensitive messages so data-only messages can be delivered more reliably while the app is backgrounded. Keep payload values small and do not include personal or trip details that are not necessary for the lock-screen notification.
+Use the Admin SDK `fid` target field (not the deprecated `token` target field) and Android high priority for these user-visible, time-sensitive messages so data-only messages can be delivered more reliably while the app is backgrounded. Keep payload values small and do not include personal or trip details that are not necessary for the lock-screen notification.
 
 Android opens NotificationsActivity when the user taps the system notification. The notification ID is used as the local system notification key, so retries for the same document replace rather than create a separate visible notification.
 
