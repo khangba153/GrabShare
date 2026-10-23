@@ -239,6 +239,7 @@ public class PendingActivity extends AppCompatActivity {
                 }
 
                 Trip trip = details.getTrip();
+                PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
                 currentDetails = details;
                 String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
 

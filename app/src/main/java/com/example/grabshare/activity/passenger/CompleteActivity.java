@@ -374,6 +374,7 @@ public class CompleteActivity extends AppCompatActivity {
     private void bindTrip(SingleRequestDetails details) {
         Trip trip = details.getTrip();
         TripRequest request = details.getRequest();
+        PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
         PublicProfile profile = details.getDriverProfile();
         String displayName = "Chủ xe";
         String vehicleName = "Chưa có tên xe";

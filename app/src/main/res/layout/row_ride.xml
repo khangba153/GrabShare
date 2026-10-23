@@ -102,6 +102,15 @@
             android:textSize="14sp"
             android:layout_marginBottom="8dp" />
 
+        <TextView
+            android:id="@+id/ride_passenger_route"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#1F2937"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
+
         <!-- Price -->
         <TextView
             android:id="@+id/ride_price"
