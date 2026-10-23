@@ -3,6 +3,9 @@ package com.example.grabshare.model;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.Exclude;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /** Dữ liệu yêu cầu đi nhờ trong collection requests. */
 public class TripRequest {
     // ID chỉ dùng trong Java, không ghi thành field Firestore.
@@ -14,6 +17,9 @@ public class TripRequest {
     private Place dropoff;
     // Phân biệt yêu cầu cũ thiếu field với dữ liệu có dropoff nhưng sai/null.
     private boolean dropoffFieldPresent;
+    // Map gốc giữ được khác biệt giữa thiếu snapshot, null và dữ liệu sai kiểu.
+    private Map<String, Object> contributionSnapshot;
+    private boolean contributionSnapshotFieldPresent;
     private String message;
     private String status;
     private Timestamp createdAt;
@@ -126,6 +132,30 @@ public class TripRequest {
     @Exclude
     public boolean hasDropoffField() {
         return dropoffFieldPresent;
+    }
+
+    /** Lấy bản sao snapshot tiền; dùng ContributionCalculator để đọc và kiểm tra. */
+    public Map<String, Object> getContributionSnapshot() {
+        if (contributionSnapshot == null) {
+            return null;
+        }
+        return new LinkedHashMap<String, Object>(contributionSnapshot);
+    }
+
+    /** Field có mặt nhưng null vẫn là dữ liệu lỗi, không được coi như legacy. */
+    public void setContributionSnapshot(Map<String, Object> contributionSnapshot) {
+        this.contributionSnapshotFieldPresent = true;
+        if (contributionSnapshot == null) {
+            this.contributionSnapshot = null;
+        } else {
+            this.contributionSnapshot = new LinkedHashMap<String, Object>(contributionSnapshot);
+        }
+    }
+
+    /** Cờ trong bộ nhớ, không được ghi vào Firestore. */
+    @Exclude
+    public boolean hasContributionSnapshotField() {
+        return contributionSnapshotFieldPresent;
     }
 
     /** Lấy lời nhắn. */

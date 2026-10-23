@@ -4,6 +4,7 @@ package com.example.grabshare.contract;
 public final class DetourCheckResult {
     private final double directDistanceMeters;
     private final double viaPassengerRouteDistanceMeters;
+    private final Double passengerDistanceMeters;
     private final long detourMeters;
     private final boolean withinLimit;
 
@@ -13,14 +14,35 @@ public final class DetourCheckResult {
             double viaPassengerRouteDistanceMeters,
             long maxDetourMeters
     ) {
+        this(directDistanceMeters, viaPassengerRouteDistanceMeters, null, maxDetourMeters);
+    }
+
+    /**
+     * Nhận thêm độ dài P→C trên chính tuyến ghép; null nghĩa là chưa đo được.
+     * Không dùng số mét đi thêm hoặc một tuyến P→C độc lập thay cho chặng khách đi.
+     */
+    public DetourCheckResult(
+            double directDistanceMeters,
+            double viaPassengerRouteDistanceMeters,
+            Double passengerDistanceMeters,
+            long maxDetourMeters
+    ) {
         if (!isValidDistance(directDistanceMeters)
                 || !isValidDistance(viaPassengerRouteDistanceMeters)
                 || maxDetourMeters < 0) {
             throw new IllegalArgumentException("Khoảng cách không hợp lệ.");
         }
 
+        if (passengerDistanceMeters != null
+                && (!isValidDistance(passengerDistanceMeters)
+                || passengerDistanceMeters <= 0
+                || passengerDistanceMeters > viaPassengerRouteDistanceMeters)) {
+            throw new IllegalArgumentException("Khoảng cách khách đi không hợp lệ.");
+        }
+
         this.directDistanceMeters = directDistanceMeters;
         this.viaPassengerRouteDistanceMeters = viaPassengerRouteDistanceMeters;
+        this.passengerDistanceMeters = passengerDistanceMeters;
 
         double extraDistance = Math.max(
                 0.0,
@@ -45,6 +67,11 @@ public final class DetourCheckResult {
     /** Khoảng cách tuyến ghép bốn điểm, giữ nguyên mét chưa làm tròn. */
     public double getViaPassengerRouteDistanceMeters() {
         return viaPassengerRouteDistanceMeters;
+    }
+
+    /** Null chỉ trạng thái chưa có chặng P→C, không được đổi thành 0 để tính tiền. */
+    public Double getPassengerDistanceMeters() {
+        return passengerDistanceMeters;
     }
 
     /** Giữ tương thích tên getter cũ; giá trị vẫn là toàn tuyến ghép. */
