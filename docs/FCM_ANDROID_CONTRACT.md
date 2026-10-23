@@ -2,14 +2,14 @@
 
 This file is the integration contract between the Android FCM work and the Cloud Function implementation.
 
-## Registration token schema
+## Firebase Installation ID schema
 
-Android writes one registration token per authenticated UID:
+Android writes one FID per authenticated UID:
 
-`fcmTokens/{uid}`
+`fcmInstallations/{uid}`
 
 Fields:
-- `token`: current FCM registration token
+- `fid`: Firebase Installation ID returned by FCM's `onRegistered()` callback / Firebase Installations SDK
 - `updatedAt`: Firestore server timestamp
 
 Client security rules allow an authenticated user to get, create, update, or delete only their own token document. Listing tokens is forbidden. Cloud Functions should use Firebase Admin SDK.
