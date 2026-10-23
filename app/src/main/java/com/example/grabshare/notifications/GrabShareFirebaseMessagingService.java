@@ -34,11 +34,18 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
     private static final String CHANNEL_NAME = "Thông báo GrabShare";
 
     @Override
-    public void onNewToken(@NonNull String token) {
-        super.onNewToken(token);
+    public void onRegistered(@NonNull String installationId) {
+        super.onRegistered(installationId);
 
-        // Repository lấy lại token hiện tại và lưu cho UID đang đăng nhập.
-        new FcmTokenRepository().syncTokenForCurrentUser();
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+
+        if (currentUser == null) {
+            return;
+        }
+
+        new FcmInstallationRepository().syncInstallationForUser(
+                currentUser.getUid(),
+                installationId);
     }
 
     @Override
