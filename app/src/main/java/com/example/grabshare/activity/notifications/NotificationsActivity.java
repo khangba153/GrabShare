@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.grabshare.R;
 import com.example.grabshare.activity.driver.DriverRequestsActivity;
 import com.example.grabshare.activity.driver.RequestDetailActivity;
+import com.example.grabshare.activity.passenger.AcceptedActivity;
 import com.example.grabshare.activity.passenger.CompleteActivity;
 import com.example.grabshare.activity.passenger.RejectedActivity;
 import com.example.grabshare.activity.passenger.UpcomingActivity;
@@ -27,6 +28,7 @@ import com.example.grabshare.repository.notifications.NotificationRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.List;
@@ -222,14 +224,14 @@ public class NotificationsActivity extends AppCompatActivity {
 
                     @Override
                     public void onError(Exception error) {
-                        showActionError(token, true);
+                        showActionError(token, error, true);
                     }
                 });
             }
 
             @Override
             public void onError(Exception error) {
-                showActionError(token, false);
+                showActionError(token, error, false);
             }
         });
     }
@@ -246,7 +248,7 @@ public class NotificationsActivity extends AppCompatActivity {
             intent = new Intent(this, DriverRequestsActivity.class);
             intent.putExtra(NavigationKeys.TRIP_ID, item.getTripId());
         } else if ("REQUEST_ACCEPTED".equals(type)) {
-            intent = new Intent(this, UpcomingActivity.class);
+            intent = new Intent(this, AcceptedActivity.class);
             intent.putExtra(NavigationKeys.REQUEST_ID, item.getRequestId());
         } else if ("REQUEST_REJECTED".equals(type)) {
             intent = new Intent(this, RejectedActivity.class);
@@ -267,16 +269,26 @@ public class NotificationsActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    private void showActionError(int token, boolean markingRead) {
+    private void showActionError(int token, Exception error, boolean markingRead) {
         if (!isCurrentAction(token)) {
             return;
         }
         routeInProgress = false;
         notificationList.setEnabled(true);
 
-        String message = markingRead
-                ? "Chưa xác nhận được trạng thái đã đọc. Kiểm tra mạng rồi thử lại."
-                : "Thông báo không còn dữ liệu liên quan hoặc chưa thể xác minh.";
+        String message;
+        if (error instanceof FirebaseFirestoreException
+                && ((FirebaseFirestoreException) error).getCode()
+                == FirebaseFirestoreException.Code.UNAVAILABLE) {
+            message = "Không thể xác minh khi ngoại tuyến. Kết nối mạng rồi thử lại.";
+        } else if (error != null && error.getMessage() != null
+                && error.getMessage().contains("không còn tồn tại")) {
+            message = "Dữ liệu liên quan không còn tồn tại. Bạn có thể quay lại Inbox.";
+        } else if (markingRead) {
+            message = "Chưa xác nhận được trạng thái đã đọc. Kiểm tra mạng rồi thử lại.";
+        } else {
+            message = "Không thể xác minh dữ liệu liên quan. Hãy thử lại.";
+        }
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
