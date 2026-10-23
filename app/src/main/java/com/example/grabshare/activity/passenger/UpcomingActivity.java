@@ -304,6 +304,7 @@ public class UpcomingActivity extends AppCompatActivity {
 
         TripRequest request = details.getRequest();
         Trip trip = details.getTrip();
+        PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
         PublicProfile profile = details.getDriverProfile();
 
         bindDriverProfile(profile);

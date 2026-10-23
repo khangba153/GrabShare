@@ -159,7 +159,7 @@ public class CompleteActivity extends AppCompatActivity {
         if (sessionGuard != null) {
             sessionGuard.stop();
         }
-        ratingReadGeneration++;
+        ratingReadGeneration = ratingReadGeneration + 1;
         removeRequestListener();
         super.onStop();
     }
@@ -183,7 +183,7 @@ public class CompleteActivity extends AppCompatActivity {
             return;
         }
         removeRequestListener();
-        ratingReadGeneration++;
+        ratingReadGeneration = ratingReadGeneration + 1;
         checkedTripId = null;
         currentDetails = null;
         showState(RatingState.LOADING, "Đang tải chuyến đi và xác nhận đánh giá…");
@@ -197,7 +197,7 @@ public class CompleteActivity extends AppCompatActivity {
                         }
                         currentDetails = details;
                         if (!eligible(details)) {
-                            ratingReadGeneration++;
+                            ratingReadGeneration = ratingReadGeneration + 1;
                             checkedTripId = null;
                             showState(RatingState.UNAVAILABLE,
                                     "Chỉ người được nhận trên chuyến đã hoàn thành mới được đánh giá.");
@@ -215,7 +215,7 @@ public class CompleteActivity extends AppCompatActivity {
                         if (!sessionGuard.current(sessionToken)) {
                             return;
                         }
-                        ratingReadGeneration++;
+                        ratingReadGeneration = ratingReadGeneration + 1;
                         currentDetails = null;
                         showState(RatingState.ERROR, "Không tải được chuyến đi. Hãy thử lại.");
                     }
@@ -244,7 +244,8 @@ public class CompleteActivity extends AppCompatActivity {
         }
         final String tripId = currentDetails.getTrip().getId();
         checkedTripId = tripId;
-        final int readToken = ++ratingReadGeneration;
+        ratingReadGeneration = ratingReadGeneration + 1;
+        final int readToken = ratingReadGeneration;
         final int sessionToken = sessionGuard.token();
         showState(RatingState.LOADING, "Đang xác nhận đánh giá trên máy chủ…");
         ratingRepository.getRating(tripId, expectedUserId, new RepositoryCallback<Rating>() {
@@ -311,7 +312,7 @@ public class CompleteActivity extends AppCompatActivity {
         }
         final Trip trip = currentDetails.getTrip();
         submitting = true;
-        ratingReadGeneration++;
+        ratingReadGeneration = ratingReadGeneration + 1;
         showState(RatingState.ABSENT, "Đang gửi đánh giá…");
         ratingRepository.submitRating(trip.getId(), expectedUserId, trip.getDriverId(),
                 Math.round(selectedScore), comment, new RepositoryCallback<Void>() {
@@ -374,6 +375,7 @@ public class CompleteActivity extends AppCompatActivity {
     private void bindTrip(SingleRequestDetails details) {
         Trip trip = details.getTrip();
         TripRequest request = details.getRequest();
+        PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
         PublicProfile profile = details.getDriverProfile();
         String displayName = "Chủ xe";
         String vehicleName = "Chưa có tên xe";

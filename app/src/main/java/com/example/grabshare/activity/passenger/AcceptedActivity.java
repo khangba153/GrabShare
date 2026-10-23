@@ -212,6 +212,7 @@ public class AcceptedActivity extends AppCompatActivity {
                 }
 
                 Trip trip = details.getTrip();
+                PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
                 String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
 
                 // State resolver chuyển hướng điều hướng chính xác

@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
+import com.example.grabshare.activity.passenger.PassengerRouteText;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.model.TripRequest;
@@ -74,6 +75,7 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
         private final TextView tvDepartureTime;
         private final TextView tvPrice;
         private final TextView tvStatus;
+        private final TextView tvPassengerRoute;
 
         public RideViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -85,12 +87,15 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
             tvDepartureTime = itemView.findViewById(R.id.ride_time);
             tvPrice = itemView.findViewById(R.id.ride_price);
             tvStatus = itemView.findViewById(R.id.ride_status);
+            tvPassengerRoute = itemView.findViewById(R.id.ride_passenger_route);
         }
 
         public void bind(final PassengerRideItem item, final OnRideClickListener listener) {
             TripRequest request = item.getRequest();
             Trip trip = item.getTrip();
             PublicProfile profile = item.getDriverProfile();
+            tvPassengerRoute.setVisibility(View.VISIBLE);
+            PassengerRouteText.bind(tvPassengerRoute, request, trip);
 
             if (trip == null) {
                 if (tvDriverName != null) tvDriverName.setText("Chưa rõ chủ xe");

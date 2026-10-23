@@ -174,8 +174,8 @@ public class TripCacheRepository implements TripCacheStore {
 
                 return new CachedTrip(trip, profile, savedAt);
             }
-        } catch (Exception e) {
-            // Trường hợp truy vấn SQLite bị lỗi
+        } catch (Exception error) {
+            throw new IllegalStateException("Không đọc được chuyến đã lưu trong SQLite.", error);
         }
 
         return null;

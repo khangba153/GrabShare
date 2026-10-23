@@ -214,6 +214,7 @@ public class RejectedActivity extends AppCompatActivity {
                 }
 
                 Trip trip = details.getTrip();
+                PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
                 String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
 
                 // State resolver điều hướng tự động nếu request không phải REJECTED

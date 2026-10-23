@@ -284,6 +284,7 @@ public class PendingActivity extends AppCompatActivity {
                 }
 
                 Trip trip = details.getTrip();
+                PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
                 if (trip == null) {
                     showLoadFailure(new IllegalStateException("Chưa tải được thông tin chuyến đi."));
                     return;

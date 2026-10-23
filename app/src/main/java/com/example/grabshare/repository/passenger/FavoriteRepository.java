@@ -60,6 +60,10 @@ public class FavoriteRepository implements FavoriteStore {
                     @Override
                     public void onSuccess(DocumentSnapshot documentSnapshot) {
                         if (callback != null) {
+                            if (documentSnapshot == null) {
+                                callback.onError(new IllegalStateException("Không đọc được yêu thích trên máy chủ."));
+                                return;
+                            }
                             if (documentSnapshot.getMetadata().isFromCache()
                                     || documentSnapshot.getMetadata().hasPendingWrites()) {
                                 callback.onError(new IllegalStateException("Chưa xác nhận yêu thích trên máy chủ."));

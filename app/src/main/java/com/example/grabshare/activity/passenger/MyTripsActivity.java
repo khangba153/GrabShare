@@ -36,6 +36,7 @@ import com.example.grabshare.activity.account.AccountActivity;
  * Activity hiển thị danh sách tất cả chuyến đi nhờ của Hành khách (Tab MyTrips).
  */
 public class MyTripsActivity extends AppCompatActivity implements RideAdapter.OnRideClickListener {
+    private static final String EXPECTED_UID = "my_trips_expected_uid";
 
     private RecyclerView recyclerView;
     private ProgressBar progressBar;
@@ -47,6 +48,8 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     private PassengerTripsRepository tripsRepository;
     private ListenerRegistration tripsListener;
     private String currentUserId;
+    private PassengerSessionGuard sessionGuard;
+    private int loadGeneration;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,6 +70,14 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             return;
         }
         currentUserId = currentUser.getUid();
+        if (savedInstanceState != null) {
+            String savedUserId = savedInstanceState.getString(EXPECTED_UID);
+            if (!currentUserId.equals(savedUserId)) {
+                finish();
+                return;
+            }
+        }
+        sessionGuard = new PassengerSessionGuard(this);
 
         setupListeners();
     }
@@ -155,21 +166,34 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     @Override
     protected void onStart() {
         super.onStart();
-        if (currentUserId != null && !currentUserId.trim().isEmpty()) {
+        if (sessionGuard != null && sessionGuard.start(currentUserId)) {
             startListeningTrips();
         }
     }
 
     @Override
     protected void onStop() {
-        super.onStop();
+        if (sessionGuard != null) sessionGuard.stop();
+        loadGeneration = loadGeneration + 1;
         if (tripsListener != null) {
             tripsListener.remove();
             tripsListener = null;
         }
+        super.onStop();
+    }
+
+    /** Giữ màn gắn với đúng UID khi xoay hoặc Android tạo lại Activity. */
+    @Override
+    protected void onSaveInstanceState(Bundle state) {
+        state.putString(EXPECTED_UID, currentUserId);
+        super.onSaveInstanceState(state);
     }
 
     private void startListeningTrips() {
+        if (sessionGuard == null || !sessionGuard.current(sessionGuard.token())) return;
+        final int sessionToken = sessionGuard.token();
+        loadGeneration = loadGeneration + 1;
+        final int generation = loadGeneration;
         showLoadingState();
 
         if (tripsListener != null) {
@@ -179,6 +203,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         tripsListener = tripsRepository.listenPassengerTrips(currentUserId, new RepositoryCallback<List<PassengerRideItem>>() {
             @Override
             public void onSuccess(List<PassengerRideItem> result) {
+                if (!sessionGuard.current(sessionToken) || generation != loadGeneration) return;
                 if (result == null || result.isEmpty()) {
                     showEmptyState();
                 } else {
@@ -188,6 +213,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
 
             @Override
             public void onError(Exception e) {
+                if (!sessionGuard.current(sessionToken) || generation != loadGeneration) return;
                 showErrorState();
             }
         });
@@ -195,6 +221,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
 
     @Override
     public void onRideClick(PassengerRideItem rideItem) {
+        if (sessionGuard == null || !sessionGuard.current(sessionGuard.token())) return;
         if (rideItem == null || rideItem.getRequest() == null) {
             return;
         }

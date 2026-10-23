@@ -59,7 +59,7 @@ final class PassengerSessionGuard {
     /** Vô hiệu hóa callback đã xếp hàng và tháo listener khi màn dừng. */
     void stop() {
         active = false;
-        generation++;
+        generation = generation + 1;
         if (authListener != null) {
             auth.removeAuthStateListener(authListener);
             authListener = null;
