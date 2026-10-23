@@ -54,6 +54,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
     private FavoriteAdapter adapter;
     private FirebaseFirestore firestore;
     private String currentUserId;
+    private PassengerSessionGuard sessionGuard;
     private int loadGeneration;
     private boolean visible;
 
@@ -73,6 +74,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
             return;
         }
         currentUserId = currentUser.getUid();
+        sessionGuard = new PassengerSessionGuard(this);
 
         initViews();
         setupRecyclerView();
@@ -168,8 +170,10 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
     @Override
     protected void onStart() {
         super.onStart();
-        visible = true;
-        loadFavorites();
+        if (sessionGuard != null && sessionGuard.start(currentUserId)) {
+            visible = true;
+            loadFavorites();
+        }
     }
 
     /** Bỏ mọi phản hồi của lượt tải cũ khi rời màn. */
@@ -177,22 +181,26 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
     protected void onStop() {
         visible = false;
         loadGeneration = loadGeneration + 1;
+        if (sessionGuard != null) sessionGuard.stop();
         super.onStop();
     }
 
     /** Chỉ cập nhật UI nếu màn còn hiện và đúng tài khoản đã bắt đầu đọc. */
     private boolean currentLoad(int generation) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        return visible && generation == loadGeneration && user != null
+        return visible && generation == loadGeneration && sessionGuard != null
+                && sessionGuard.current(sessionGuard.token()) && user != null
                 && user.getUid().equals(currentUserId);
     }
 
     private void loadFavorites() {
-        if (currentUserId == null || currentUserId.trim().isEmpty()) {
+        if (currentUserId == null || currentUserId.trim().isEmpty() || sessionGuard == null
+                || !sessionGuard.current(sessionGuard.token())) {
             return;
         }
 
-        final int generation = loadGeneration = loadGeneration + 1;
+        loadGeneration = loadGeneration + 1;
+        final int generation = loadGeneration;
         adapter.setItems(new ArrayList<FavoriteItem>());
         showLoadingState();
 
@@ -204,7 +212,11 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                     @Override
                     public void onSuccess(QuerySnapshot querySnapshot) {
                         if (!currentLoad(generation)) return;
-                        if (querySnapshot == null || querySnapshot.isEmpty()) {
+                        if (querySnapshot == null) {
+                            showErrorState();
+                            return;
+                        }
+                        if (querySnapshot.isEmpty()) {
                             showEmptyState();
                             return;
                         }
@@ -212,6 +224,10 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                         List<Favorite> favorites = new ArrayList<>();
                         for (QueryDocumentSnapshot doc : querySnapshot) {
                             Favorite favorite = doc.toObject(Favorite.class);
+                            if (favorite == null) {
+                                showErrorState();
+                                return;
+                            }
                             favorite.setId(doc.getId());
                             favorites.add(favorite);
                         }
@@ -253,13 +269,21 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                         @Override
                         public void onSuccess(DocumentSnapshot tripDoc) {
                             if (!currentLoad(generation)) return;
-                            if (tripDoc != null && tripDoc.exists()) {
+                            if (tripDoc == null) {
+                                failed[0] = true;
+                                finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
+                                return;
+                            }
+                            if (tripDoc.exists()) {
                                 final Trip trip = tripDoc.toObject(Trip.class);
-                                if (trip != null) {
-                                    trip.setId(tripDoc.getId());
+                                if (trip == null) {
+                                    failed[0] = true;
+                                    finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
+                                    return;
                                 }
+                                trip.setId(tripDoc.getId());
 
-                                String driverId = trip != null ? trip.getDriverId() : null;
+                                String driverId = trip.getDriverId();
                                 if (driverId != null && !driverId.trim().isEmpty()) {
                                     firestore.collection("publicProfiles").document(driverId).get(Source.SERVER)
                                             .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
@@ -325,6 +349,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
 
     @Override
     public void onFavoriteClick(FavoriteItem favoriteItem) {
+        if (!currentLoad(loadGeneration)) return;
         if (favoriteItem == null || favoriteItem.getTrip() == null) {
             Toast.makeText(this, "Chuyến đi không khả dụng.", Toast.LENGTH_SHORT).show();
             return;
