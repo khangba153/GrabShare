@@ -9,7 +9,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 /**
- * Khởi tạo đồng bộ FCM token khi trạng thái đăng nhập thay đổi.
+ * Đồng bộ Firebase Installation ID khi trạng thái đăng nhập thay đổi.
  * Không giữ tham chiếu Activity và không thực hiện thao tác UI.
  */
 public class GrabShareApplication extends Application {
