@@ -130,9 +130,12 @@ public class PassengerTripsRepository {
         private ListenerRegistration requestsListener;
         private final Map<String, ListenerRegistration> tripListenersMap;
         private final Map<String, Trip> tripDataMap;
+        private final Set<String> resolvedTripIds;
+        private final Set<String> failedTripIds;
         private final Map<String, ListenerRegistration> profileListenersMap;
         private final Map<String, com.example.grabshare.model.PublicProfile> profileDataMap;
         private List<TripRequest> currentRequestsList;
+        private boolean requestReadFailed;
 
         public RealtimeTripsHandler(FirebaseFirestore firestore, String passengerId, RepositoryCallback<List<PassengerRideItem>> callback) {
             this.firestore = firestore;
@@ -140,6 +143,8 @@ public class PassengerTripsRepository {
             this.callback = callback;
             this.tripListenersMap = new HashMap<>();
             this.tripDataMap = new HashMap<>();
+            this.resolvedTripIds = new HashSet<>();
+            this.failedTripIds = new HashSet<>();
             this.profileListenersMap = new HashMap<>();
             this.profileDataMap = new HashMap<>();
             this.currentRequestsList = new ArrayList<>();
@@ -157,11 +162,21 @@ public class PassengerTripsRepository {
                             if (!active) return;
 
                             if (error != null) {
+                                requestReadFailed = true;
                                 if (callback != null) callback.onError(error);
                                 return;
                             }
 
-                            if (querySnapshot == null || querySnapshot.isEmpty()) {
+                            if (querySnapshot == null) {
+                                requestReadFailed = true;
+                                if (callback != null) {
+                                    callback.onError(new IllegalStateException("Không đọc được danh sách yêu cầu."));
+                                }
+                                return;
+                            }
+                            requestReadFailed = false;
+
+                            if (querySnapshot.isEmpty()) {
                                 currentRequestsList.clear();
                                 cleanupUnusedTripListeners(new HashSet<String>());
                                 cleanupUnusedProfileListeners(new HashSet<String>());
@@ -174,6 +189,13 @@ public class PassengerTripsRepository {
 
                             for (QueryDocumentSnapshot doc : querySnapshot) {
                                 TripRequest request = doc.toObject(TripRequest.class);
+                                if (request == null) {
+                                    requestReadFailed = true;
+                                    if (callback != null) {
+                                        callback.onError(new IllegalStateException("Dữ liệu yêu cầu không hợp lệ."));
+                                    }
+                                    return;
+                                }
                                 request.setId(doc.getId());
                                 requestsList.add(request);
                                 if (request.getTripId() != null && !request.getTripId().trim().isEmpty()) {
@@ -200,19 +222,36 @@ public class PassengerTripsRepository {
                                     if (!active) return;
 
                                     if (error != null) {
-                                        // Khi có lỗi đọc trip (mạng/quyền), gọi callback.onError để UI báo lỗi & thử lại thay vì nuốt lỗi
+                                        failedTripIds.add(tripId);
+                                        // Lỗi đọc không được biến thành trip đã bị xóa hoặc kết quả cũ.
                                         if (callback != null) {
                                             callback.onError(error);
                                         }
                                         return;
                                     }
 
-                                    if (doc != null && doc.exists()) {
-                                        Trip trip = doc.toObject(Trip.class);
-                                        if (trip != null) {
-                                            trip.setId(doc.getId());
-                                            tripDataMap.put(tripId, trip);
+                                    if (doc == null) {
+                                        failedTripIds.add(tripId);
+                                        if (callback != null) {
+                                            callback.onError(new IllegalStateException("Không đọc được dữ liệu chuyến."));
                                         }
+                                        return;
+                                    }
+
+                                    failedTripIds.remove(tripId);
+                                    resolvedTripIds.add(tripId);
+
+                                    if (doc.exists()) {
+                                        Trip trip = doc.toObject(Trip.class);
+                                        if (trip == null) {
+                                            failedTripIds.add(tripId);
+                                            if (callback != null) {
+                                                callback.onError(new IllegalStateException("Dữ liệu chuyến không hợp lệ."));
+                                            }
+                                            return;
+                                        }
+                                        trip.setId(doc.getId());
+                                        tripDataMap.put(tripId, trip);
                                     } else {
                                         // Document thực sự không tồn tại trên server (chuyến đi đã bị xóa)
                                         tripDataMap.remove(tripId);
@@ -281,6 +320,8 @@ public class PassengerTripsRepository {
                 ListenerRegistration reg = tripListenersMap.remove(tripId);
                 if (reg != null) reg.remove();
                 tripDataMap.remove(tripId);
+                resolvedTripIds.remove(tripId);
+                failedTripIds.remove(tripId);
             }
         }
 
@@ -299,7 +340,16 @@ public class PassengerTripsRepository {
         }
 
         private void notifyCallbackIfReady() {
-            if (!active) return;
+            if (!active || requestReadFailed) return;
+
+            // Trip chưa có snapshot đầu tiên là đang tải; chỉ snapshot không tồn tại mới là mất thật.
+            for (TripRequest request : currentRequestsList) {
+                String tripId = request.getTripId();
+                if (tripId != null && !tripId.trim().isEmpty()
+                        && (!resolvedTripIds.contains(tripId) || failedTripIds.contains(tripId))) {
+                    return;
+                }
+            }
 
             List<PassengerRideItem> items = new ArrayList<>();
             for (TripRequest request : currentRequestsList) {
@@ -327,6 +377,8 @@ public class PassengerTripsRepository {
             }
             tripListenersMap.clear();
             tripDataMap.clear();
+            resolvedTripIds.clear();
+            failedTripIds.clear();
 
             for (ListenerRegistration reg : profileListenersMap.values()) {
                 if (reg != null) reg.remove();
@@ -356,6 +408,8 @@ public class PassengerTripsRepository {
         private com.example.grabshare.model.PublicProfile currentProfile;
         private String listenedTripId;
         private String listenedDriverId;
+        private boolean requestReadFailed;
+        private boolean tripResolved;
 
         public SingleRequestListenerHandler(FirebaseFirestore firestore, String requestId, RepositoryCallback<SingleRequestDetails> callback) {
             this.firestore = firestore;
@@ -374,11 +428,20 @@ public class PassengerTripsRepository {
                             if (!active) return;
 
                             if (error != null) {
+                                requestReadFailed = true;
                                 if (callback != null) callback.onError(error);
                                 return;
                             }
 
-                            if (doc == null || !doc.exists()) {
+                            if (doc == null) {
+                                requestReadFailed = true;
+                                if (callback != null) {
+                                    callback.onError(new IllegalStateException("Không đọc được dữ liệu yêu cầu."));
+                                }
+                                return;
+                            }
+                            requestReadFailed = false;
+                            if (!doc.exists()) {
                                 currentRequest = null;
                                 resetTripAndProfileListeners();
                                 if (callback != null) {
@@ -388,12 +451,17 @@ public class PassengerTripsRepository {
                             }
 
                             TripRequest request = doc.toObject(TripRequest.class);
-                            if (request != null) {
-                                request.setId(doc.getId());
+                            if (request == null) {
+                                requestReadFailed = true;
+                                if (callback != null) {
+                                    callback.onError(new IllegalStateException("Dữ liệu yêu cầu không hợp lệ."));
+                                }
+                                return;
                             }
+                            request.setId(doc.getId());
                             currentRequest = request;
 
-                            if (request != null && request.getTripId() != null && !request.getTripId().trim().isEmpty()) {
+                            if (request.getTripId() != null && !request.getTripId().trim().isEmpty()) {
                                 String newTripId = request.getTripId().trim();
                                 if (!newTripId.equals(listenedTripId)) {
                                     startListeningTrip(newTripId);
@@ -419,9 +487,10 @@ public class PassengerTripsRepository {
                     .addSnapshotListener(new EventListener<DocumentSnapshot>() {
                         @Override
                         public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
-                            if (!active) return;
+                            if (!active || !tripId.equals(listenedTripId)) return;
 
                             if (error != null) {
+                                tripResolved = false;
                                 currentTrip = null;
                                 resetProfileListener();
                                 if (callback != null) {
@@ -430,14 +499,32 @@ public class PassengerTripsRepository {
                                 return;
                             }
 
-                            if (doc != null && doc.exists()) {
-                                Trip trip = doc.toObject(Trip.class);
-                                if (trip != null) {
-                                    trip.setId(doc.getId());
+                            if (doc == null) {
+                                tripResolved = false;
+                                currentTrip = null;
+                                resetProfileListener();
+                                if (callback != null) {
+                                    callback.onError(new IllegalStateException("Không đọc được dữ liệu chuyến."));
                                 }
+                                return;
+                            }
+
+                            if (doc.exists()) {
+                                Trip trip = doc.toObject(Trip.class);
+                                if (trip == null) {
+                                    tripResolved = false;
+                                    currentTrip = null;
+                                    resetProfileListener();
+                                    if (callback != null) {
+                                        callback.onError(new IllegalStateException("Dữ liệu chuyến không hợp lệ."));
+                                    }
+                                    return;
+                                }
+                                tripResolved = true;
+                                trip.setId(doc.getId());
                                 currentTrip = trip;
 
-                                if (trip != null && trip.getDriverId() != null && !trip.getDriverId().trim().isEmpty()) {
+                                if (trip.getDriverId() != null && !trip.getDriverId().trim().isEmpty()) {
                                     String newDriverId = trip.getDriverId().trim();
                                     if (!newDriverId.equals(listenedDriverId)) {
                                         startListeningProfile(newDriverId);
@@ -449,6 +536,7 @@ public class PassengerTripsRepository {
                                     notifyCallback();
                                 }
                             } else {
+                                tripResolved = true;
                                 currentTrip = null;
                                 resetProfileListener();
                                 notifyCallback();
@@ -496,6 +584,7 @@ public class PassengerTripsRepository {
                 tripListener = null;
             }
             listenedTripId = null;
+            tripResolved = false;
             currentTrip = null;
             resetProfileListener();
         }
@@ -510,7 +599,8 @@ public class PassengerTripsRepository {
         }
 
         private void notifyCallback() {
-            if (!active) return;
+            if (!active || requestReadFailed) return;
+            if (listenedTripId != null && !tripResolved) return;
 
             if (callback != null && currentRequest != null) {
                 callback.onSuccess(new SingleRequestDetails(currentRequest, currentTrip, currentProfile));
