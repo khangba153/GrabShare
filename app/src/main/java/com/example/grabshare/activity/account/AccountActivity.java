@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.grabshare.R;
 import com.example.grabshare.activity.driver.DriverTripsActivity;
+import com.example.grabshare.activity.notifications.NotificationsActivity;
 import com.example.grabshare.activity.passenger.MyTripsActivity;
 import com.example.grabshare.activity.search.HomeActivity;
 import com.example.grabshare.repository.account.ProfileRepository.AccountProfile;
@@ -150,7 +151,7 @@ public class AccountActivity extends AppCompatActivity {
         connectScreen(R.id.account_terms, TermsActivity.class);
 
         showUnavailable(R.id.account_favorites);
-        showUnavailable(R.id.account_notifications);
+        connectScreen(R.id.account_notifications, NotificationsActivity.class);
         findViewById(R.id.header_action).setVisibility(View.GONE);
     }
 

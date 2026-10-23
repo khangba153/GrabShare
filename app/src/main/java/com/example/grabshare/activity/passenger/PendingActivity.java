@@ -12,9 +12,11 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.activity.search.HomeActivity;
 import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -29,6 +31,7 @@ import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.text.DecimalFormat;
@@ -70,6 +73,7 @@ public class PendingActivity extends AppCompatActivity {
     private PassengerSessionGuard sessionGuard;
     private SingleRequestDetails currentDetails;
     private boolean cancellationInFlight;
+    private boolean loadFailed;
     private Dialog cancelDialog;
 
     @Override
@@ -106,6 +110,13 @@ public class PendingActivity extends AppCompatActivity {
         initRepositories();
         initViews();
         setupListeners();
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            /** Back hệ thống cũng trở về trang chủ, không mở lại form đã gửi. */
+            @Override
+            public void handleOnBackPressed() {
+                returnHome();
+            }
+        });
     }
 
     private void initRepositories() {
@@ -132,7 +143,10 @@ public class PendingActivity extends AppCompatActivity {
             primaryAction.setText("Hủy yêu cầu");
         }
         if (secondaryAction != null) {
-            secondaryAction.setVisibility(View.GONE);
+            secondaryAction.setText("Về trang chủ");
+            secondaryAction.setVisibility(View.VISIBLE);
+            secondaryAction.setClickable(true);
+            secondaryAction.setFocusable(true);
         }
 
         if (headerTitle != null) {
@@ -153,19 +167,42 @@ public class PendingActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
+        if (secondaryAction != null) {
+            secondaryAction.setOnClickListener(new View.OnClickListener() {
+                /** Cho phép về trang chủ trực tiếp trong khi chờ chủ xe phản hồi. */
+                @Override
+                public void onClick(View view) {
+                    returnHome();
+                }
+            });
+        }
         if (headerBack != null) {
             headerBack.setOnClickListener(new View.OnClickListener() {
+                /** Thoát màn trạng thái về trang chủ thay vì kết quả tìm cũ. */
                 @Override
-                public void onClick(View v) {
-                    finish();
+                public void onClick(View view) {
+                    returnHome();
                 }
             });
         }
 
         if (primaryAction != null) {
             primaryAction.setOnClickListener(new View.OnClickListener() {
+                /** Lỗi chỉ tải lại trạng thái; yêu cầu đã hủy chỉ cho trở về trang chủ. */
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
+                    if (loadFailed) {
+                        startListeningRequest();
+                        return;
+                    }
+                    if (currentDetails != null
+                            && currentDetails.getRequest() != null
+                            && currentDetails.getTrip() != null
+                            && ("CANCELLED".equals(currentDetails.getRequest().getStatus())
+                                || "CANCELLED".equals(currentDetails.getTrip().getStatus()))) {
+                        returnHome();
+                        return;
+                    }
                     showCancelConfirmDialog();
                 }
             });
@@ -213,7 +250,16 @@ public class PendingActivity extends AppCompatActivity {
 
         if (singleRequestListener != null) {
             singleRequestListener.remove();
+            singleRequestListener = null;
         }
+        loadFailed = false;
+        currentDetails = null;
+        statusTitle.setText("Đang tải trạng thái yêu cầu…");
+        statusDescription.setText("Vui lòng chờ trong giây lát.");
+        primaryAction.setText("Đang tải…");
+        primaryAction.setEnabled(false);
+        findViewById(R.id.pending_trip_summary).setVisibility(View.GONE);
+        findViewById(R.id.pending_route_summary).setVisibility(View.GONE);
 
         final int sessionToken = sessionGuard.token();
         singleRequestListener = tripsRepository.listenSingleRequest(requestId, new RepositoryCallback<SingleRequestDetails>() {
@@ -224,8 +270,7 @@ public class PendingActivity extends AppCompatActivity {
                     return;
                 }
                 if (details == null || details.getRequest() == null) {
-                    Toast.makeText(PendingActivity.this, "Không tìm thấy dữ liệu yêu cầu.", Toast.LENGTH_SHORT).show();
-                    finish();
+                    showLoadFailure(new IllegalStateException("Không tìm thấy dữ liệu yêu cầu."));
                     return;
                 }
 
@@ -240,14 +285,30 @@ public class PendingActivity extends AppCompatActivity {
 
                 Trip trip = details.getTrip();
                 PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
+                if (trip == null) {
+                    showLoadFailure(new IllegalStateException("Chưa tải được thông tin chuyến đi."));
+                    return;
+                }
+                loadFailed = false;
                 currentDetails = details;
+                findViewById(R.id.pending_trip_summary).setVisibility(View.VISIBLE);
+                findViewById(R.id.pending_route_summary).setVisibility(View.VISIBLE);
                 String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
 
                 // Ưu tiên kiểm tra chuyến đi đã bị hủy bởi chủ xe
                 if ("CANCELLED".equalsIgnoreCase(effectiveStatus)) {
-                    if (statusTitle != null) statusTitle.setText("Chuyến đi đã bị hủy");
-                    if (statusDescription != null) statusDescription.setText("Chủ xe hoặc bạn đã hủy chuyến đi này.");
-                    if (primaryAction != null) primaryAction.setEnabled(false);
+                    if (trip != null && "CANCELLED".equals(trip.getStatus())) {
+                        headerTitle.setText("Chuyến đã hủy");
+                        statusTitle.setText("Chuyến đi đã bị hủy");
+                        statusDescription.setText("Chủ xe đã hủy chuyến đi này.");
+                    } else {
+                        headerTitle.setText("Yêu cầu đã hủy");
+                        statusTitle.setText("Yêu cầu đi nhờ đã hủy");
+                        statusDescription.setText("Bạn đã hủy yêu cầu đi nhờ này.");
+                    }
+                    primaryAction.setText("Về trang chủ");
+                    primaryAction.setEnabled(true);
+                    secondaryAction.setVisibility(View.GONE);
                     bindDetailsToViews(details);
                     return;
                 }
@@ -285,6 +346,11 @@ public class PendingActivity extends AppCompatActivity {
                 }
 
                 // Nếu vẫn ở PENDING, cập nhật dữ liệu hiển thị
+                headerTitle.setText("Chờ xác nhận");
+                statusTitle.setText("Đang chờ chủ xe xác nhận");
+                statusDescription.setText("Yêu cầu của bạn đã được gửi đến chủ xe.");
+                primaryAction.setText("Hủy yêu cầu");
+                secondaryAction.setVisibility(View.VISIBLE);
                 bindDetailsToViews(details);
                 primaryAction.setEnabled(!cancellationInFlight && canCancelPending());
             }
@@ -295,10 +361,38 @@ public class PendingActivity extends AppCompatActivity {
                 if (!sessionGuard.current(sessionToken)) {
                     return;
                 }
-                Toast.makeText(PendingActivity.this, "Không thể tải dữ liệu: " + error.getMessage(), Toast.LENGTH_SHORT).show();
-                finish();
+                showLoadFailure(error);
             }
         });
+    }
+
+    /** Giữ lỗi trên màn trạng thái, chỉ thử đọc lại; không gửi thêm request. */
+    private void showLoadFailure(Exception error) {
+        loadFailed = true;
+        currentDetails = null;
+        String description =
+                "Chưa tải được dữ liệu. Bạn có thể thử tải lại, không cần gửi lại yêu cầu.";
+        if (error instanceof FirebaseFirestoreException) {
+            FirebaseFirestoreException firestoreError = (FirebaseFirestoreException) error;
+            if (firestoreError.getCode() == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                description = "Máy chủ từ chối quyền xem yêu cầu. Vui lòng báo nhóm hỗ trợ.";
+            } else {
+                if (firestoreError.getCode() == FirebaseFirestoreException.Code.UNAUTHENTICATED) {
+                    description = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                }
+            }
+        } else {
+            if (error.getMessage() != null && !error.getMessage().trim().isEmpty()) {
+                description = error.getMessage();
+            }
+        }
+        statusTitle.setText("Không thể tải trạng thái yêu cầu");
+        statusDescription.setText(description);
+        primaryAction.setText("Thử tải lại");
+        primaryAction.setEnabled(true);
+        secondaryAction.setVisibility(View.VISIBLE);
+        findViewById(R.id.pending_trip_summary).setVisibility(View.GONE);
+        findViewById(R.id.pending_route_summary).setVisibility(View.GONE);
     }
 
     private void bindDetailsToViews(SingleRequestDetails details) {
@@ -430,7 +524,7 @@ public class PendingActivity extends AppCompatActivity {
                 }
                 cancellationInFlight = false;
                 Toast.makeText(PendingActivity.this, "Đã hủy yêu cầu thành công.", Toast.LENGTH_SHORT).show();
-                finish();
+                returnHome();
             }
 
             /** Sau lỗi chỉ bật lại nút nếu dữ liệu hiện tại vẫn cho phép hủy. */
@@ -444,6 +538,14 @@ public class PendingActivity extends AppCompatActivity {
                 Toast.makeText(PendingActivity.this, "Hủy yêu cầu thất bại: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    /** Xóa các màn tìm/chi tiết cũ phía trên Home khi thoát hoặc hủy yêu cầu. */
+    private void returnHome() {
+        Intent homeIntent = new Intent(this, HomeActivity.class);
+        homeIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(homeIntent);
+        finish();
     }
 
     /** Kiểm tra dữ liệu đang hiển thị trước khi mở/xác nhận dialog; transaction vẫn đọc lại. */
