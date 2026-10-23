@@ -4,7 +4,7 @@ import android.app.Application;
 
 import androidx.annotation.NonNull;
 
-import com.example.grabshare.repository.notifications.FcmTokenRepository;
+import com.example.grabshare.repository.notifications.FcmInstallationRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
