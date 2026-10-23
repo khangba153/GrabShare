@@ -8,7 +8,7 @@ import androidx.lifecycle.AndroidViewModel;
 
 import com.example.grabshare.local.TripCacheRepository;
 import com.example.grabshare.repository.account.AuthRepository;
-import com.example.grabshare.repository.notifications.FcmTokenRepository;
+import com.example.grabshare.repository.notifications.FcmInstallationRepository;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
