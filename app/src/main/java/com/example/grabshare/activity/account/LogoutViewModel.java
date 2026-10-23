@@ -160,7 +160,7 @@ public class LogoutViewModel extends AndroidViewModel {
      * MessagingService sẽ bỏ qua tin không thuộc UID đang đăng nhập.
      */
     private void signOutAfterRemovingToken(final String userId) {
-        FcmTokenRepository.deleteTokenForUser(userId)
+        FcmInstallationRepository.deleteInstallationForUser(userId)
                 .addOnCompleteListener(new OnCompleteListener<Void>() {
                     @Override
                     public void onComplete(@NonNull Task<Void> task) {
