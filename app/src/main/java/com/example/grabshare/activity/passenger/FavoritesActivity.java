@@ -33,6 +33,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.Source;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +54,8 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
     private FavoriteAdapter adapter;
     private FirebaseFirestore firestore;
     private String currentUserId;
+    private int loadGeneration;
+    private boolean visible;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -165,7 +168,23 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
     @Override
     protected void onStart() {
         super.onStart();
+        visible = true;
         loadFavorites();
+    }
+
+    /** Bỏ mọi phản hồi của lượt tải cũ khi rời màn. */
+    @Override
+    protected void onStop() {
+        visible = false;
+        loadGeneration = loadGeneration + 1;
+        super.onStop();
+    }
+
+    /** Chỉ cập nhật UI nếu màn còn hiện và đúng tài khoản đã bắt đầu đọc. */
+    private boolean currentLoad(int generation) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        return visible && generation == loadGeneration && user != null
+                && user.getUid().equals(currentUserId);
     }
 
     private void loadFavorites() {
@@ -173,15 +192,18 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
             return;
         }
 
+        final int generation = loadGeneration = loadGeneration + 1;
+        adapter.setItems(new ArrayList<FavoriteItem>());
         showLoadingState();
 
         firestore.collection("favorites")
                 .whereEqualTo("userId", currentUserId)
                 .orderBy("createdAt", Query.Direction.DESCENDING)
-                .get()
+                .get(Source.SERVER)
                 .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
                     @Override
                     public void onSuccess(QuerySnapshot querySnapshot) {
+                        if (!currentLoad(generation)) return;
                         if (querySnapshot == null || querySnapshot.isEmpty()) {
                             showEmptyState();
                             return;
@@ -194,41 +216,43 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                             favorites.add(favorite);
                         }
 
-                        fetchTripsForFavorites(favorites);
+                        fetchTripsForFavorites(favorites, generation);
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(Exception e) {
-                        showErrorState();
+                        if (currentLoad(generation)) showErrorState();
                     }
                 });
     }
 
-    private void fetchTripsForFavorites(final List<Favorite> favorites) {
+    private void fetchTripsForFavorites(final List<Favorite> favorites, final int generation) {
         if (favorites.isEmpty()) {
             showEmptyState();
             return;
         }
 
-        final List<FavoriteItem> favoriteItems = new ArrayList<>();
+        final FavoriteItem[] favoriteItems = new FavoriteItem[favorites.size()];
         final int total = favorites.size();
         final int[] loadedCount = {0};
+        final boolean[] failed = {false};
 
-        for (final Favorite favorite : favorites) {
+        for (int index = 0; index < total; index++) {
+            final Favorite favorite = favorites.get(index);
+            final int position = index;
             final String tripId = favorite.getTripId();
             if (tripId == null || tripId.trim().isEmpty()) {
-                loadedCount[0]++;
-                if (loadedCount[0] == total) {
-                    showDataState(favoriteItems);
-                }
+                failed[0] = true;
+                finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
                 continue;
             }
 
-            firestore.collection("trips").document(tripId).get()
+            firestore.collection("trips").document(tripId).get(Source.SERVER)
                     .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
                         @Override
                         public void onSuccess(DocumentSnapshot tripDoc) {
+                            if (!currentLoad(generation)) return;
                             if (tripDoc != null && tripDoc.exists()) {
                                 final Trip trip = tripDoc.toObject(Trip.class);
                                 if (trip != null) {
@@ -237,10 +261,11 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
 
                                 String driverId = trip != null ? trip.getDriverId() : null;
                                 if (driverId != null && !driverId.trim().isEmpty()) {
-                                    firestore.collection("publicProfiles").document(driverId).get()
+                                    firestore.collection("publicProfiles").document(driverId).get(Source.SERVER)
                                             .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
                                                 @Override
                                                 public void onSuccess(DocumentSnapshot profileDoc) {
+                                                    if (!currentLoad(generation)) return;
                                                     PublicProfile profile = null;
                                                     if (profileDoc != null && profileDoc.exists()) {
                                                         profile = profileDoc.toObject(PublicProfile.class);
@@ -248,50 +273,54 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                                                             profile.setId(profileDoc.getId());
                                                         }
                                                     }
-                                                    favoriteItems.add(new FavoriteItem(favorite, trip, profile));
-                                                    loadedCount[0]++;
-                                                    if (loadedCount[0] == total) {
-                                                        showDataState(favoriteItems);
-                                                    }
+                                                    favoriteItems[position] = new FavoriteItem(favorite, trip, profile);
+                                                    finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
                                                 }
                                             })
                                             .addOnFailureListener(new OnFailureListener() {
                                                 @Override
                                                 public void onFailure(Exception e) {
-                                                    favoriteItems.add(new FavoriteItem(favorite, trip, null));
-                                                    loadedCount[0]++;
-                                                    if (loadedCount[0] == total) {
-                                                        showDataState(favoriteItems);
-                                                    }
+                                                    if (!currentLoad(generation)) return;
+                                                    favoriteItems[position] = new FavoriteItem(favorite, trip, null);
+                                                    finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
                                                 }
                                             });
                                 } else {
-                                    favoriteItems.add(new FavoriteItem(favorite, trip, null));
-                                    loadedCount[0]++;
-                                    if (loadedCount[0] == total) {
-                                        showDataState(favoriteItems);
-                                    }
+                                    favoriteItems[position] = new FavoriteItem(favorite, trip, null);
+                                    finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
                                 }
                             } else {
-                                favoriteItems.add(new FavoriteItem(favorite, null, null));
-                                loadedCount[0]++;
-                                if (loadedCount[0] == total) {
-                                    showDataState(favoriteItems);
-                                }
+                                favoriteItems[position] = new FavoriteItem(favorite, null, null);
+                                finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
                             }
                         }
                     })
                     .addOnFailureListener(new OnFailureListener() {
                         @Override
                         public void onFailure(Exception e) {
-                            favoriteItems.add(new FavoriteItem(favorite, null, null));
-                            loadedCount[0]++;
-                            if (loadedCount[0] == total) {
-                                showDataState(favoriteItems);
-                            }
+                            if (!currentLoad(generation)) return;
+                            failed[0] = true;
+                            finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
                         }
                     });
         }
+    }
+
+    /** Giữ thứ tự createdAt dù phản hồi về đảo thứ tự; lỗi đọc trip hiển thị Retry. */
+    private void finishFavoriteLoad(FavoriteItem[] items, int[] count, int total,
+                                    boolean[] failed, int generation) {
+        if (!currentLoad(generation)) return;
+        count[0] = count[0] + 1;
+        if (count[0] != total) return;
+        if (failed[0]) {
+            showErrorState();
+            return;
+        }
+        List<FavoriteItem> ordered = new ArrayList<>();
+        for (FavoriteItem item : items) {
+            if (item != null) ordered.add(item);
+        }
+        showDataState(ordered);
     }
 
     @Override
