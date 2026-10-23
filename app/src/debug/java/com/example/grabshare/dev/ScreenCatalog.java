@@ -28,7 +28,7 @@ final class ScreenCatalog {
         new ScreenCatalog("C", "REQUESTS", "Yêu cầu đi nhờ", "driver.DriverRequestsActivity"),
         new ScreenCatalog("C", "REQUEST_DETAIL", "Chi tiết yêu cầu", "driver.RequestDetailActivity"),
         new ScreenCatalog("C", "MANAGE", "Quản lý chuyến", "driver.ManageTripActivity"),
-        new ScreenCatalog("C", "NOTIFICATIONS", "Thông báo", "driver.NotificationsActivity")
+        new ScreenCatalog("C", "NOTIFICATIONS", "Thông báo", "notifications.NotificationsActivity")
     };
 
     final String group;
