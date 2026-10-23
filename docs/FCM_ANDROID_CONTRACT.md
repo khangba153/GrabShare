@@ -32,7 +32,7 @@ Do not write another document to `notifications` from this trigger; it can trigg
 
 ## Receiver contract
 
-Look up `fcmTokens/{recipientId}` where `recipientId` comes from the new notification document. If no token exists, return without sending.
+Look up `fcmInstallations/{recipientId}` where `recipientId` comes from the new notification document. Read its `fid` field. If no FID exists, return without sending.
 
 Send a **data-only** FCM message. Do not include the FCM `notification` property, because Android needs to validate that the message belongs to the currently signed-in UID before showing it.
 
