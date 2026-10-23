@@ -286,6 +286,10 @@ public class TripDetailActivity extends AppCompatActivity {
         super.onStart();
         supportViewModel.start(tripId, userIdentifier);
         tripViewModel.start(tripId, userIdentifier);
+        RequestReviewViewModel.State request = requestViewModel.getState().getValue();
+        if (request != null && request.result != null && !requestViewModel.shouldNavigate()) {
+            requestViewModel.checkExisting();
+        }
     }
 
     /** Chỉ mở kết quả gửi đang chờ khi màn thực sự trở lại foreground. */
@@ -472,7 +476,11 @@ public class TripDetailActivity extends AppCompatActivity {
             button.setText("Đang xử lý…");
         } else {
             if (existing) {
-                button.setText("Xem trạng thái yêu cầu");
+                if ("CANCELLED".equals(request.result.status)) {
+                    button.setText("Tìm chuyến khác");
+                } else {
+                    button.setText("Xem trạng thái yêu cầu");
+                }
             } else {
                 if (!checked) {
                     button.setText("Kiểm tra lại yêu cầu");
@@ -531,6 +539,14 @@ public class TripDetailActivity extends AppCompatActivity {
             return;
         }
         if (request.result != null) {
+            if ("CANCELLED".equals(request.result.status)) {
+                Intent homeIntent = new Intent(this, HomeActivity.class);
+                homeIntent.addFlags(
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(homeIntent);
+                finish();
+                return;
+            }
             openRequest();
             return;
         }
@@ -551,7 +567,7 @@ public class TripDetailActivity extends AppCompatActivity {
         requestViewModel.submit();
     }
 
-    /** Mở đúng màn Thuận bằng ID đã xác nhận, không tạo Pending bản sao. */
+    /** Gửi thành công chỉ mở trạng thái; màn trạng thái xử lý việc quay về Home. */
     private void openRequest() {
         if (!sameUser() || !getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) {
             return;

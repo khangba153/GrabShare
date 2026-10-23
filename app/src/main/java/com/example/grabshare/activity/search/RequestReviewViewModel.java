@@ -110,12 +110,11 @@ public class RequestReviewViewModel extends AndroidViewModel {
                             state.setValue(new State(false, true, result, ""));
                         } else {
                             restoreJourney(result);
-                            state.setValue(
-                                    new State(
-                                            false,
-                                            true,
-                                            result,
-                                            "Bạn đã có yêu cầu cho chuyến này; không gửi lại."));
+                            String statusMessage = "Bạn đã có yêu cầu cho chuyến này.";
+                            if ("CANCELLED".equals(result.status)) {
+                                statusMessage = "Bạn đã hủy yêu cầu này. Vui lòng tìm chuyến khác.";
+                            }
+                            state.setValue(new State(false, true, result, statusMessage));
                         }
                     }
 
@@ -231,13 +230,13 @@ public class RequestReviewViewModel extends AndroidViewModel {
                 switch (firestoreError.getCode()) {
                     case PERMISSION_DENIED:
                         return "Máy chủ chưa cho phép thao tác này. Vui lòng thử lại sau hoặc báo"
-                                   + " nhóm hỗ trợ.";
+                                + " nhóm hỗ trợ.";
                     case UNAUTHENTICATED:
                         return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
                     case UNAVAILABLE:
                     case DEADLINE_EXCEEDED:
                         return "Chưa xác nhận được yêu cầu do kết nối. Vui lòng kiểm tra lại trước"
-                                   + " khi gửi tiếp.";
+                                + " khi gửi tiếp.";
                     default:
                         break;
                 }
