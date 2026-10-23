@@ -464,8 +464,6 @@ public class PassengerTripsRepository {
                                 return;
                             }
                             requestReadFailed = false;
-                                return;
-                            }
                             if (!doc.exists() && doc.getMetadata().isFromCache()) {
                                 return;
                             }
@@ -525,7 +523,6 @@ public class PassengerTripsRepository {
                         /** Chờ chuyến từ server khi cache trống, bỏ callback của tuyến đã tháo. */
                         @Override
                         public void onEvent(DocumentSnapshot doc, FirebaseFirestoreException error) {
-                            if (!active || !tripId.equals(listenedTripId)) return;
                             if (!active || !tripId.equals(listenedTripId)) {
                                 return;
                             }
@@ -546,19 +543,12 @@ public class PassengerTripsRepository {
                                 resetProfileListener();
                                 if (callback != null) {
                                     callback.onError(new IllegalStateException("Không đọc được dữ liệu chuyến."));
+                                }
                                 return;
                             }
                             if (!doc.exists() && doc.getMetadata().isFromCache()) {
                                 return;
                             }
-                            if (doc.exists()) {
-                                Trip trip = doc.toObject(Trip.class);
-                                if (trip != null) {
-                                    trip.setId(doc.getId());
-                                }
-                                return;
-                            }
-
                             if (doc.exists()) {
                                 Trip trip;
                                 try {
