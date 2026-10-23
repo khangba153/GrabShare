@@ -135,6 +135,8 @@ public class PassengerTripsRepository {
         private final Set<String> failedTripIds;
         private final Map<String, ListenerRegistration> profileListenersMap;
         private final Map<String, com.example.grabshare.model.PublicProfile> profileDataMap;
+        private final Set<String> resolvedProfileIds;
+        private final Set<String> failedProfileIds;
         private List<TripRequest> currentRequestsList;
         private boolean requestReadFailed;
 
@@ -148,6 +150,8 @@ public class PassengerTripsRepository {
             this.failedTripIds = new HashSet<>();
             this.profileListenersMap = new HashMap<>();
             this.profileDataMap = new HashMap<>();
+            this.resolvedProfileIds = new HashSet<>();
+            this.failedProfileIds = new HashSet<>();
             this.currentRequestsList = new ArrayList<>();
 
             startListeningRequests();
@@ -302,27 +306,42 @@ public class PassengerTripsRepository {
                                     if (!active) return;
 
                                     if (error != null) {
-                                        profileDataMap.remove(driverId);
-                                        notifyCallbackIfReady();
+                                        failedProfileIds.add(driverId);
+                                        if (callback != null) callback.onError(error);
                                         return;
                                     }
 
-                                    if (doc != null && doc.exists()) {
+                                    if (doc == null) {
+                                        failedProfileIds.add(driverId);
+                                        if (callback != null) {
+                                            callback.onError(new IllegalStateException("Không đọc được hồ sơ chủ xe."));
+                                        }
+                                        return;
+                                    }
+
+                                    if (doc.exists()) {
                                         com.example.grabshare.model.PublicProfile profile;
                                         try {
                                             profile = doc.toObject(com.example.grabshare.model.PublicProfile.class);
                                         } catch (RuntimeException conversionError) {
-                                            profileDataMap.remove(driverId);
-                                            notifyCallbackIfReady();
+                                            failedProfileIds.add(driverId);
+                                            if (callback != null) callback.onError(conversionError);
                                             return;
                                         }
-                                        if (profile != null) {
-                                            profile.setId(doc.getId());
-                                            profileDataMap.put(driverId, profile);
+                                        if (profile == null) {
+                                            failedProfileIds.add(driverId);
+                                            if (callback != null) {
+                                                callback.onError(new IllegalStateException("Dữ liệu hồ sơ chủ xe không hợp lệ."));
+                                            }
+                                            return;
                                         }
+                                        profile.setId(doc.getId());
+                                        profileDataMap.put(driverId, profile);
                                     } else {
                                         profileDataMap.remove(driverId);
                                     }
+                                    failedProfileIds.remove(driverId);
+                                    resolvedProfileIds.add(driverId);
                                     notifyCallbackIfReady();
                                 }
                             });
@@ -358,6 +377,8 @@ public class PassengerTripsRepository {
                 ListenerRegistration reg = profileListenersMap.remove(driverId);
                 if (reg != null) reg.remove();
                 profileDataMap.remove(driverId);
+                resolvedProfileIds.remove(driverId);
+                failedProfileIds.remove(driverId);
             }
         }
 
@@ -370,6 +391,15 @@ public class PassengerTripsRepository {
                 if (tripId != null && !tripId.trim().isEmpty()
                         && (!resolvedTripIds.contains(tripId) || failedTripIds.contains(tripId))) {
                     return;
+                }
+            }
+
+            for (Trip trip : tripDataMap.values()) {
+                if (trip != null && trip.getDriverId() != null && !trip.getDriverId().trim().isEmpty()) {
+                    String driverId = trip.getDriverId().trim();
+                    if (!resolvedProfileIds.contains(driverId) || failedProfileIds.contains(driverId)) {
+                        return;
+                    }
                 }
             }
 
@@ -407,6 +437,8 @@ public class PassengerTripsRepository {
             }
             profileListenersMap.clear();
             profileDataMap.clear();
+            resolvedProfileIds.clear();
+            failedProfileIds.clear();
             currentRequestsList.clear();
         }
     }
@@ -432,6 +464,8 @@ public class PassengerTripsRepository {
         private String listenedDriverId;
         private boolean requestReadFailed;
         private boolean tripResolved;
+        private boolean profileResolved;
+        private boolean profileReadFailed;
 
         public SingleRequestListenerHandler(FirebaseFirestore firestore, String requestId, RepositoryCallback<SingleRequestDetails> callback) {
             this.firestore = firestore;
@@ -614,27 +648,42 @@ public class PassengerTripsRepository {
                             }
 
                             if (error != null) {
-                                currentProfile = null;
-                                notifyCallback();
+                                profileReadFailed = true;
+                                if (callback != null) callback.onError(error);
                                 return;
                             }
 
-                            if (doc != null && doc.exists()) {
+                            if (doc == null) {
+                                profileReadFailed = true;
+                                if (callback != null) {
+                                    callback.onError(new IllegalStateException("Không đọc được hồ sơ chủ xe."));
+                                }
+                                return;
+                            }
+
+                            if (doc.exists()) {
                                 com.example.grabshare.model.PublicProfile profile;
                                 try {
                                     profile = doc.toObject(com.example.grabshare.model.PublicProfile.class);
                                 } catch (RuntimeException conversionError) {
-                                    currentProfile = null;
-                                    notifyCallback();
+                                    profileReadFailed = true;
+                                    if (callback != null) callback.onError(conversionError);
                                     return;
                                 }
-                                if (profile != null) {
-                                    profile.setId(doc.getId());
+                                if (profile == null) {
+                                    profileReadFailed = true;
+                                    if (callback != null) {
+                                        callback.onError(new IllegalStateException("Dữ liệu hồ sơ chủ xe không hợp lệ."));
+                                    }
+                                    return;
                                 }
+                                profile.setId(doc.getId());
                                 currentProfile = profile;
                             } else {
                                 currentProfile = null;
                             }
+                            profileReadFailed = false;
+                            profileResolved = true;
                             notifyCallback();
                         }
                     });
@@ -658,11 +707,14 @@ public class PassengerTripsRepository {
             }
             listenedDriverId = null;
             currentProfile = null;
+            profileResolved = false;
+            profileReadFailed = false;
         }
 
         private void notifyCallback() {
-            if (!active || requestReadFailed) return;
+            if (!active || requestReadFailed || profileReadFailed) return;
             if (listenedTripId != null && !tripResolved) return;
+            if (listenedDriverId != null && !profileResolved) return;
 
             if (callback != null && currentRequest != null && currentTrip != null) {
                 callback.onSuccess(new SingleRequestDetails(currentRequest, currentTrip, currentProfile));
