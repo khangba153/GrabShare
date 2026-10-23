@@ -12,7 +12,7 @@ Fields:
 - `fid`: Firebase Installation ID returned by FCM's `onRegistered()` callback / Firebase Installations SDK
 - `updatedAt`: Firestore server timestamp
 
-Client security rules allow an authenticated user to get, create, update, or delete only their own token document. Listing tokens is forbidden. Cloud Functions should use Firebase Admin SDK.
+Client security rules allow an authenticated user to get, create, update, or delete only their own installation document. Listing installation IDs is forbidden. Cloud Functions should use Firebase Admin SDK.
 
 ## Trigger
 
