@@ -155,7 +155,7 @@ public class LogoutViewModel extends AndroidViewModel {
     }
 
     /**
-     * Xóa token khi tài khoản còn đăng nhập rồi kết thúc phiên.
+     * Xóa FID khi tài khoản còn đăng nhập rồi kết thúc phiên.
      * Nếu xóa token thất bại (ví dụ ngoại tuyến), vẫn cho phép đăng xuất;
      * MessagingService sẽ bỏ qua tin không thuộc UID đang đăng nhập.
      */
