@@ -16,7 +16,7 @@ import androidx.core.content.ContextCompat;
 
 import com.example.grabshare.R;
 import com.example.grabshare.activity.notifications.NotificationsActivity;
-import com.example.grabshare.repository.notifications.FcmTokenRepository;
+import com.example.grabshare.repository.notifications.FcmInstallationRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.messaging.FirebaseMessagingService;
