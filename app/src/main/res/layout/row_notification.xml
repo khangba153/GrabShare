@@ -1,11 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
-    <LinearLayout style="@style/Row">
-        <ImageView android:id="@+id/notification_icon" android:layout_width="36dp" android:layout_height="36dp" android:src="@drawable/ic_bell" android:importantForAccessibility="no" />
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:orientation="vertical">
-            <TextView android:id="@+id/notification_title" style="@style/BodyBold" android:text="Yêu cầu đã được chấp nhận" />
-            <TextView android:id="@+id/notification_time" style="@style/Caption" android:text="2 phút trước" />
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:clickable="false"
+    android:focusable="false"
+    android:foreground="?attr/selectableItemBackground">
+
+    <LinearLayout
+        style="@style/Row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/notification_icon"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="@null"
+            android:importantForAccessibility="no" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/notification_title"
+                style="@style/BodyBold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Thông báo mới" />
+
+            <TextView
+                android:id="@+id/notification_actor"
+                style="@style/Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Liên quan: Người liên quan" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/notification_unread"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/bg_badge"
+            android:text="MỚI"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="@color/primary"
+            android:visibility="gone" />
     </LinearLayout>
-    <TextView android:id="@+id/notification_body" style="@style/Body" android:text="Chủ xe đã phản hồi yêu cầu của bạn." />
+
+    <TextView
+        android:id="@+id/notification_body"
+        style="@style/Body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Có cập nhật liên quan đến chuyến đi." />
+
+    <TextView
+        android:id="@+id/notification_time"
+        style="@style/Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Chưa rõ thời gian" />
 </LinearLayout>
