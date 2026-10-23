@@ -110,4 +110,29 @@ public class AppNotification {
     public void setCreatedAt(Timestamp createdAt) {
         this.createdAt = createdAt;
     }
+    // Các trường chỉ phục vụ hiển thị trong bộ nhớ; không thuộc schema Firestore.
+    private String actorDisplayName;
+    private String tripSummary;
+
+    /** Tên hồ sơ công khai của actor, nạp bổ sung sau khi đọc Inbox. */
+    @Exclude
+    public String getActorDisplayName() {
+        return actorDisplayName;
+    }
+
+    @Exclude
+    public void setActorDisplayName(String actorDisplayName) {
+        this.actorDisplayName = actorDisplayName;
+    }
+
+    /** Tóm tắt tuyến đọc từ chuyến, không ghi ngược về document notification. */
+    @Exclude
+    public String getTripSummary() {
+        return tripSummary;
+    }
+
+    @Exclude
+    public void setTripSummary(String tripSummary) {
+        this.tripSummary = tripSummary;
+    }
 }
