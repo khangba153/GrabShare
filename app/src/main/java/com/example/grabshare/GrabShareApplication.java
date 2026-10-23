@@ -16,7 +16,7 @@ public class GrabShareApplication extends Application {
 
     private FirebaseAuth firebaseAuth;
     private FirebaseAuth.AuthStateListener authStateListener;
-    private FcmTokenRepository fcmTokenRepository;
+    private FcmInstallationRepository fcmInstallationRepository;
 
     @Override
     public void onCreate() {
