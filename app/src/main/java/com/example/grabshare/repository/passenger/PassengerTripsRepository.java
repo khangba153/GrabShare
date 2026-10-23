@@ -188,7 +188,14 @@ public class PassengerTripsRepository {
                             Set<String> activeTripIds = new HashSet<>();
 
                             for (QueryDocumentSnapshot doc : querySnapshot) {
-                                TripRequest request = doc.toObject(TripRequest.class);
+                                TripRequest request;
+                                try {
+                                    request = doc.toObject(TripRequest.class);
+                                } catch (RuntimeException conversionError) {
+                                    requestReadFailed = true;
+                                    if (callback != null) callback.onError(conversionError);
+                                    return;
+                                }
                                 if (request == null) {
                                     requestReadFailed = true;
                                     if (callback != null) {
@@ -242,7 +249,14 @@ public class PassengerTripsRepository {
                                     resolvedTripIds.add(tripId);
 
                                     if (doc.exists()) {
-                                        Trip trip = doc.toObject(Trip.class);
+                                        Trip trip;
+                                        try {
+                                            trip = doc.toObject(Trip.class);
+                                        } catch (RuntimeException conversionError) {
+                                            failedTripIds.add(tripId);
+                                            if (callback != null) callback.onError(conversionError);
+                                            return;
+                                        }
                                         if (trip == null) {
                                             failedTripIds.add(tripId);
                                             if (callback != null) {
@@ -293,7 +307,14 @@ public class PassengerTripsRepository {
                                     }
 
                                     if (doc != null && doc.exists()) {
-                                        com.example.grabshare.model.PublicProfile profile = doc.toObject(com.example.grabshare.model.PublicProfile.class);
+                                        com.example.grabshare.model.PublicProfile profile;
+                                        try {
+                                            profile = doc.toObject(com.example.grabshare.model.PublicProfile.class);
+                                        } catch (RuntimeException conversionError) {
+                                            profileDataMap.remove(driverId);
+                                            notifyCallbackIfReady();
+                                            return;
+                                        }
                                         if (profile != null) {
                                             profile.setId(doc.getId());
                                             profileDataMap.put(driverId, profile);
@@ -450,7 +471,14 @@ public class PassengerTripsRepository {
                                 return;
                             }
 
-                            TripRequest request = doc.toObject(TripRequest.class);
+                            TripRequest request;
+                            try {
+                                request = doc.toObject(TripRequest.class);
+                            } catch (RuntimeException conversionError) {
+                                requestReadFailed = true;
+                                if (callback != null) callback.onError(conversionError);
+                                return;
+                            }
                             if (request == null) {
                                 requestReadFailed = true;
                                 if (callback != null) {
@@ -510,7 +538,16 @@ public class PassengerTripsRepository {
                             }
 
                             if (doc.exists()) {
-                                Trip trip = doc.toObject(Trip.class);
+                                Trip trip;
+                                try {
+                                    trip = doc.toObject(Trip.class);
+                                } catch (RuntimeException conversionError) {
+                                    tripResolved = false;
+                                    currentTrip = null;
+                                    resetProfileListener();
+                                    if (callback != null) callback.onError(conversionError);
+                                    return;
+                                }
                                 if (trip == null) {
                                     tripResolved = false;
                                     currentTrip = null;
@@ -565,7 +602,14 @@ public class PassengerTripsRepository {
                             }
 
                             if (doc != null && doc.exists()) {
-                                com.example.grabshare.model.PublicProfile profile = doc.toObject(com.example.grabshare.model.PublicProfile.class);
+                                com.example.grabshare.model.PublicProfile profile;
+                                try {
+                                    profile = doc.toObject(com.example.grabshare.model.PublicProfile.class);
+                                } catch (RuntimeException conversionError) {
+                                    currentProfile = null;
+                                    notifyCallback();
+                                    return;
+                                }
                                 if (profile != null) {
                                     profile.setId(doc.getId());
                                 }

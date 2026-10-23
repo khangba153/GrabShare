@@ -223,7 +223,13 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
 
                         List<Favorite> favorites = new ArrayList<>();
                         for (QueryDocumentSnapshot doc : querySnapshot) {
-                            Favorite favorite = doc.toObject(Favorite.class);
+                            Favorite favorite;
+                            try {
+                                favorite = doc.toObject(Favorite.class);
+                            } catch (RuntimeException conversionError) {
+                                showErrorState();
+                                return;
+                            }
                             if (favorite == null) {
                                 showErrorState();
                                 return;
@@ -275,7 +281,14 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                                 return;
                             }
                             if (tripDoc.exists()) {
-                                final Trip trip = tripDoc.toObject(Trip.class);
+                                final Trip trip;
+                                try {
+                                    trip = tripDoc.toObject(Trip.class);
+                                } catch (RuntimeException conversionError) {
+                                    failed[0] = true;
+                                    finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
+                                    return;
+                                }
                                 if (trip == null) {
                                     failed[0] = true;
                                     finishFavoriteLoad(favoriteItems, loadedCount, total, failed, generation);
@@ -292,7 +305,11 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                                                     if (!currentLoad(generation)) return;
                                                     PublicProfile profile = null;
                                                     if (profileDoc != null && profileDoc.exists()) {
-                                                        profile = profileDoc.toObject(PublicProfile.class);
+                                                        try {
+                                                            profile = profileDoc.toObject(PublicProfile.class);
+                                                        } catch (RuntimeException conversionError) {
+                                                            profile = null;
+                                                        }
                                                         if (profile != null) {
                                                             profile.setId(profileDoc.getId());
                                                         }
