@@ -26,6 +26,7 @@ import com.example.grabshare.activity.passenger.MyTripsActivity;
 import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.model.Place;
+import com.example.grabshare.repository.search.SearchTripPolicy;
 import com.google.firebase.auth.FirebaseAuth;
 
 import org.osmdroid.config.Configuration;
@@ -161,6 +162,9 @@ public class HomeActivity extends AppCompatActivity {
                         new ActivityResultContracts.StartActivityForResult(),
                         new ActivityResultCallback<ActivityResult>() {
 
+                            /**
+                             * Chỉ nhận Place hợp lệ về đúng ô; Cancel hoặc dữ liệu sai giữ điểm cũ.
+                             */
                             @Override
                             public void onActivityResult(ActivityResult result) {
                                 if (result.getResultCode() == RESULT_OK
@@ -171,21 +175,31 @@ public class HomeActivity extends AppCompatActivity {
                                             && data.hasExtra(LocationKeys.PLACE_LONGITUDE)) {
                                         String name = data.getStringExtra(LocationKeys.PLACE_NAME);
                                         double selectedLatitude =
-                                                data.getDoubleExtra(LocationKeys.PLACE_LATITUDE, 0);
+                                                data.getDoubleExtra(
+                                                        LocationKeys.PLACE_LATITUDE, Double.NaN);
                                         double selectedLongitude =
                                                 data.getDoubleExtra(
-                                                        LocationKeys.PLACE_LONGITUDE, 0);
+                                                        LocationKeys.PLACE_LONGITUDE, Double.NaN);
                                         Place selectedPlace =
                                                 new Place(
                                                         name, selectedLatitude, selectedLongitude);
-                                        if (currentPickingField == 1) {
-                                            origin = selectedPlace;
-                                        } else {
-                                            if (currentPickingField == 2) {
-                                                destination = selectedPlace;
+                                        if (SearchTripPolicy.validPlace(selectedPlace)) {
+                                            if (currentPickingField == 1) {
+                                                origin = selectedPlace;
+                                            } else {
+                                                if (currentPickingField == 2) {
+                                                    destination = selectedPlace;
+                                                }
                                             }
+                                            updateUI();
+                                        } else {
+                                            Toast.makeText(
+                                                            HomeActivity.this,
+                                                            "Địa điểm trả về không hợp lệ. Vui lòng"
+                                                                    + " chọn lại.",
+                                                            Toast.LENGTH_SHORT)
+                                                    .show();
                                         }
-                                        updateUI();
                                     }
                                 }
                                 // Reset lại ô đang chọn
@@ -196,8 +210,8 @@ public class HomeActivity extends AppCompatActivity {
             restoreState(savedInstanceState);
         } else {
             // Mặc định là null và hiển thị hint
-            originValueTextView.setText("Chọn điểm đi");
-            destinationValueTextView.setText("Chọn điểm đến");
+            originValueTextView.setText("Chọn điểm đón");
+            destinationValueTextView.setText("Chọn điểm xuống");
             updateDateTimeUI();
         }
         setupListeners();
@@ -379,7 +393,7 @@ public class HomeActivity extends AppCompatActivity {
         currentRouteRequestId = currentRouteRequestId + 1;
         final int requestId = currentRouteRequestId;
         routingClient.cancelCurrentRequest();
-        routeDistanceTextView.setText("Chọn điểm đi và điểm đến để xem quãng đường");
+        routeDistanceTextView.setText("Chọn điểm đón và điểm xuống để xem quãng đường");
         // LUÔN LUÔN xóa toàn bộ ghim và đường vẽ cũ đi trước khi bắt đầu vẽ lại
         mapView.getOverlays().clear();
         GeoPoint startPoint = null;
@@ -392,7 +406,7 @@ public class HomeActivity extends AppCompatActivity {
             startMarker.setTitle(origin.getName());
             mapView.getOverlays().add(startMarker);
         } else {
-            originValueTextView.setText("Chọn điểm đi");
+            originValueTextView.setText("Chọn điểm đón");
         }
         if (destination != null) {
             destinationValueTextView.setText(destination.getName());
@@ -402,7 +416,7 @@ public class HomeActivity extends AppCompatActivity {
             endMarker.setTitle(destination.getName());
             mapView.getOverlays().add(endMarker);
         } else {
-            destinationValueTextView.setText("Chọn điểm đến");
+            destinationValueTextView.setText("Chọn điểm xuống");
         }
         if (startPoint != null && endPoint != null) {
             // Zoom để thấy cả 2 điểm
@@ -564,31 +578,15 @@ public class HomeActivity extends AppCompatActivity {
         super.onSaveInstanceState(outState);
         outState.putInt("current_picking_field", currentPickingField);
         outState.putLong("search_time", searchTime.getTimeInMillis());
-        if (origin != null) {
+        if (SearchTripPolicy.validPlace(origin)) {
             outState.putString("origin_name", origin.getName());
-            if (origin.getLatitude() != null) {
-                outState.putDouble("origin_lat", origin.getLatitude());
-            } else {
-                outState.putDouble("origin_lat", 0.0);
-            }
-            if (origin.getLongitude() != null) {
-                outState.putDouble("origin_lng", origin.getLongitude());
-            } else {
-                outState.putDouble("origin_lng", 0.0);
-            }
+            outState.putDouble("origin_lat", origin.getLatitude());
+            outState.putDouble("origin_lng", origin.getLongitude());
         }
-        if (destination != null) {
+        if (SearchTripPolicy.validPlace(destination)) {
             outState.putString("dest_name", destination.getName());
-            if (destination.getLatitude() != null) {
-                outState.putDouble("dest_lat", destination.getLatitude());
-            } else {
-                outState.putDouble("dest_lat", 0.0);
-            }
-            if (destination.getLongitude() != null) {
-                outState.putDouble("dest_lng", destination.getLongitude());
-            } else {
-                outState.putDouble("dest_lng", 0.0);
-            }
+            outState.putDouble("dest_lat", destination.getLatitude());
+            outState.putDouble("dest_lng", destination.getLongitude());
         }
     }
 
@@ -625,15 +623,21 @@ public class HomeActivity extends AppCompatActivity {
         updateDateTimeUI();
         if (savedInstanceState.containsKey("origin_name")) {
             String name = savedInstanceState.getString("origin_name");
-            double selectedLatitude = savedInstanceState.getDouble("origin_lat");
-            double selectedLongitude = savedInstanceState.getDouble("origin_lng");
-            origin = new Place(name, selectedLatitude, selectedLongitude);
+            double selectedLatitude = savedInstanceState.getDouble("origin_lat", Double.NaN);
+            double selectedLongitude = savedInstanceState.getDouble("origin_lng", Double.NaN);
+            Place restoredPlace = new Place(name, selectedLatitude, selectedLongitude);
+            if (SearchTripPolicy.validPlace(restoredPlace)) {
+                origin = restoredPlace;
+            }
         }
         if (savedInstanceState.containsKey("dest_name")) {
             String name = savedInstanceState.getString("dest_name");
-            double selectedLatitude = savedInstanceState.getDouble("dest_lat");
-            double selectedLongitude = savedInstanceState.getDouble("dest_lng");
-            destination = new Place(name, selectedLatitude, selectedLongitude);
+            double selectedLatitude = savedInstanceState.getDouble("dest_lat", Double.NaN);
+            double selectedLongitude = savedInstanceState.getDouble("dest_lng", Double.NaN);
+            Place restoredPlace = new Place(name, selectedLatitude, selectedLongitude);
+            if (SearchTripPolicy.validPlace(restoredPlace)) {
+                destination = restoredPlace;
+            }
         }
         updateUI();
     }

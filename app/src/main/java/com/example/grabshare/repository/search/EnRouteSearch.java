@@ -1,7 +1,8 @@
 package com.example.grabshare.repository.search;
 
-import com.example.grabshare.model.Place;
+import com.example.grabshare.contract.ContributionSnapshot;
 import com.example.grabshare.contract.DetourLimit;
+import com.example.grabshare.model.Place;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
 import com.google.firebase.Timestamp;
@@ -101,6 +102,10 @@ public final class EnRouteSearch {
 
         public final boolean baselineAdjusted;
 
+        public final ContributionSnapshot contribution;
+
+        public final Criteria criteria;
+
         /** Tạo kết quả bất biến để giao diện có thể sắp xếp mà không gọi API lại. */
         public Match(
                 Trip trip,
@@ -109,12 +114,35 @@ public final class EnRouteSearch {
                 double detourMeters,
                 double baselineMeters,
                 boolean baselineAdjusted) {
+            this(
+                    trip,
+                    profile,
+                    startGapMeters,
+                    detourMeters,
+                    baselineMeters,
+                    baselineAdjusted,
+                    null,
+                    null);
+        }
+
+        /** Giữ khoản dự kiến cùng Trip và P/C của đúng lượt tìm; không xác nhận thay khách. */
+        public Match(
+                Trip trip,
+                PublicProfile profile,
+                double startGapMeters,
+                double detourMeters,
+                double baselineMeters,
+                boolean baselineAdjusted,
+                ContributionSnapshot contribution,
+                Criteria criteria) {
             this.trip = trip;
             this.profile = profile;
             this.startGapMeters = startGapMeters;
             this.detourMeters = detourMeters;
             this.baselineMeters = baselineMeters;
             this.baselineAdjusted = baselineAdjusted;
+            this.contribution = contribution;
+            this.criteria = criteria;
         }
 
         /** Bổ sung profile không thay metric đã được kiểm tra. */
@@ -125,7 +153,9 @@ public final class EnRouteSearch {
                     startGapMeters,
                     detourMeters,
                     baselineMeters,
-                    baselineAdjusted);
+                    baselineAdjusted,
+                    contribution,
+                    criteria);
         }
     }
 
@@ -270,9 +300,7 @@ public final class EnRouteSearch {
 
     /** Chỉ lọc/sắp xếp những ứng viên đã kiểm tra, không thay hàng đợi còn chờ. */
     public static List<Match> sorted(
-            List<Match> matches,
-            final Sort sort,
-            long currentTimeMilliseconds) {
+            List<Match> matches, final Sort sort, long currentTimeMilliseconds) {
         List<Match> result = new ArrayList<Match>();
         for (Match match : matches) {
             if (match.trip.getDepartureAt().toDate().getTime() > currentTimeMilliseconds) {
@@ -288,10 +316,7 @@ public final class EnRouteSearch {
                     public int compare(Match firstMatch, Match secondMatch) {
                         int comparisonResult;
                         if (sort == Sort.PRICE) {
-                            comparisonResult =
-                                    Long.compare(
-                                            firstMatch.trip.getCostVnd(),
-                                            secondMatch.trip.getCostVnd());
+                            comparisonResult = compareContribution(firstMatch, secondMatch);
                         } else {
                             if (sort == Sort.START_GAP) {
                                 comparisonResult =
@@ -315,10 +340,7 @@ public final class EnRouteSearch {
                                             firstMatch.startGapMeters, secondMatch.startGapMeters);
                         }
                         if (comparisonResult == 0) {
-                            comparisonResult =
-                                    Long.compare(
-                                            firstMatch.trip.getCostVnd(),
-                                            secondMatch.trip.getCostVnd());
+                            comparisonResult = compareContribution(firstMatch, secondMatch);
                         }
                         if (comparisonResult == 0) {
                             return firstMatch.trip.getId().compareTo(secondMatch.trip.getId());
@@ -328,5 +350,20 @@ public final class EnRouteSearch {
                     }
                 });
         return result;
+    }
+
+    /** Khoản chưa tính luôn đứng sau khoản đã tính, không mặc định là miễn phí. */
+    private static int compareContribution(Match firstMatch, Match secondMatch) {
+        if (firstMatch.contribution == null) {
+            if (secondMatch.contribution == null) {
+                return 0;
+            }
+            return 1;
+        }
+        if (secondMatch.contribution == null) {
+            return -1;
+        }
+        return Long.compare(
+                firstMatch.contribution.getAmountVnd(), secondMatch.contribution.getAmountVnd());
     }
 }

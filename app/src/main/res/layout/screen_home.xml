@@ -18,7 +18,7 @@
                 <LinearLayout android:id="@+id/pick_start" style="@style/Picker" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
                     <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_pin" android:importantForAccessibility="no" />
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="12dp">
-                        <TextView style="@style/Caption" android:text="Điểm đi" />
+                        <TextView style="@style/Caption" android:text="Điểm đón" />
                         <TextView android:id="@+id/pick_start_value" style="@style/BodyBold" android:text="Công viên Lê Văn Tám" />
                     </LinearLayout>
                     <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron" android:importantForAccessibility="no" />
@@ -27,16 +27,17 @@
                 <LinearLayout android:id="@+id/pick_end" style="@style/Picker" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
                     <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_pin" android:importantForAccessibility="no" />
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="12dp">
-                        <TextView style="@style/Caption" android:text="Điểm đến" />
+                        <TextView style="@style/Caption" android:text="Điểm xuống" />
                         <TextView android:id="@+id/pick_end_value" style="@style/BodyBold" android:text="Khu dân cư An Phú" />
                     </LinearLayout>
                     <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron" android:importantForAccessibility="no" />
                 </LinearLayout>
                 <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="12dp" android:background="@color/border" />
+                <TextView style="@style/Caption" android:text="Giờ tài xế khởi hành bạn muốn tìm" />
                 <include layout="@layout/view_search_schedule" />
             </LinearLayout>
             <include layout="@layout/view_home_map" />
-            <TextView style="@style/Hint" android:text="Chi phí rõ ràng trước khi gửi yêu cầu." />
+            <TextView style="@style/Hint" android:text="Khoản đóng góp tính theo đoạn bạn đi, không theo km tài xế đi thêm." />
         </LinearLayout>
     </ScrollView>
     <LinearLayout android:id="@+id/action_area" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="4dp" android:paddingBottom="12dp" android:background="@color/background" android:visibility="visible">

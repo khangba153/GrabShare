@@ -20,6 +20,17 @@
             <TextView android:id="@+id/detail_favorite_status" style="@style/Caption"
                 android:layout_width="match_parent" android:accessibilityLiveRegion="polite" />
             <include layout="@layout/view_passenger_search_route" />
+            <LinearLayout android:id="@+id/detail_contribution_card" style="@style/Card">
+                <TextView android:id="@+id/detail_contribution_title" style="@style/Subtitle" android:text="Khoản đóng góp của bạn" />
+                <TextView android:id="@+id/detail_passenger_distance" style="@style/Body" />
+                <TextView android:id="@+id/detail_driver_detour" style="@style/Body" />
+                <TextView android:id="@+id/detail_contribution_amount" style="@style/Subtitle" android:textColor="@color/primary" />
+                <TextView android:id="@+id/detail_contribution_status" style="@style/Caption" android:accessibilityLiveRegion="polite" />
+                <CheckBox android:id="@+id/detail_confirm_contribution" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:minHeight="48dp"
+                    android:text="Tôi đồng ý khoản đóng góp đang hiển thị" android:enabled="false"
+                    android:saveEnabled="false" />
+            </LinearLayout>
             <LinearLayout android:id="@+id/review_form" style="@style/Card">
                 <TextView android:id="@+id/review_pickup_label" style="@style/Caption" android:text="Điểm đón" />
                 <androidx.appcompat.widget.AppCompatButton android:id="@+id/review_pickup" style="@style/ButtonSecondary" android:text="Chọn điểm đón" />

@@ -10,7 +10,7 @@
     <TextView android:id="@+id/trip_time" style="@style/Body" android:layout_marginTop="12dp" android:text="" />
     <TextView android:id="@+id/trip_seats" style="@style/Caption" android:text="" />
     <TextView android:id="@+id/search_trip_state" style="@style/Badge" android:text="" />
-    <TextView style="@style/Caption" android:text="Đóng góp xăng xe" android:layout_marginTop="12dp" />
+    <TextView android:id="@+id/search_trip_cost_label" style="@style/Caption" android:text="Mức tham khảo toàn tuyến" android:layout_marginTop="12dp" />
     <TextView android:id="@+id/search_trip_cost" style="@style/Subtitle" android:text="" />
     <TextView style="@style/Caption" android:text="Ghi chú của chủ xe" />
     <TextView android:id="@+id/search_trip_note" style="@style/Body" android:layout_width="match_parent" android:text="" />

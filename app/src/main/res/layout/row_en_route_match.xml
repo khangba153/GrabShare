@@ -7,6 +7,8 @@
     <TextView android:id="@+id/match_vehicle" style="@style/Caption" />
     <TextView android:id="@+id/match_time" style="@style/Body" />
     <TextView android:id="@+id/match_price" style="@style/Subtitle" android:textColor="@color/primary" />
+    <TextView android:id="@+id/match_full_trip_cost" style="@style/Caption" />
+    <TextView android:id="@+id/match_passenger_distance" style="@style/Body" />
     <TextView android:id="@+id/match_route" style="@style/Body" />
     <TextView android:id="@+id/match_gap" style="@style/Body" />
     <TextView android:id="@+id/match_detour" style="@style/Body" android:textColor="@color/primary" />

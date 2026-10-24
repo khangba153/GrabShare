@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
-/** Hiển thị giá dự kiến, đường bộ A/B và mức đi thêm đã được kiểm tra. */
+/** Hiển thị riêng khoản khách đóng góp, chặng P/C và mức tài xế đi thêm đã kiểm tra. */
 public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder> {
 
     private final List<Match> trips = new ArrayList<Match>();
@@ -75,14 +75,36 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
                 "Tài xế khởi hành: "
                         + departureTimeFormatter.format(
                                 matchedTrip.trip.getDepartureAt().toDate()));
-        if (matchedTrip.trip.getCostVnd() == 0) {
-            tripViewHolder.priceTextView.setText("Miễn phí");
+        if (matchedTrip.contribution == null) {
+            tripViewHolder.priceTextView.setText("Chưa tính được khoản đóng góp của bạn");
+            tripViewHolder.passengerDistanceTextView.setText("Chặng bạn đi: chưa tính được");
         } else {
-            tripViewHolder.priceTextView.setText(
+            if (matchedTrip.contribution.getFullTripCostVnd() == 0) {
+                tripViewHolder.priceTextView.setText("Bạn dự kiến đóng góp: Miễn phí");
+            } else {
+                tripViewHolder.priceTextView.setText(
+                        String.format(
+                                new Locale("vi", "VN"),
+                                "Bạn dự kiến đóng góp: %,dđ",
+                                matchedTrip.contribution.getAmountVnd()));
+            }
+            tripViewHolder.passengerDistanceTextView.setText(
+                    "Chặng bạn đi: "
+                            + RouteDistanceFormatter.formatKilometers(
+                                    matchedTrip.contribution.getPassengerDistanceMeters()));
+        }
+        Long fullTripCostVnd = matchedTrip.trip.getCostVnd();
+        if (matchedTrip.contribution != null) {
+            fullTripCostVnd = matchedTrip.contribution.getFullTripCostVnd();
+        }
+        if (fullTripCostVnd == null) {
+            tripViewHolder.fullTripCostTextView.setText("Mức tham khảo toàn tuyến: chưa có");
+        } else {
+            tripViewHolder.fullTripCostTextView.setText(
                     String.format(
                             new Locale("vi", "VN"),
-                            "Giá dự kiến: %,dđ",
-                            matchedTrip.trip.getCostVnd()));
+                            "Mức tham khảo toàn tuyến: %,dđ",
+                            fullTripCostVnd));
         }
         tripViewHolder.driverRouteTextView.setText(
                 "Tuyến tài xế: "
@@ -132,6 +154,10 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
 
         final TextView priceTextView;
 
+        final TextView fullTripCostTextView;
+
+        final TextView passengerDistanceTextView;
+
         final TextView driverRouteTextView;
 
         final TextView startGapTextView;
@@ -147,6 +173,8 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
             vehicleNameTextView = view.findViewById(R.id.match_vehicle);
             departureTimeTextView = view.findViewById(R.id.match_time);
             priceTextView = view.findViewById(R.id.match_price);
+            fullTripCostTextView = view.findViewById(R.id.match_full_trip_cost);
+            passengerDistanceTextView = view.findViewById(R.id.match_passenger_distance);
             driverRouteTextView = view.findViewById(R.id.match_route);
             startGapTextView = view.findViewById(R.id.match_gap);
             detourTextView = view.findViewById(R.id.match_detour);

@@ -6,6 +6,9 @@ import androidx.lifecycle.ViewModel;
 
 import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.api.VietnamRoutingClient.Point;
+import com.example.grabshare.contract.ContributionCalculator;
+import com.example.grabshare.contract.ContributionSnapshot;
+import com.example.grabshare.contract.DetourCheckResult;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.repository.search.EnRouteSearch;
@@ -127,6 +130,10 @@ public class ResultsViewModel extends ViewModel {
 
     private String notice = "";
 
+    private String metadataNotice = "";
+
+    private String evaluationNotice = "";
+
     /** Theo dõi phiên đăng nhập để hủy dữ liệu đang tìm của người dùng cũ. */
     public ResultsViewModel() {
         authListener =
@@ -184,6 +191,8 @@ public class ResultsViewModel extends ViewModel {
         profiles.clear();
         requestedProfiles.clear();
         verifiedBaselines = new ConcurrentHashMap<String, Double>();
+        metadataNotice = "";
+        evaluationNotice = "";
         busy = true;
         notice = "Đang tìm chuyến từ giờ bạn chọn đến tối đa một giờ sau…";
         publish();
@@ -219,6 +228,25 @@ public class ResultsViewModel extends ViewModel {
                                                     return;
                                                 }
                                                 pending.addAll(prepared.candidates);
+                                                if (prepared.missingMetadata > 0) {
+                                                    metadataNotice =
+                                                            prepared.missingMetadata
+                                                                    + " chuyến thiếu cấu hình đi"
+                                                                    + " vòng nên chưa được kiểm"
+                                                                    + " tra.";
+                                                }
+                                                int invalidDocuments =
+                                                        prepared.invalid
+                                                                + snapshot.invalidDocuments;
+                                                if (invalidDocuments > 0) {
+                                                    metadataNotice =
+                                                            (metadataNotice
+                                                                            + " "
+                                                                            + invalidDocuments
+                                                                            + " chuyến có dữ liệu"
+                                                                            + " không hợp lệ.")
+                                                                    .trim();
+                                                }
                                             }
                                             runAction(requestGeneration, criteriaSnapshot);
                                         }
@@ -320,7 +348,7 @@ public class ResultsViewModel extends ViewModel {
                     if (batch.isEmpty()) {
                         break;
                     }
-                    notice = "Đang kiểm tra đường đón và trả khách; tối đa 10 ứng viên mỗi nhóm…";
+                    notice = "Đang kiểm tra đường đón và trả khách…";
                     for (final Candidate candidate : batch) {
                         Future<Evaluation> future =
                                 completion.submit(
@@ -370,6 +398,7 @@ public class ResultsViewModel extends ViewModel {
                         }
                         if (!result.error.isEmpty()) {
                             lastError = result.error;
+                            evaluationNotice = result.error;
                         }
                         publish();
                     }
@@ -449,9 +478,13 @@ public class ResultsViewModel extends ViewModel {
                             },
                             baselineCache);
             // Số km chủ xe nhập là giới hạn thật; chỉ làm tròn lên mét, không nới thêm sai số.
-            if (Math.ceil(route.detourMeters()) <= candidate.trip.getMaxDetourMeters()
+            DetourCheckResult routeResult =
+                    route.toDetourCheckResult(candidate.trip.getMaxDetourMeters());
+            if (routeResult.isWithinLimit()
                     && candidate.trip.getDepartureAt().toDate().getTime()
                             > System.currentTimeMillis()) {
+                ContributionSnapshot contribution =
+                        ContributionCalculator.calculate(candidate.trip.getCostVnd(), routeResult);
                 result.match =
                         new Match(
                                 candidate.trip,
@@ -459,7 +492,9 @@ public class ResultsViewModel extends ViewModel {
                                 route.route.requiredLegDistancesMeters.get(0),
                                 route.detourMeters(),
                                 route.baselineMeters,
-                                route.baselineAdjusted);
+                                route.baselineAdjusted,
+                                contribution,
+                                criteriaSnapshot);
             }
         } catch (VietnamRoutingClient.RoutingException error) {
             result.error = error.getMessage();
@@ -472,6 +507,10 @@ public class ResultsViewModel extends ViewModel {
                     result.deferred = true;
                 }
             }
+        } catch (IllegalArgumentException invalidContribution) {
+            result.error =
+                    "Có chuyến chưa tính được chặng khách đi hoặc khoản đóng góp. Làm mới để thử"
+                            + " lại.";
         } catch (IOException | RuntimeException error) {
             result.error = "Một số chuyến chưa đánh giá được đường bộ. Làm mới để thử lại.";
         } finally {
@@ -585,7 +624,23 @@ public class ResultsViewModel extends ViewModel {
         } else {
             visible = new ArrayList<Match>();
         }
-        state.postValue(new State(visible, busy, !pending.isEmpty(), sameUser(), sort, notice));
+        String message = notice;
+        if (sameUser()) {
+            if (!metadataNotice.isEmpty()) {
+                message = (message + " " + metadataNotice).trim();
+            }
+            if (!evaluationNotice.isEmpty() && !message.contains(evaluationNotice)) {
+                message = (message + " " + evaluationNotice).trim();
+            }
+            if (!busy && !pending.isEmpty()) {
+                message = (message + " Còn chuyến chưa kiểm tra. Bấm Xem thêm để tiếp tục.").trim();
+            } else {
+                if (!busy && visible.isEmpty() && message.isEmpty()) {
+                    message = "Chưa tìm thấy chuyến phù hợp với điều kiện đã chọn.";
+                }
+            }
+        }
+        state.postValue(new State(visible, busy, !pending.isEmpty(), sameUser(), sort, message));
     }
 
     /** Hủy HTTP và future cũ; token ngăn snapshot Firebase trễ khởi động lượt khác. */

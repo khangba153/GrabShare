@@ -1,5 +1,7 @@
 package com.example.grabshare.api;
 
+import com.example.grabshare.contract.DetourCheckResult;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -139,6 +141,16 @@ public class VietnamRoutingClient {
         /** Tính mức đi thêm không âm từ hai tuyến đã được kiểm tra tương thích. */
         public double detourMeters() {
             return Math.max(0, route.distanceMeters - baselineMeters);
+        }
+
+        /** Chặng bắt buộc vẫn là A/P, P/C, C/D dù API gộp điểm trùng hoặc thêm hành lang. */
+        public DetourCheckResult toDetourCheckResult(long maxDetourMeters) {
+            Double passengerDistanceMeters = null;
+            if (route.requiredLegDistancesMeters.size() == 3) {
+                passengerDistanceMeters = route.requiredLegDistancesMeters.get(1);
+            }
+            return new DetourCheckResult(
+                    baselineMeters, route.distanceMeters, passengerDistanceMeters, maxDetourMeters);
         }
     }
 
