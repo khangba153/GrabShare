@@ -159,7 +159,10 @@ public class FcmInstallationRepository {
                 });
     }
 
-    /** Xóa FID trước khi Firebase Authentication kết thúc phiên đăng nhập. */
+    /**
+     * Xếp yêu cầu xóa FID khi còn Auth; Task chỉ hoàn tất sau phản hồi của Firestore.
+     * Bên gọi không được chờ Task này để signOut vì ngoại tuyến có thể chờ vô hạn.
+     */
     public static Task<Void> deleteInstallationForUser(String uid) {
         if (uid == null || uid.trim().isEmpty()) {
             return Tasks.forException(

@@ -2,6 +2,7 @@ package com.example.grabshare.activity.account;
 
 import android.app.Application;
 import android.util.Log;
+import android.os.CancellationSignal;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
@@ -12,6 +13,9 @@ import com.example.grabshare.repository.notifications.FcmInstallationRepository;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
@@ -59,7 +63,15 @@ public class LogoutViewModel extends AndroidViewModel {
     private final ExecutorService executor =
             Executors.newSingleThreadExecutor();
 
-    private boolean cleared;
+    private static final long CREDENTIAL_CLEAR_TIMEOUT_SECONDS = 3L;
+
+    private final ScheduledExecutorService timeoutExecutor =
+            Executors.newSingleThreadScheduledExecutor();
+
+    private ScheduledFuture<?> credentialTimeout;
+    private CancellationSignal credentialCancellation;
+    private int credentialRequestNumber;
+    private volatile boolean cleared;
 
     /** Dùng Application Context để không giữ tham chiếu Activity. */
     public LogoutViewModel(Application application) {
@@ -74,134 +86,161 @@ public class LogoutViewModel extends AndroidViewModel {
         return state;
     }
 
-    /** Xóa cache đúng UID ngoài UI thread, chỉ tiếp tục khi thành công. */
-    private void clearCache(
-            final String userId,
-            final Runnable afterClear) {
-
+    /** Xóa cache và kết thúc Auth cùng khóa với writer, không chờ xác nhận FID. */
+    private void clearCacheAndSignOut(final String userId) {
         executor.execute(new Runnable() {
             @Override
             public void run() {
-                try {
-                    cacheRepository.clearUserCache(userId);
-                } catch (final Exception error) {
-                    ContextCompat.getMainExecutor(getApplication())
-                            .execute(new Runnable() {
-                                @Override
-                                public void run() {
-                                    state.setValue(new State(
-                                            false,
-                                            false,
-                                            new IllegalStateException(
-                                                    "Không thể xóa dữ liệu tạm. "
-                                                            + "Vui lòng thử lại.",
-                                                    error)));
-                                }
-                            });
+                if (cleared) {
                     return;
                 }
-
-                ContextCompat.getMainExecutor(getApplication())
-                        .execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                afterClear.run();
+                try {
+                    cacheRepository.clearUserCacheAndFinishSession(userId, new Runnable() {
+                        /** Không nhả khóa ghi cache trước khi Auth kết thúc đúng UID. */
+                        @Override
+                        public void run() {
+                            signOutLocally(userId);
+                        }
+                    });
+                } catch (final Exception error) {
+                    ContextCompat.getMainExecutor(getApplication()).execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!cleared) {
+                                state.setValue(new State(false, false,
+                                        new IllegalStateException(
+                                                "Không thể hoàn tất đăng xuất. Vui lòng thử lại.",
+                                                error)));
                             }
-                        });
+                        }
+                    });
+                    return;
+                }
+                ContextCompat.getMainExecutor(getApplication()).execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!cleared) {
+                            clearCredentialSession();
+                        }
+                    }
+                });
             }
         });
     }
 
-    /** Xóa trạng thái phiên của nhà cung cấp sau khi Firebase đã đăng xuất. */
-    private void clearCredentialSession() {
-        try {
-            CredentialManager.create(getApplication())
-                    .clearCredentialStateAsync(
-                            new ClearCredentialStateRequest(),
-                            null,
-                            ContextCompat.getMainExecutor(getApplication()),
-                            new CredentialManagerCallback<
-                                    Void, ClearCredentialException>() {
-
-                                /** Chuyển kết quả về UI kể cả khi nhà cung cấp gọi trên luồng nền. */
-                                @Override
-                                public void onResult(Void result) {
-                                    state.postValue(
-                                            new State(false, true, null));
-                                }
-
-                                /** Firebase đã đăng xuất; báo việc xóa phiên chưa thành công. */
-                                @Override
-                                public void onError(
-                                        ClearCredentialException error) {
-                                    state.postValue(new State(
-                                            false,
-                                            true,
-                                            new IllegalStateException(
-                                                    "Đã đăng xuất. Không thể xóa "
-                                                            + "trạng thái phiên Google.",
-                                                    error)));
-                                }
-                            });
-        } catch (Exception error) {
-            state.setValue(new State(
-                    false,
-                    true,
-                    new IllegalStateException(
-                            "Đã đăng xuất. Không thể xóa "
-                                    + "trạng thái phiên Google.",
-                            error)));
+    /** Chỉ callback ghi log, không giữ ViewModel hoặc tác động Auth của phiên mới. */
+    private static class InstallationRemovalListener implements OnCompleteListener<Void> {
+        @Override
+        public void onComplete(@NonNull Task<Void> task) {
+            if (!task.isSuccessful()) {
+                Log.w("LogoutViewModel", "Chưa xóa được FID trên server khi đăng xuất.",
+                        task.getException());
+            }
         }
     }
 
-    /**
-     * Xóa FID khi tài khoản còn đăng nhập rồi kết thúc phiên.
-     * Nếu xóa token thất bại (ví dụ ngoại tuyến), vẫn cho phép đăng xuất;
-     * MessagingService sẽ bỏ qua tin không thuộc UID đang đăng nhập.
-     */
-    private void signOutAfterRemovingToken(final String userId) {
-        FcmInstallationRepository.deleteInstallationForUser(userId)
-                .addOnCompleteListener(new OnCompleteListener<Void>() {
+    /** Xếp yêu cầu xóa FID khi còn Auth rồi signOut ngay, kể cả khi ngoại tuyến. */
+    private void signOutLocally(String userId) {
+        FirebaseUser currentUser = authRepository.getCurrentUser();
+        if (currentUser != null && !userId.equals(currentUser.getUid())) {
+            throw new IllegalStateException("Tài khoản đã thay đổi. Vui lòng thực hiện lại.");
+        }
+        if (currentUser == null) {
+            return;
+        }
+        try {
+            FcmInstallationRepository.deleteInstallationForUser(userId)
+                    .addOnCompleteListener(new InstallationRemovalListener());
+        } catch (Exception error) {
+            // Xóa đăng ký thông báo là tác vụ nền; lỗi không được chặn signOut cục bộ.
+            Log.w("LogoutViewModel", "Không khởi tạo được yêu cầu xóa FID.", error);
+        }
+        authRepository.signOut();
+    }
+
+    /** Giới hạn thời gian xóa phiên Google để UI không bị khóa khi nhà cung cấp chậm. */
+    private void clearCredentialSession() {
+        if (cleared) {
+            return;
+        }
+        FirebaseUser currentUser = authRepository.getCurrentUser();
+        if (currentUser != null) {
+            state.setValue(new State(false, false, new IllegalStateException(
+                    "Tài khoản đã thay đổi. Không xóa trạng thái phiên mới.")));
+            return;
+        }
+        credentialRequestNumber++;
+        final int expectedRequestNumber = credentialRequestNumber;
+        credentialCancellation = new CancellationSignal();
+        credentialTimeout = timeoutExecutor.schedule(new Runnable() {
+            @Override
+            public void run() {
+                ContextCompat.getMainExecutor(getApplication()).execute(new Runnable() {
                     @Override
-                    public void onComplete(@NonNull Task<Void> task) {
-                        if (cleared) {
-                            return;
-                        }
-
-                        if (!task.isSuccessful()) {
-                            Log.w(
-                                    "LogoutViewModel",
-                                    "Không xóa được FCM token khi đăng xuất.",
-                                    task.getException());
-                        }
-
-                        FirebaseUser currentUser = authRepository.getCurrentUser();
-                        if (currentUser != null
-                                && !userId.equals(currentUser.getUid())) {
-                            state.setValue(new State(
-                                    false,
-                                    false,
-                                    new IllegalStateException(
-                                            "Tài khoản đã thay đổi. "
-                                                    + "Vui lòng thực hiện lại.")));
-                            return;
-                        }
-
-                        try {
-                            authRepository.signOut();
-                        } catch (Exception error) {
-                            state.setValue(new State(
-                                    false,
-                                    false,
-                                    new IllegalStateException(
-                                            "Không thể đăng xuất. Vui lòng thử lại.",
-                                            error)));
-                            return;
-                        }
-
-                        clearCredentialSession();
+                    public void run() {
+                        finishCredentialClear(expectedRequestNumber,
+                                new IllegalStateException(
+                                        "Đã đăng xuất. Chưa xác nhận việc xóa phiên Google."));
                     }
                 });
+            }
+        }, CREDENTIAL_CLEAR_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        try {
+            CredentialManager.create(getApplication()).clearCredentialStateAsync(
+                    new ClearCredentialStateRequest(),
+                    credentialCancellation,
+                    ContextCompat.getMainExecutor(getApplication()),
+                    new CredentialManagerCallback<Void, ClearCredentialException>() {
+                        @Override
+                        public void onResult(Void result) {
+                            finishCredentialClear(expectedRequestNumber, null);
+                        }
+
+                        @Override
+                        public void onError(ClearCredentialException error) {
+                            finishCredentialClear(expectedRequestNumber,
+                                    new IllegalStateException(
+                                            "Đã đăng xuất. Không thể xóa trạng thái phiên Google.",
+                                            error));
+                        }
+                    });
+        } catch (Exception error) {
+            finishCredentialClear(expectedRequestNumber, new IllegalStateException(
+                    "Đã đăng xuất. Không thể xóa trạng thái phiên Google.", error));
+        }
+    }
+
+    /** Nhà cung cấp có thể trả callback qua Binder, phải chuyển về UI trước khi đổi State. */
+    private void finishCredentialClear(
+            final int expectedRequestNumber, final Exception error) {
+        ContextCompat.getMainExecutor(getApplication()).execute(new Runnable() {
+            @Override
+            public void run() {
+                completeCredentialClearOnMain(expectedRequestNumber, error);
+            }
+        });
+    }
+
+    /** Chỉ nhận một kết quả trên UI; timeout và callback muộn không đổi Auth. */
+    private void completeCredentialClearOnMain(int expectedRequestNumber, Exception error) {
+        if (cleared || expectedRequestNumber != credentialRequestNumber) {
+            return;
+        }
+        credentialRequestNumber++;
+        if (credentialTimeout != null) {
+            credentialTimeout.cancel(false);
+            credentialTimeout = null;
+        }
+        if (credentialCancellation != null) {
+            credentialCancellation.cancel();
+            credentialCancellation = null;
+        }
+        if (authRepository.getCurrentUser() != null) {
+            state.setValue(new State(false, false, new IllegalStateException(
+                    "Tài khoản đã thay đổi. Không điều hướng phiên mới về đăng nhập.")));
+            return;
+        }
+        state.setValue(new State(false, true, error));
     }
 
     /** Xóa cache rồi đăng xuất; không nhận thêm yêu cầu khi đang xử lý. */
@@ -233,36 +272,21 @@ public class LogoutViewModel extends AndroidViewModel {
             return;
         }
 
-        clearCache(userId, new Runnable() {
-            /** Chỉ đăng xuất sau khi cache của đúng tài khoản đã được xóa. */
-            @Override
-            public void run() {
-                if (cleared) {
-                    return;
-                }
-
-                FirebaseUser currentUser = authRepository.getCurrentUser();
-
-                if (currentUser != null
-                        && !userId.equals(currentUser.getUid())) {
-                    state.setValue(new State(
-                            false,
-                            false,
-                            new IllegalStateException(
-                                    "Tài khoản đã thay đổi. "
-                                            + "Vui lòng thực hiện lại.")));
-                    return;
-                }
-
-                signOutAfterRemovingToken(userId);
-            }
-        });
+        clearCacheAndSignOut(userId);
     }
 
     /** Dừng nhận tác vụ mới khi ViewModel không còn được sử dụng. */
     @Override
     protected void onCleared() {
         cleared = true;
+        credentialRequestNumber++;
+        if (credentialTimeout != null) {
+            credentialTimeout.cancel(false);
+        }
+        if (credentialCancellation != null) {
+            credentialCancellation.cancel();
+        }
+        timeoutExecutor.shutdownNow();
         executor.shutdown();
         super.onCleared();
     }

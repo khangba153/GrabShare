@@ -11,6 +11,8 @@ import com.example.grabshare.model.Place;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
 import com.google.firebase.Timestamp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.util.Date;
 
@@ -18,6 +20,9 @@ import java.util.Date;
  * Triển khai TripCacheStore cho phép lưu trữ và đọc lại các chuyến đi đã xem bằng SQLite cục bộ.
  */
 public class TripCacheRepository implements TripCacheStore {
+
+    /** Các instance cùng dùng một khóa để ghi cache không chen giữa xóa và signOut. */
+    private static final Object CACHE_WRITE_LOCK = new Object();
 
     private final TripCacheDbHelper dbHelper;
 
@@ -38,12 +43,20 @@ public class TripCacheRepository implements TripCacheStore {
      */
     @Override
     public void saveViewedTrip(String userId, Trip trip, PublicProfile profile) {
+        synchronized (CACHE_WRITE_LOCK) {
+            saveViewedTripWhileLocked(userId, trip, profile);
+        }
+    }
+
+    /** Kiểm tra Auth bên trong khóa dùng chung, ngay trước thao tác SQLite. */
+    private void saveViewedTripWhileLocked(
+            String userId, Trip trip, PublicProfile profile) {
         if (userId == null || userId.trim().isEmpty() || trip == null || trip.getId() == null || trip.getId().trim().isEmpty()) {
             return;
         }
 
         // Chặn race condition nếu tài khoản đã đăng xuất hoặc thay đổi trước khi callback hoàn tất
-        com.google.firebase.auth.FirebaseUser currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null || !userId.equals(currentUser.getUid())) {
             return;
         }
@@ -86,14 +99,17 @@ public class TripCacheRepository implements TripCacheStore {
 
             values.put(TripCacheDbHelper.COLUMN_SAVED_AT, System.currentTimeMillis());
 
-            db.insertWithOnConflict(
+            long insertedRowIdentifier = db.insertWithOnConflict(
                     TripCacheDbHelper.TABLE_VIEWED_TRIPS,
                     null,
                     values,
                     SQLiteDatabase.CONFLICT_REPLACE
             );
-        } catch (Exception ignored) {
-            // Lỗi thao tác cơ sở dữ liệu không làm dừng luồng ứng dụng
+            if (insertedRowIdentifier == -1L) {
+                throw new IllegalStateException("SQLite không lưu được chuyến đã xem.");
+            }
+        } catch (Exception error) {
+            throw new IllegalStateException("Không lưu được bản xem offline.", error);
         }
     }
 
@@ -197,6 +213,33 @@ public class TripCacheRepository implements TripCacheStore {
      */
     @Override
     public void clearUserCache(String userId) {
+        synchronized (CACHE_WRITE_LOCK) {
+            clearUserCacheWhileLocked(userId);
+        }
+    }
+
+    /**
+     * Xóa cache và kết thúc Auth trong cùng khóa với mọi writer của repository.
+     * Gọi ngoài UI thread; afterClear chỉ kết thúc phiên cục bộ, không chờ mạng.
+     * Nếu xóa lỗi thì không gọi afterClear, để màn đăng xuất cho phép thử lại.
+     */
+    public void clearUserCacheAndFinishSession(String userId, Runnable afterClear) {
+        if (userId == null || userId.trim().isEmpty() || afterClear == null) {
+            throw new IllegalArgumentException("Thiếu tài khoản hoặc tác vụ kết thúc phiên.");
+        }
+
+        synchronized (CACHE_WRITE_LOCK) {
+            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+            if (currentUser != null && !userId.equals(currentUser.getUid())) {
+                throw new IllegalStateException("Tài khoản đã thay đổi. Vui lòng thực hiện lại.");
+            }
+            clearUserCacheWhileLocked(userId);
+            afterClear.run();
+        }
+    }
+
+    /** Chỉ xóa đúng UID; lỗi phải được trả cho luồng đăng xuất thay vì bị bỏ qua. */
+    private void clearUserCacheWhileLocked(String userId) {
         if (userId == null || userId.trim().isEmpty()) {
             return;
         }
@@ -206,8 +249,8 @@ public class TripCacheRepository implements TripCacheStore {
             String whereClause = TripCacheDbHelper.COLUMN_USER_ID + " = ?";
             String[] whereArgs = new String[]{userId};
             db.delete(TripCacheDbHelper.TABLE_VIEWED_TRIPS, whereClause, whereArgs);
-        } catch (Exception ignored) {
-            // Đảm bảo không ném ngoại lệ khi cơ sở dữ liệu đã bị đóng hoặc lỗi khóa
+        } catch (Exception error) {
+            throw new IllegalStateException("Không xóa được dữ liệu tạm của tài khoản.", error);
         }
     }
 }
