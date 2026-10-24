@@ -250,17 +250,44 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Snapshot tiền phiên bản 1; chỉ bật production cùng client đã nghiệm thu.
+    function contributionNumber(value) {
+      return value is number
+        && value > 0 && value < 9223372036854775807;
+    }
+    function contributionAmount(c) {
+      let ratio = (1.0 * c.passengerDistanceMeters) / c.directDistanceMeters;
+      let rawAmount = c.fullTripCostVnd * ratio;
+      return (c.passengerDistanceMeters >= c.directDistanceMeters
+          && c.amountVnd == c.fullTripCostVnd)
+        || (c.passengerDistanceMeters < c.directDistanceMeters
+          && ((rawAmount >= c.fullTripCostVnd && c.amountVnd == c.fullTripCostVnd)
+            || (rawAmount < c.fullTripCostVnd && c.amountVnd == math.round(rawAmount))));
+    }
+    function contributionData(c) {
+      return c is map && exact(c, ['version', 'fullTripCostVnd',
+          'directDistanceMeters', 'passengerDistanceMeters', 'amountVnd'])
+        && c.version is int && c.version == 1
+        && c.fullTripCostVnd is int && c.fullTripCostVnd >= 0
+        && contributionNumber(c.directDistanceMeters)
+        && contributionNumber(c.passengerDistanceMeters)
+        && c.amountVnd is int && c.amountVnd >= 0
+        && c.amountVnd <= c.fullTripCostVnd && contributionAmount(c);
+    }
+
     function requestData(r, rid) {
       // Cho update yêu cầu cũ thiếu dropoff; create kiểm tra C riêng phía dưới.
       return r.keys().hasAll(['tripId', 'passengerId', 'driverId', 'pickup', 'message',
           'status', 'createdAt', 'updatedAt'])
-        && r.keys().hasOnly(['tripId', 'passengerId', 'driverId', 'pickup', 'dropoff', 'message',
+        && r.keys().hasOnly(['tripId', 'passengerId', 'driverId', 'pickup', 'dropoff', 'contributionSnapshot', 'message',
           'status', 'createdAt', 'updatedAt'])
         && id(r.tripId) && id(r.passengerId) && id(r.driverId)
         && r.passengerId != r.driverId
         && rid == r.tripId + '_' + r.passengerId
         && place(r.pickup) && text(r.message, 500)
         && (!r.keys().hasAny(['dropoff']) || place(r.dropoff))
+        && (!r.keys().hasAny(['contributionSnapshot'])
+          || contributionData(r.contributionSnapshot))
         && r.status in ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED']
         && r.createdAt is timestamp && r.updatedAt is timestamp
         && r.updatedAt == request.time;
@@ -270,6 +297,8 @@ service cloud.firestore {
       return owner(r.passengerId) && r.driverId == t.driverId
         // Yêu cầu mới bắt buộc P/C khác tọa độ; C=D vẫn hợp lệ.
         && r.keys().hasAll(['dropoff']) && place(r.dropoff)
+        && r.keys().hasAll(['contributionSnapshot'])
+        && r.contributionSnapshot.fullTripCostVnd == t.costVnd
         && differentPlaces(r.pickup, r.dropoff)
         && r.status == 'PENDING' && r.createdAt == request.time
         && openTrip(t) && t.departureAt > request.time
