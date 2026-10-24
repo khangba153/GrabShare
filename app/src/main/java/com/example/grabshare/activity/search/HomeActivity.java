@@ -20,6 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.notifications.NotificationPermissionHelper;
 import com.example.grabshare.activity.account.AccountActivity;
 import com.example.grabshare.activity.account.LoginActivity;
 import com.example.grabshare.activity.passenger.MyTripsActivity;
@@ -97,6 +98,9 @@ public class HomeActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_home);
+        if (savedInstanceState == null) {
+            NotificationPermissionHelper.requestIfNeeded(this);
+        }
         originValueTextView = findViewById(R.id.pick_start_value);
         destinationValueTextView = findViewById(R.id.pick_end_value);
         departureDateTextView = findViewById(R.id.pick_date_value);

@@ -1,11 +1,14 @@
 package com.example.grabshare.activity.account;
 
 import android.app.Application;
+import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 
 import com.example.grabshare.local.TripCacheRepository;
 import com.example.grabshare.repository.account.AuthRepository;
+import com.example.grabshare.repository.notifications.FcmInstallationRepository;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,6 +23,8 @@ import androidx.credentials.CredentialManager;
 import androidx.credentials.CredentialManagerCallback;
 import androidx.credentials.exceptions.ClearCredentialException;
 
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseUser;
 
 /** Giữ tác vụ đăng xuất qua lần xoay màn hình. */
@@ -149,6 +154,56 @@ public class LogoutViewModel extends AndroidViewModel {
         }
     }
 
+    /**
+     * Xóa FID khi tài khoản còn đăng nhập rồi kết thúc phiên.
+     * Nếu xóa token thất bại (ví dụ ngoại tuyến), vẫn cho phép đăng xuất;
+     * MessagingService sẽ bỏ qua tin không thuộc UID đang đăng nhập.
+     */
+    private void signOutAfterRemovingToken(final String userId) {
+        FcmInstallationRepository.deleteInstallationForUser(userId)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if (cleared) {
+                            return;
+                        }
+
+                        if (!task.isSuccessful()) {
+                            Log.w(
+                                    "LogoutViewModel",
+                                    "Không xóa được FCM token khi đăng xuất.",
+                                    task.getException());
+                        }
+
+                        FirebaseUser currentUser = authRepository.getCurrentUser();
+                        if (currentUser != null
+                                && !userId.equals(currentUser.getUid())) {
+                            state.setValue(new State(
+                                    false,
+                                    false,
+                                    new IllegalStateException(
+                                            "Tài khoản đã thay đổi. "
+                                                    + "Vui lòng thực hiện lại.")));
+                            return;
+                        }
+
+                        try {
+                            authRepository.signOut();
+                        } catch (Exception error) {
+                            state.setValue(new State(
+                                    false,
+                                    false,
+                                    new IllegalStateException(
+                                            "Không thể đăng xuất. Vui lòng thử lại.",
+                                            error)));
+                            return;
+                        }
+
+                        clearCredentialSession();
+                    }
+                });
+    }
+
     /** Xóa cache rồi đăng xuất; không nhận thêm yêu cầu khi đang xử lý. */
     public void submit() {
         State currentState = state.getValue();
@@ -199,19 +254,7 @@ public class LogoutViewModel extends AndroidViewModel {
                     return;
                 }
 
-                try {
-                    authRepository.signOut();
-                } catch (Exception error) {
-                    state.setValue(new State(
-                            false,
-                            false,
-                            new IllegalStateException(
-                                    "Không thể đăng xuất. Vui lòng thử lại.",
-                                    error)));
-                    return;
-                }
-
-                clearCredentialSession();
+                signOutAfterRemovingToken(userId);
             }
         });
     }
