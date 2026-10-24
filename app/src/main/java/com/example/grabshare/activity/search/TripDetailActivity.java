@@ -7,6 +7,8 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,13 +25,17 @@ import androidx.lifecycle.ViewModelProvider;
 import com.example.grabshare.R;
 import com.example.grabshare.activity.passenger.PendingActivity;
 import com.example.grabshare.contract.CachedTrip;
+import com.example.grabshare.contract.ContributionSnapshot;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.model.Place;
+import com.example.grabshare.repository.search.RequestCreationRepository;
 import com.example.grabshare.repository.search.RequestCreationRepository.Result;
+import com.example.grabshare.repository.search.RequestQuote;
 import com.example.grabshare.repository.search.SearchTripPolicy;
 import com.google.firebase.auth.FirebaseAuth;
 
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
@@ -45,6 +51,8 @@ public class TripDetailActivity extends AppCompatActivity {
     private RequestReviewViewModel requestViewModel;
 
     private TripDetailSupportViewModel supportViewModel;
+
+    private TripContributionViewModel contributionViewModel;
 
     private EditText messageInput;
 
@@ -83,6 +91,16 @@ public class TripDetailActivity extends AppCompatActivity {
         tripViewModel = new ViewModelProvider(this).get(OnlineTripViewModel.class);
         requestViewModel = new ViewModelProvider(this).get(RequestReviewViewModel.class);
         supportViewModel = new ViewModelProvider(this).get(TripDetailSupportViewModel.class);
+        contributionViewModel = new ViewModelProvider(this).get(TripContributionViewModel.class);
+        ((CheckBox) findViewById(R.id.detail_confirm_contribution))
+                .setOnCheckedChangeListener(
+                        new CompoundButton.OnCheckedChangeListener() {
+                            /** Đồng ý chỉ gắn với quote đang hiện, không tự gửi yêu cầu. */
+                            @Override
+                            public void onCheckedChanged(CompoundButton button, boolean checked) {
+                                contributionViewModel.confirm(checked);
+                            }
+                        });
         locationPicker =
                 registerForActivityResult(
                         new ActivityResultContracts.StartActivityForResult(),
@@ -215,6 +233,7 @@ public class TripDetailActivity extends AppCompatActivity {
                             /** Tải lại chuyến và đối soát request, không tự gửi lại. */
                             @Override
                             public void onClick(View view) {
+                                contributionViewModel.retry();
                                 tripViewModel.start(tripId, userIdentifier);
                                 requestViewModel.checkExisting();
                             }
@@ -278,6 +297,17 @@ public class TripDetailActivity extends AppCompatActivity {
                             }
                         });
         requestViewModel.initialize(tripId, userIdentifier);
+        contributionViewModel
+                .getState()
+                .observe(
+                        this,
+                        new Observer<TripContributionViewModel.State>() {
+                            /** Kết quả Routing chỉ cập nhật giao diện của màn còn hoạt động. */
+                            @Override
+                            public void onChanged(TripContributionViewModel.State state) {
+                                render();
+                            }
+                        });
     }
 
     /** Listener đọc sống theo màn; tác vụ gửi nằm riêng trong ViewModel qua xoay. */
@@ -401,6 +431,14 @@ public class TripDetailActivity extends AppCompatActivity {
             cachedTrip = supportState.cachedTrip;
         }
         boolean busy = request != null && request.busy;
+        if (ready && !existing && request != null && request.checked) {
+            contributionViewModel.update(
+                    trip.trip, userIdentifier, requestViewModel.pickup, requestViewModel.dropoff);
+        } else {
+            contributionViewModel.clear(
+                    "Khoản dự kiến cần thông tin chuyến mới nhất và kết nối Internet.");
+        }
+        renderContribution(existing, ready, sameAccount, request);
         if (ready) {
             findViewById(R.id.review_form).setVisibility(View.VISIBLE);
         } else {
@@ -417,6 +455,15 @@ public class TripDetailActivity extends AppCompatActivity {
             if (cachedTrip != null) {
                 TripDisplay.bindCached(this, cachedTrip);
             }
+        }
+        if (existing && request.result.contribution != null) {
+            ((TextView) findViewById(R.id.search_trip_cost))
+                    .setText(formatContribution(request.result.contribution.getFullTripCostVnd()));
+            ((TextView) findViewById(R.id.search_trip_cost_label))
+                    .setText("Mức toàn tuyến lúc xác nhận");
+        } else {
+            ((TextView) findViewById(R.id.search_trip_cost_label))
+                    .setText("Mức tham khảo toàn tuyến hiện tại");
         }
         renderFavorite(ready, supportState);
         if (!sameAccount) {
@@ -489,7 +536,101 @@ public class TripDetailActivity extends AppCompatActivity {
                 }
             }
         }
-        button.setEnabled(ready && !busy && (existing || !checked || reason.isEmpty()));
+        button.setEnabled(
+                ready
+                        && !busy
+                        && (existing
+                                || !checked
+                                || (RequestCreationRepository.CONTRIBUTION_SUBMISSION_ENABLED
+                                        && contributionViewModel.getConfirmedQuote() != null
+                                        && reason.isEmpty())));
+        if (ready && !existing && checked && !busy) {
+            TripContributionViewModel.State contributionState =
+                    contributionViewModel.getState().getValue();
+            if (contributionState != null && contributionState.busy) {
+                button.setText("Đang tính khoản đóng góp…");
+            } else {
+                button.setText("Gửi yêu cầu");
+            }
+            if (reason.isEmpty()
+                    && contributionState != null
+                    && contributionState.contribution != null) {
+                String hint = "Vui lòng xác nhận khoản đóng góp trước khi gửi.";
+                if (!RequestCreationRepository.CONTRIBUTION_SUBMISSION_ENABLED) {
+                    hint = "Chưa thể gửi với khoản đóng góp mới. Vui lòng thử lại sau.";
+                }
+                ((TextView) findViewById(R.id.search_action_hint)).setText(hint);
+            }
+        }
+    }
+
+    /** Phân biệt quote mới, tiền lịch sử và yêu cầu legacy; không bù tiền từ Trip. */
+    private void renderContribution(
+            boolean existing,
+            boolean ready,
+            boolean sameAccount,
+            RequestReviewViewModel.State request) {
+        View card = findViewById(R.id.detail_contribution_card);
+        if (!sameAccount) {
+            card.setVisibility(View.GONE);
+            return;
+        }
+        card.setVisibility(View.VISIBLE);
+        ContributionSnapshot contribution = null;
+        String message;
+        String title;
+        Long detourMeters = null;
+        if (existing) {
+            contribution = request.result.contribution;
+            title = "Khoản đóng góp đã xác nhận";
+            message = "Giữ nguyên theo yêu cầu đã gửi, không tính lại theo giá chuyến hiện tại.";
+            if (contribution == null) {
+                message = "Yêu cầu cũ chưa có khoản đóng góp được xác nhận.";
+            }
+        } else {
+            title = "Khoản bạn dự kiến đóng góp";
+            TripContributionViewModel.State value = contributionViewModel.getState().getValue();
+            message = "Cần kết nối Internet để tính khoản đóng góp.";
+            if (value != null) {
+                message = value.message;
+                if (ready) {
+                    contribution = value.contribution;
+                    detourMeters = value.detourMeters;
+                }
+            }
+        }
+        ((TextView) findViewById(R.id.detail_contribution_title)).setText(title);
+        ((TextView) findViewById(R.id.detail_contribution_status)).setText(message);
+        String amount = "Chưa có khoản đóng góp được xác nhận";
+        String passengerDistance = "Chặng bạn đi: chưa tính được";
+        String detour = "";
+        if (contribution != null) {
+            amount = formatContribution(contribution.getAmountVnd());
+            passengerDistance =
+                    "Chặng bạn đi: "
+                            + RouteDistanceFormatter.formatKilometers(
+                                    contribution.getPassengerDistanceMeters());
+        }
+        if (detourMeters != null) {
+            detour = "Tài xế đi thêm: " + RouteDistanceFormatter.formatKilometers(detourMeters);
+        }
+        ((TextView) findViewById(R.id.detail_contribution_amount)).setText(amount);
+        ((TextView) findViewById(R.id.detail_passenger_distance)).setText(passengerDistance);
+        ((TextView) findViewById(R.id.detail_driver_detour)).setText(detour);
+        CheckBox confirmation = findViewById(R.id.detail_confirm_contribution);
+        if (existing) {
+            confirmation.setVisibility(View.GONE);
+        } else {
+            confirmation.setVisibility(View.VISIBLE);
+        }
+        confirmation.setEnabled(
+                ready && !existing && contribution != null && request != null && !request.busy);
+        confirmation.setChecked(!existing && contributionViewModel.getConfirmedQuote() != null);
+    }
+
+    /** Không dùng số 0 cho khoản chưa tính; chỉ gọi khi có snapshot hợp lệ. */
+    private static String formatContribution(long amountVnd) {
+        return NumberFormat.getIntegerInstance(new Locale("vi", "VN")).format(amountVnd) + "đ";
     }
 
     /** Dùng chung cách hiện P/C, không lộ bản nháp khi tài khoản đã đổi. */
@@ -564,7 +705,23 @@ public class TripDetailActivity extends AppCompatActivity {
             render();
             return;
         }
-        requestViewModel.submit();
+        RequestQuote confirmedQuote = contributionViewModel.getConfirmedQuote();
+        if (confirmedQuote == null
+                || !confirmedQuote.matches(
+                        trip.trip,
+                        userIdentifier,
+                        requestViewModel.pickup,
+                        requestViewModel.dropoff)) {
+            contributionViewModel.retry();
+            render();
+            showError("Hãy xem và xác nhận lại khoản đóng góp trước khi gửi.");
+            return;
+        }
+        if (!RequestCreationRepository.CONTRIBUTION_SUBMISSION_ENABLED) {
+            showError("Chưa thể gửi với khoản đóng góp mới. Vui lòng thử lại sau.");
+            return;
+        }
+        requestViewModel.submit(confirmedQuote);
     }
 
     /** Gửi thành công chỉ mở trạng thái; màn trạng thái xử lý việc quay về Home. */

@@ -27,6 +27,9 @@
                 android:indeterminate="true" android:visibility="gone" />
             <TextView android:id="@+id/status_text" style="@style/Body" android:accessibilityLiveRegion="polite"
                 android:text="Chuyến xe phù hợp: 0" android:paddingVertical="12dp" />
+            <TextView android:id="@+id/en_route_notice" style="@style/Caption"
+                android:accessibilityLiveRegion="polite" android:visibility="gone"
+                android:paddingBottom="12dp" />
             <androidx.recyclerview.widget.RecyclerView android:id="@+id/ride_list"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false" />

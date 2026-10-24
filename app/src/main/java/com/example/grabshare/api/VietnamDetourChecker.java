@@ -93,10 +93,7 @@ public final class VietnamDetourChecker implements DetourChecker, AutoCloseable 
                         // quyết định.
                         VietnamRoutingClient.MatchRoute routes =
                                 client.findMatchRoute(points, 1L, cancellation());
-                        return new DetourCheckResult(
-                                routes.baselineMeters,
-                                routes.route.distanceMeters,
-                                maxDetourMeters);
+                        return routes.toDetourCheckResult(maxDetourMeters);
                     }
                 },
                 callback);

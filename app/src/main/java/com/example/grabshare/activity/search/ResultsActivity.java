@@ -76,8 +76,10 @@ public class ResultsActivity extends AppCompatActivity {
                             public void onTripClick(EnRouteSearch.Match match) {
                                 FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
                                 if (criteria == null
+                                        || match.criteria == null
                                         || user == null
-                                        || !criteria.userId.equals(user.getUid())) {
+                                        || !criteria.userId.equals(user.getUid())
+                                        || !match.criteria.userId.equals(user.getUid())) {
                                     return;
                                 }
                                 if (match.trip.getDepartureAt().toDate().getTime()
@@ -92,8 +94,8 @@ public class ResultsActivity extends AppCompatActivity {
                                         intent,
                                         match.trip.getId(),
                                         criteria.userId,
-                                        criteria.pickup,
-                                        criteria.dropoff);
+                                        match.criteria.pickup,
+                                        match.criteria.dropoff);
                                 startActivity(intent);
                             }
                         });
@@ -107,7 +109,7 @@ public class ResultsActivity extends AppCompatActivity {
                         android.R.layout.simple_spinner_dropdown_item,
                         new String[] {
                             "Đề xuất",
-                            "Giá thấp nhất",
+                            "Khoản bạn đóng góp thấp nhất",
                             "Tài xế xuất phát gần điểm đón nhất",
                             "Ít lệch đường nhất"
                         }));
@@ -178,8 +180,9 @@ public class ResultsActivity extends AppCompatActivity {
                             });
             resultsViewModel.initialize(criteria);
         } catch (IllegalArgumentException invalid) {
-            ((TextView) findViewById(R.id.status_text))
+            ((TextView) findViewById(R.id.en_route_notice))
                     .setText("Thiếu hoặc sai điều kiện. Quay lại Home để chọn điểm và thời gian.");
+            findViewById(R.id.en_route_notice).setVisibility(View.VISIBLE);
             findViewById(R.id.en_route_more).setEnabled(false);
             findViewById(R.id.en_route_refresh).setEnabled(false);
             sortSpinner.setEnabled(false);
@@ -255,6 +258,13 @@ public class ResultsActivity extends AppCompatActivity {
         adapter.setTrips(state.matches);
         ((TextView) findViewById(R.id.status_text))
                 .setText("Chuyến xe phù hợp: " + state.matches.size());
+        TextView noticeTextView = findViewById(R.id.en_route_notice);
+        noticeTextView.setText(state.message);
+        if (state.message.isEmpty()) {
+            noticeTextView.setVisibility(View.GONE);
+        } else {
+            noticeTextView.setVisibility(View.VISIBLE);
+        }
         if (state.busy) {
             findViewById(R.id.en_route_progress).setVisibility(View.VISIBLE);
         } else {

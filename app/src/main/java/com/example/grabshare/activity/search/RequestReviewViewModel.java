@@ -11,6 +11,7 @@ import com.example.grabshare.model.Place;
 import com.example.grabshare.repository.search.RequestCreationRepository;
 import com.example.grabshare.repository.search.RequestCreationRepository.Result;
 import com.example.grabshare.repository.search.RequestJourney;
+import com.example.grabshare.repository.search.RequestQuote;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 
@@ -133,13 +134,19 @@ public class RequestReviewViewModel extends AndroidViewModel {
     }
 
     /** Chỉ gửi theo thao tác người dùng, không gửi từ restore/onCreate. */
-    public void submit() {
+    public void submit(RequestQuote confirmedQuote) {
         State value = state.getValue();
         if (!current()) {
             sessionChanged();
             return;
         }
         if (value == null || value.busy || !value.checked || value.result != null) {
+            return;
+        }
+        if (confirmedQuote == null) {
+            state.setValue(
+                    new State(
+                            false, true, null, "Vui lòng xác nhận khoản đóng góp đang hiển thị."));
             return;
         }
         try {
@@ -156,6 +163,7 @@ public class RequestReviewViewModel extends AndroidViewModel {
                 pickup,
                 dropoff,
                 message,
+                confirmedQuote,
                 new RepositoryCallback<Result>() {
 
                     /** Activity đang RESUMED mới được mở kết quả này. */
@@ -225,6 +233,9 @@ public class RequestReviewViewModel extends AndroidViewModel {
     private String explain(Exception error) {
         Throwable cause = error;
         while (cause != null) {
+            if (cause instanceof RequestQuote.ChangedException) {
+                return cause.getMessage();
+            }
             if (cause instanceof FirebaseFirestoreException) {
                 FirebaseFirestoreException firestoreError = (FirebaseFirestoreException) cause;
                 switch (firestoreError.getCode()) {
