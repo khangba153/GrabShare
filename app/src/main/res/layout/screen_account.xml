@@ -183,8 +183,8 @@
                         style="@style/Picker"
                         android:paddingHorizontal="12dp"
                         android:minHeight="58dp"
-                        android:clickable="false"
-                        android:focusable="false"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:foreground="?attr/selectableItemBackground">
                         <ImageView
                             android:id="@+id/menu_icon"
@@ -210,8 +210,8 @@
                         style="@style/Picker"
                         android:paddingHorizontal="12dp"
                         android:minHeight="58dp"
-                        android:clickable="false"
-                        android:focusable="false"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:foreground="?attr/selectableItemBackground">
                         <ImageView
                             android:id="@+id/menu_icon"

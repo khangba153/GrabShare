@@ -17,6 +17,7 @@ import com.example.grabshare.R;
 import com.example.grabshare.activity.driver.DriverTripsActivity;
 import com.example.grabshare.activity.notifications.NotificationsActivity;
 import com.example.grabshare.activity.passenger.MyTripsActivity;
+import com.example.grabshare.activity.passenger.FavoritesActivity;
 import com.example.grabshare.activity.search.HomeActivity;
 import com.example.grabshare.repository.account.ProfileRepository.AccountProfile;
 import com.google.firebase.auth.FirebaseAuth;
@@ -142,7 +143,7 @@ public class AccountActivity extends AppCompatActivity {
         });
     }
 
-    /** Nối các mục leader sở hữu; các màn chưa bàn giao được ghi rõ chưa khả dụng. */
+    /** Nối các màn đã bàn giao; quyền thao tác vẫn phụ thuộc UID và tiến trình đăng xuất. */
     private void setupMenu() {
         connectScreen(R.id.account_driver_trips, DriverTripsActivity.class);
         connectScreen(R.id.edit_profile, EditProfileActivity.class);
@@ -150,14 +151,16 @@ public class AccountActivity extends AppCompatActivity {
         connectScreen(R.id.account_help, HelpActivity.class);
         connectScreen(R.id.account_terms, TermsActivity.class);
 
-        showUnavailable(R.id.account_favorites);
+        connectScreen(R.id.account_favorites, FavoritesActivity.class);
         connectScreen(R.id.account_notifications, NotificationsActivity.class);
         findViewById(R.id.header_action).setVisibility(View.GONE);
     }
 
     /** Mỗi menu dùng đích thật trong Manifest và chỉ mở từ phiên hợp lệ. */
     private void connectScreen(int viewIdentifier, final Class<? extends Activity> screen) {
-        findViewById(viewIdentifier).setOnClickListener(new View.OnClickListener() {
+        View row = findViewById(viewIdentifier);
+        row.setFocusable(true);
+        row.setOnClickListener(new View.OnClickListener() {
             /** Không mở màn khác giữa tác vụ đăng xuất hoặc sau khi UID thay đổi. */
             @Override
             public void onClick(View view) {
@@ -168,20 +171,6 @@ public class AccountActivity extends AppCompatActivity {
                 }
             }
         });
-    }
-
-    /** Hiển thị trạng thái chưa khả dụng để menu không tạo cảm giác bấm mà im lặng. */
-    private void showUnavailable(int viewIdentifier) {
-        View row = findViewById(viewIdentifier);
-        row.setEnabled(false);
-        row.setClickable(false);
-        row.setFocusable(false);
-        row.setAlpha(0.5f);
-
-        TextView label = row.findViewById(R.id.menu_label);
-        if (label != null) {
-            label.setText(getString(R.string.profile_unavailable_menu, label.getText()));
-        }
     }
 
     /** Dùng lại màn tab hiện có và đóng Account để tránh nhân stack. */
@@ -318,6 +307,7 @@ public class AccountActivity extends AppCompatActivity {
         boolean available = isExpectedUserSignedIn() && !logoutInProgress();
         int[] generalMenus = {
                 R.id.nav_home, R.id.nav_trips, R.id.account_driver_trips,
+                R.id.account_favorites, R.id.account_notifications,
                 R.id.account_help, R.id.account_terms, R.id.account_logout
         };
 
