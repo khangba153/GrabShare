@@ -1,9 +1,8 @@
 package com.example.grabshare.repository.notifications;
 
-import android.util.Log;
-
 import androidx.annotation.NonNull;
 
+import com.example.grabshare.notifications.FcmDebugLogger;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
@@ -20,14 +19,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Đồng bộ Firebase Installation ID (FID) cho tài khoản đang đăng nhập.
+ * Lien ket Firebase Installation ID (FID) voi tai khoan dang dang nhap.
  *
  * Schema: fcmInstallations/{uid} -> fid, updatedAt.
- * Không ghi FID vào log và không cho phép đồng bộ sang UID khác.
+ * Khong ghi toan bo FID vao Logcat va khong ghi sang UID khac.
  */
 public class FcmInstallationRepository {
 
-    private static final String TAG = "FcmInstallationRepository";
     private static final String COLLECTION_INSTALLATIONS = "fcmInstallations";
 
     private final FirebaseAuth auth;
@@ -38,52 +36,82 @@ public class FcmInstallationRepository {
         firestore = FirebaseFirestore.getInstance();
     }
 
-    /** Lấy FID và đồng bộ cho tài khoản hiện tại, nếu đã đăng nhập. */
+    /** Chi dung khi can lay FID tu Firebase Installations de kiem tra rieng. */
     public void syncInstallationForCurrentUser() {
         FirebaseUser currentUser = auth.getCurrentUser();
 
         if (currentUser == null) {
+            FcmDebugLogger.warning(
+                    "FID_LOOKUP_SKIP",
+                    "Khong co user dang nhap.");
             return;
         }
 
         syncInstallationForUser(currentUser.getUid());
     }
 
-    /** Lấy FID hiện tại từ Firebase Installations. */
+    /**
+     * Lay FID tu Firebase Installations. Buoc nay rieng le khong khang dinh FCM
+     * da dang ky; pipeline chinh dung callback onRegistered() ben duoi.
+     */
     public void syncInstallationForUser(final String expectedUid) {
         if (expectedUid == null || expectedUid.trim().isEmpty()) {
+            FcmDebugLogger.warning(
+                    "FID_LOOKUP_SKIP",
+                    "UID rong.");
             return;
         }
 
         if (!isCurrentUser(expectedUid)) {
+            FcmDebugLogger.warning(
+                    "FID_LOOKUP_SKIP",
+                    "UID da thay doi; expectedUidMasked="
+                            + FcmDebugLogger.mask(expectedUid));
             return;
         }
 
+        FcmDebugLogger.info(
+                "FID_LOOKUP_START",
+                "Lay FID tu Firebase Installations; uidMasked="
+                        + FcmDebugLogger.mask(expectedUid));
+
         FirebaseInstallations.getInstance().getId()
-                .addOnCompleteListener(new OnCompleteListener<String>() {
-                    @Override
-                    public void onComplete(@NonNull Task<String> task) {
-                        if (!task.isSuccessful()) {
-                            Log.w(TAG, "Không lấy được Firebase Installation ID.",
-                                    task.getException());
-                            return;
-                        }
+                .addOnCompleteListener(
+                        new OnCompleteListener<String>() {
+                            @Override
+                            public void onComplete(@NonNull Task<String> task) {
+                                if (!task.isSuccessful()) {
+                                    FcmDebugLogger.error(
+                                            "FID_LOOKUP_FAIL",
+                                            "Khong lay duoc Firebase Installation ID.",
+                                            task.getException());
+                                    return;
+                                }
 
-                        String installationId = task.getResult();
+                                String installationId = task.getResult();
 
-                        if (installationId == null || installationId.trim().isEmpty()) {
-                            Log.w(TAG, "Firebase trả về Installation ID rỗng.");
-                            return;
-                        }
+                                if (installationId == null
+                                        || installationId.trim().isEmpty()) {
+                                    FcmDebugLogger.warning(
+                                            "FID_LOOKUP_FAIL",
+                                            "Firebase tra ve FID rong.");
+                                    return;
+                                }
 
-                        saveInstallationIfChanged(expectedUid, installationId);
-                    }
-                });
+                                FcmDebugLogger.info(
+                                        "FID_LOOKUP_SUCCESS",
+                                        "Lay duoc FID; fidMasked="
+                                                + FcmDebugLogger.mask(installationId));
+
+                                saveInstallationIfChanged(
+                                        expectedUid,
+                                        installationId);
+                            }
+                        });
     }
 
     /**
-     * Lưu FID mà onRegistered vừa xác nhận đã đăng ký với FCM.
-     * Chỉ ghi nếu UID vẫn là tài khoản hiện tại.
+     * Luu FID tu callback onRegistered() - moc xac nhan app da dang ky voi FCM.
      */
     public void syncInstallationForUser(
             final String expectedUid,
@@ -93,90 +121,188 @@ public class FcmInstallationRepository {
                 || expectedUid.trim().isEmpty()
                 || installationId == null
                 || installationId.trim().isEmpty()) {
+            FcmDebugLogger.warning(
+                    "FID_CALLBACK_SKIP",
+                    "UID hoac FID trong callback bi rong.");
             return;
         }
 
+        FcmDebugLogger.info(
+                "FID_CALLBACK",
+                "Nhan callback onRegistered(); uidMasked="
+                        + FcmDebugLogger.mask(expectedUid)
+                        + ", fidMasked="
+                        + FcmDebugLogger.mask(installationId));
+
         if (!isCurrentUser(expectedUid)) {
+            FcmDebugLogger.warning(
+                    "FID_CALLBACK_SKIP",
+                    "UID khong con la tai khoan hien tai; uidMasked="
+                            + FcmDebugLogger.mask(expectedUid));
             return;
         }
 
         saveInstallationIfChanged(expectedUid, installationId);
     }
 
-    /** Tránh ghi Firestore khi FID vẫn không đổi trên máy chủ. */
+    /** Chi ghi Firestore neu FID tren server khac voi FID hien tai. */
     private void saveInstallationIfChanged(
             final String uid,
             final String installationId) {
 
         if (!isCurrentUser(uid)) {
+            FcmDebugLogger.warning(
+                    "FIRESTORE_SKIP",
+                    "Tai khoan da thay doi truoc khi doc Firestore; uidMasked="
+                            + FcmDebugLogger.mask(uid));
             return;
         }
 
         final DocumentReference installationDocument =
                 firestore.collection(COLLECTION_INSTALLATIONS).document(uid);
 
+        FcmDebugLogger.info(
+                "FIRESTORE_READ_START",
+                "Doc fcmInstallations/{uid} tu server; uidMasked="
+                        + FcmDebugLogger.mask(uid));
+
         installationDocument.get(Source.SERVER)
-                .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-                    @Override
-                    public void onComplete(
-                            @NonNull Task<DocumentSnapshot> readTask) {
+                .addOnCompleteListener(
+                        new OnCompleteListener<DocumentSnapshot>() {
+                            @Override
+                            public void onComplete(
+                                    @NonNull Task<DocumentSnapshot> readTask) {
 
-                        if (!isCurrentUser(uid)) {
-                            return;
-                        }
+                                if (!isCurrentUser(uid)) {
+                                    FcmDebugLogger.warning(
+                                            "FIRESTORE_SKIP",
+                                            "Tai khoan da thay doi trong luc doc Firestore; uidMasked="
+                                                    + FcmDebugLogger.mask(uid));
+                                    return;
+                                }
 
-                        if (readTask.isSuccessful()) {
-                            DocumentSnapshot snapshot = readTask.getResult();
+                                if (readTask.isSuccessful()) {
+                                    DocumentSnapshot snapshot = readTask.getResult();
+                                    boolean documentExists =
+                                            snapshot != null && snapshot.exists();
 
-                            if (snapshot != null
-                                    && snapshot.exists()
-                                    && installationId.equals(snapshot.getString("fid"))) {
-                                return;
-                            }
-                        }
+                                    FcmDebugLogger.info(
+                                            "FIRESTORE_READ_SUCCESS",
+                                            "readServer thanh cong; documentExists="
+                                                    + documentExists
+                                                    + ", uidMasked="
+                                                    + FcmDebugLogger.mask(uid));
 
-                        // Nếu đọc thất bại vẫn thử ghi; Firestore có thể xếp hàng
-                        // khi ngoại tuyến. Security Rules vẫn phải xác thực UID.
-                        Map<String, Object> installationData = new HashMap<>();
-                        installationData.put("fid", installationId);
-                        installationData.put("updatedAt", FieldValue.serverTimestamp());
-
-                        installationDocument.set(installationData)
-                                .addOnCompleteListener(new OnCompleteListener<Void>() {
-                                    @Override
-                                    public void onComplete(
-                                            @NonNull Task<Void> writeTask) {
-
-                                        if (!writeTask.isSuccessful()) {
-                                            Log.w(
-                                                    TAG,
-                                                    "Không thể lưu Firebase Installation ID.",
-                                                    writeTask.getException());
-                                        }
+                                    if (documentExists
+                                            && installationId.equals(
+                                                    snapshot.getString("fid"))) {
+                                        FcmDebugLogger.info(
+                                                "FIRESTORE_WRITE_SKIP",
+                                                "FID khong doi; document da dung.");
+                                        return;
                                     }
-                                });
-                    }
-                });
+
+                                    if (documentExists) {
+                                        FcmDebugLogger.info(
+                                                "FIRESTORE_FID_CHANGED",
+                                                "Document da ton tai nhung FID khac; se cap nhat.");
+                                    } else {
+                                        FcmDebugLogger.info(
+                                                "FIRESTORE_DOCUMENT_MISSING",
+                                                "Chua co document; se tao moi.");
+                                    }
+                                } else {
+                                    FcmDebugLogger.error(
+                                            "FIRESTORE_READ_FAIL",
+                                            "Khong doc duoc document tu server; van thu ghi. "
+                                                    + "Kiem tra loi READ va Security Rules.",
+                                            readTask.getException());
+                                }
+
+                                Map<String, Object> installationData =
+                                        new HashMap<String, Object>();
+                                installationData.put("fid", installationId);
+                                installationData.put(
+                                        "updatedAt",
+                                        FieldValue.serverTimestamp());
+
+                                FcmDebugLogger.info(
+                                        "FIRESTORE_WRITE_START",
+                                        "Bat dau ghi fcmInstallations; uidMasked="
+                                                + FcmDebugLogger.mask(uid)
+                                                + ", fidMasked="
+                                                + FcmDebugLogger.mask(installationId));
+
+                                installationDocument.set(installationData)
+                                        .addOnCompleteListener(
+                                                new OnCompleteListener<Void>() {
+                                                    @Override
+                                                    public void onComplete(
+                                                            @NonNull Task<Void> writeTask) {
+                                                        if (!writeTask.isSuccessful()) {
+                                                            FcmDebugLogger.error(
+                                                                    "FIRESTORE_WRITE_FAIL",
+                                                                    "Ghi fcmInstallations that bai; "
+                                                                            + "kiem tra Security Rules, "
+                                                                            + "Firebase project va mang.",
+                                                                    writeTask.getException());
+                                                            return;
+                                                        }
+
+                                                        FcmDebugLogger.info(
+                                                                "FIRESTORE_WRITE_SUCCESS",
+                                                                "Da ghi fcmInstallations/{uid}; uidMasked="
+                                                                        + FcmDebugLogger.mask(uid));
+                                                    }
+                                                });
+                            }
+                        });
     }
 
-    /** Xóa FID trước khi Firebase Authentication kết thúc phiên đăng nhập. */
+    /** Xoa lien ket cua tai khoan truoc khi Firebase Authentication dang xuat. */
     public static Task<Void> deleteInstallationForUser(String uid) {
         if (uid == null || uid.trim().isEmpty()) {
             return Tasks.forException(
-                    new IllegalArgumentException("UID không được rỗng."));
+                    new IllegalArgumentException("UID khong duoc rong."));
         }
 
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        FirebaseUser currentUser =
+                FirebaseAuth.getInstance().getCurrentUser();
 
         if (currentUser == null || !uid.equals(currentUser.getUid())) {
             return Tasks.forException(
-                    new IllegalStateException("Tài khoản đã thay đổi."));
+                    new IllegalStateException("Tai khoan da thay doi."));
         }
 
-        return FirebaseFirestore.getInstance()
+        FcmDebugLogger.info(
+                "FIRESTORE_DELETE_START",
+                "Xoa fcmInstallations/{uid}; uidMasked="
+                        + FcmDebugLogger.mask(uid));
+
+        Task<Void> deleteTask = FirebaseFirestore.getInstance()
                 .collection(COLLECTION_INSTALLATIONS)
                 .document(uid)
                 .delete();
+
+        deleteTask.addOnCompleteListener(
+                new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if (!task.isSuccessful()) {
+                            FcmDebugLogger.error(
+                                    "FIRESTORE_DELETE_FAIL",
+                                    "Khong xoa duoc lien ket FID khi dang xuat.",
+                                    task.getException());
+                            return;
+                        }
+
+                        FcmDebugLogger.info(
+                                "FIRESTORE_DELETE_SUCCESS",
+                                "Da xoa lien ket FID.");
+                    }
+                });
+
+        return deleteTask;
     }
 
     private boolean isCurrentUser(String expectedUid) {
