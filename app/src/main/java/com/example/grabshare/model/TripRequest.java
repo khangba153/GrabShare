@@ -13,6 +13,8 @@ public class TripRequest {
     private String tripId;
     private String passengerId;
     private String driverId;
+    private Long attemptNumber;
+    private boolean attemptNumberFieldPresent;
     private Place pickup;
     private Place dropoff;
     // Phân biệt yêu cầu cũ thiếu field với dữ liệu có dropoff nhưng sai/null.
@@ -105,6 +107,23 @@ public class TripRequest {
     /** Gán UID chủ xe. */
     public void setDriverId(String driverId) {
         this.driverId = driverId;
+    }
+
+    /** Null là yêu cầu legacy; chỉ repository mới đã tích hợp được ghi số lần dương. */
+    public Long getAttemptNumber() {
+        return attemptNumber;
+    }
+
+    /** Ánh xạ số lần đã lưu, không tự tăng hoặc backfill khi đọc dữ liệu cũ. */
+    public void setAttemptNumber(Long attemptNumber) {
+        this.attemptNumber = attemptNumber;
+        this.attemptNumberFieldPresent = true;
+    }
+
+    /** Cờ trong bộ nhớ: có field nhưng null là lỗi, không phải yêu cầu legacy. */
+    @Exclude
+    public boolean hasAttemptNumberField() {
+        return attemptNumberFieldPresent;
     }
 
     /** Lấy điểm đón. */
