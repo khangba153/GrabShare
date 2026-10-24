@@ -20,9 +20,28 @@ public class Trip {
     private Timestamp updatedAt;
     private Long maxDetourMeters;
     private Long baseDistanceMeters;
+    private String duplicateKey;
+    private boolean duplicateKeyFieldPresent;
 
     /** Tạo đối tượng rỗng để Firestore ánh xạ dữ liệu. */
     public Trip() {
+    }
+
+    /** Null ở dữ liệu legacy; không suy ra rằng chuyến cũ đã được bảo vệ chống trùng. */
+    public String getDuplicateKey() {
+        return duplicateKey;
+    }
+
+    /** Gán khóa theo hợp đồng; phải ghi cùng transaction chiếm/chuyển khóa. */
+    public void setDuplicateKey(String duplicateKey) {
+        this.duplicateKey = duplicateKey;
+        this.duplicateKeyFieldPresent = true;
+    }
+
+    /** Phân biệt thiếu hẳn khóa legacy với field có mặt nhưng sai/null. */
+    @Exclude
+    public boolean hasDuplicateKeyField() {
+        return duplicateKeyFieldPresent;
     }
 
     /** Tạo đối tượng từ các field dữ liệu dùng chung. */
