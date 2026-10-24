@@ -599,6 +599,7 @@ public class HomeActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        NotificationPermissionHelper.logCurrentState(this, "HomeActivity.onResume");
         mapView.onResume();
     }
 
