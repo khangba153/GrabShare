@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
 import com.example.grabshare.activity.passenger.PassengerRouteText;
+import com.example.grabshare.activity.passenger.PassengerContributionText;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.model.TripRequest;
@@ -104,7 +105,7 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
                 if (tvPickup != null) tvPickup.setText("Điểm đi: Không xác định");
                 if (tvDestination != null) tvDestination.setText("Điểm đến: Không xác định");
                 if (tvDepartureTime != null) tvDepartureTime.setText("Thời gian: --/--");
-                if (tvPrice != null) tvPrice.setText("Chưa có giá");
+                if (tvPrice != null) tvPrice.setText(PassengerContributionText.format(request));
                 if (tvStatus != null) tvStatus.setText("Không khả dụng");
                 itemView.setAlpha(0.5f);
                 itemView.setOnClickListener(null);
@@ -156,17 +157,7 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
                 }
             }
 
-            if (tvPrice != null) {
-                if (trip.getCostVnd() != null) {
-                    if (trip.getCostVnd() == 0) {
-                        tvPrice.setText("Miễn phí");
-                    } else {
-                        tvPrice.setText(String.format(java.util.Locale.getDefault(), "%,d VNĐ", trip.getCostVnd()));
-                    }
-                } else {
-                    tvPrice.setText("Chưa có giá");
-                }
-            }
+            if (tvPrice != null) tvPrice.setText(PassengerContributionText.format(request));
 
             String effectiveStatus = resolveEffectiveStatus(request, trip);
             if (tvStatus != null) {
