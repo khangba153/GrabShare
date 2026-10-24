@@ -28,7 +28,6 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
-import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
@@ -403,10 +402,7 @@ public class CompleteActivity extends AppCompatActivity {
         if (request.getPickup() != null) {
             setText(R.id.trip_pickup, "Điểm đón: " + textOr(request.getPickup().getName(), "Chưa có điểm đón"));
         }
-        setText(R.id.trip_cost, "Chưa có chi phí");
-        if (trip.getCostVnd() != null) {
-            setText(R.id.trip_cost, new DecimalFormat("#,###").format(trip.getCostVnd()) + "đ");
-        }
+        setText(R.id.trip_cost, PassengerContributionText.format(request));
     }
 
     /** Gán nội dung vào TextView của phần tóm tắt chuyến thuộc màn này. */

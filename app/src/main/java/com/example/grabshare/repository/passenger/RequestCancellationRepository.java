@@ -1,6 +1,7 @@
 package com.example.grabshare.repository.passenger;
 
 import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.contract.RequestAttemptContract;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.model.TripRequest;
 import com.google.firebase.auth.FirebaseAuth;
@@ -11,6 +12,7 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.Transaction;
+import com.google.firebase.firestore.Source;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -93,6 +95,7 @@ public class RequestCancellationRepository {
                     throw new FirebaseFirestoreException("Chỉ được hủy trước giờ khởi hành.",
                             FirebaseFirestoreException.Code.FAILED_PRECONDITION);
                 }
+                requireActiveAttempt(transaction, request, requestId, passengerId);
                 requireCurrentPassenger(passengerId);
 
                 // Cập nhật trạng thái Request thành CANCELLED
@@ -130,9 +133,7 @@ public class RequestCancellationRepository {
             /** Trả lỗi thực tế để caller cập nhật đúng trạng thái. */
             @Override
             public void onFailure(Exception e) {
-                if (callback != null) {
-                    callback.onError(e);
-                }
+                reconcileCancellationFailure(requestId, passengerId, e, callback);
             }
         });
     }
@@ -224,6 +225,7 @@ public class RequestCancellationRepository {
                     throw new FirebaseFirestoreException("Đã quá giờ khởi hành, không thể hủy chuyến đi này.", FirebaseFirestoreException.Code.FAILED_PRECONDITION);
                 }
 
+                requireActiveAttempt(transaction, request, requestId, passengerId);
                 requireCurrentPassenger(passengerId);
                 // 8. Cập nhật trạng thái Request thành CANCELLED
                 Map<String, Object> requestUpdates = new HashMap<>();
@@ -268,11 +270,60 @@ public class RequestCancellationRepository {
             /** Không giả thành công khi giao dịch bị từ chối hoặc mất mạng. */
             @Override
             public void onFailure(Exception e) {
-                if (callback != null) {
-                    callback.onError(e);
-                }
+                reconcileCancellationFailure(requestId, passengerId, e, callback);
             }
         });
+    }
+
+    /** Yêu cầu theo attempt mới chỉ được hủy khi guard vẫn trỏ đúng lần đó. */
+    private void requireActiveAttempt(Transaction transaction, TripRequest request,
+            String requestId, String passengerId) throws FirebaseFirestoreException {
+        if (!request.hasAttemptNumberField()) return;
+        Long attemptNumber = request.getAttemptNumber();
+        String tripId = request.getTripId();
+        if (attemptNumber == null || attemptNumber < 1 || tripId == null
+                || tripId.trim().isEmpty()) {
+            throw new FirebaseFirestoreException("Dữ liệu lần gửi yêu cầu không hợp lệ.",
+                    FirebaseFirestoreException.Code.FAILED_PRECONDITION);
+        }
+        DocumentReference guardRef = firestore.document(
+                RequestAttemptContract.guardPath(tripId, passengerId));
+        DocumentSnapshot guard = transaction.get(guardRef);
+        if (!guard.exists() || !requestId.equals(guard.getString("requestId"))
+                || !attemptNumber.equals(guard.getLong("attemptNumber"))) {
+            throw new FirebaseFirestoreException("Lần gửi này không còn là yêu cầu hiện hành.",
+                    FirebaseFirestoreException.Code.FAILED_PRECONDITION);
+        }
+    }
+
+    /** Sau lỗi ghi, chỉ công nhận hủy nếu server xác nhận chính request đã CANCELLED. */
+    private void reconcileCancellationFailure(final String requestId, final String passengerId,
+            final Exception writeError, final RepositoryCallback<Void> callback) {
+        if (callback == null) return;
+        if (!validateSession(passengerId, callback)) return;
+        firestore.collection("requests").document(requestId).get(Source.SERVER)
+                .addOnSuccessListener(new com.google.android.gms.tasks.OnSuccessListener<DocumentSnapshot>() {
+                    /** Không suy luận thành công từ cache, request khác hoặc phiên đã đổi. */
+                    @Override
+                    public void onSuccess(DocumentSnapshot snapshot) {
+                        if (snapshot != null && snapshot.exists()
+                                && !snapshot.getMetadata().isFromCache()
+                                && !snapshot.getMetadata().hasPendingWrites()
+                                && passengerId.equals(snapshot.getString("passengerId"))
+                                && "CANCELLED".equals(snapshot.getString("status"))) {
+                            if (validateSession(passengerId, callback)) callback.onSuccess(null);
+                        } else {
+                            callback.onError(writeError);
+                        }
+                    }
+                })
+                .addOnFailureListener(new com.google.android.gms.tasks.OnFailureListener() {
+                    /** Không có xác nhận server thì giữ nguyên lỗi giao dịch. */
+                    @Override
+                    public void onFailure(Exception readError) {
+                        callback.onError(writeError);
+                    }
+                });
     }
 
     /** Kiểm tra UID thật trước gọi Firestore và trước trả callback thành công. */
