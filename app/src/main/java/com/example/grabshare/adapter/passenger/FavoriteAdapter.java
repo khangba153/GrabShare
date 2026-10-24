@@ -32,20 +32,24 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
         private final Trip trip;
         private final PublicProfile driverProfile;
 
+        /** Giữ đúng favorite, chuyến và hồ sơ công khai của cùng một hàng. */
         public FavoriteItem(Favorite favorite, Trip trip, PublicProfile driverProfile) {
             this.favorite = favorite;
             this.trip = trip;
             this.driverProfile = driverProfile;
         }
 
+        /** Trả bản ghi yêu thích để caller giữ đúng ID đã lưu. */
         public Favorite getFavorite() {
             return favorite;
         }
 
+        /** Chuyến có thể vắng nếu document nguồn đã bị xóa. */
         public Trip getTrip() {
             return trip;
         }
 
+        /** Hồ sơ công khai có thể vắng mà không làm mất hàng yêu thích. */
         public PublicProfile getDriverProfile() {
             return driverProfile;
         }
@@ -55,12 +59,14 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
     private final List<FavoriteItem> items;
     private final OnFavoriteClickListener listener;
 
+    /** Nhận listener của màn danh sách; adapter không tự điều hướng. */
     public FavoriteAdapter(Context context, OnFavoriteClickListener listener) {
         this.context = context;
         this.items = new ArrayList<>();
         this.listener = listener;
     }
 
+    /** Thay dữ liệu của lượt tải hiện tại sau khi Activity đã kiểm tra thế hệ. */
     public void setItems(List<FavoriteItem> newItems) {
         this.items.clear();
         if (newItems != null) {
@@ -69,13 +75,16 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
         notifyDataSetChanged();
     }
 
+    /** Tạo hàng theo layout hiện có của danh sách chuyến. */
     @NonNull
+    /** Gắn đúng favorite theo vị trí hiện tại. */
     @Override
     public FavoriteViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(context).inflate(R.layout.row_ride, parent, false);
         return new FavoriteViewHolder(view);
     }
 
+    /** Số hàng đã nhận từ server. */
     @Override
     public void onBindViewHolder(@NonNull FavoriteViewHolder holder, int position) {
         final FavoriteItem item = items.get(position);
@@ -98,6 +107,7 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
         private final TextView tvPrice;
         private final TextView tvStatus;
 
+        /** Lấy các view của một hàng để bind nhiều lần khi RecyclerView tái sử dụng. */
         public FavoriteViewHolder(@NonNull View itemView) {
             super(itemView);
             tvDriverName = itemView.findViewById(R.id.driver_name);
@@ -110,6 +120,7 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
             tvStatus = itemView.findViewById(R.id.ride_status);
         }
 
+        /** Không mở Detail nếu chuyến nguồn không còn tồn tại. */
         public void bind(final FavoriteItem item, final OnFavoriteClickListener listener) {
             Trip trip = item.getTrip();
             PublicProfile profile = item.getDriverProfile();
@@ -155,11 +166,19 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
             }
 
             if (tvPickup != null) {
-                tvPickup.setText(trip.getOrigin() != null ? "Điểm đi: " + trip.getOrigin().getName() : "Điểm đi chưa rõ");
+                if (trip.getOrigin() != null) {
+                    tvPickup.setText("Điểm đi: " + trip.getOrigin().getName());
+                } else {
+                    tvPickup.setText("Điểm đi chưa rõ");
+                }
             }
 
             if (tvDestination != null) {
-                tvDestination.setText(trip.getDestination() != null ? "Điểm đến: " + trip.getDestination().getName() : "Điểm đến chưa rõ");
+                if (trip.getDestination() != null) {
+                    tvDestination.setText("Điểm đến: " + trip.getDestination().getName());
+                } else {
+                    tvDestination.setText("Điểm đến chưa rõ");
+                }
             }
 
             if (tvDepartureTime != null) {
@@ -184,7 +203,10 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
             }
 
             if (tvStatus != null) {
-                String status = trip.getStatus() != null ? trip.getStatus().toUpperCase() : "OPEN";
+                String status = "OPEN";
+                if (trip.getStatus() != null) {
+                    status = trip.getStatus().toUpperCase();
+                }
                 if ("CANCELLED".equals(status)) {
                     tvStatus.setText("♥ Đã lưu · Đã hủy");
                 } else if ("COMPLETED".equals(status)) {
@@ -197,6 +219,7 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
             }
 
             itemView.setOnClickListener(new View.OnClickListener() {
+                /** Chỉ báo item cho Activity tự xác thực phiên và điều hướng. */
                 @Override
                 public void onClick(View v) {
                     if (listener != null) {
