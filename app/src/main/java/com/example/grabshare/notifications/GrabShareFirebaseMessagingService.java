@@ -25,8 +25,9 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.Map;
 
 /**
- * Nhận FCM dạng data-only. Chỉ hiển thị thông báo dành cho UID đang đăng nhập.
- * Cloud Function cần gửi recipientId, notificationId, type, title và body trong data.
+ * Nhan FCM dang data-only.
+ * Chi hien thi thong bao co recipientId trung UID dang dang nhap.
+ * Dung Logcat tag FCM_DEBUG de kiem tra tung buoc.
  */
 public class GrabShareFirebaseMessagingService extends FirebaseMessagingService {
 
@@ -37,11 +38,24 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
     public void onRegistered(@NonNull String installationId) {
         super.onRegistered(installationId);
 
+        FcmDebugLogger.info(
+                "FCM_CALLBACK_REGISTERED",
+                "FCM da dang ky instance; fidMasked="
+                        + FcmDebugLogger.mask(installationId));
+
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
 
         if (currentUser == null) {
+            FcmDebugLogger.warning(
+                    "FCM_CALLBACK_NO_USER",
+                    "onRegistered den khi chua co user dang nhap. Application se goi register() lai sau login.");
             return;
         }
+
+        FcmDebugLogger.info(
+                "FCM_CALLBACK_MAP_USER",
+                "Lien ket FID voi uidMasked="
+                        + FcmDebugLogger.mask(currentUser.getUid()));
 
         new FcmInstallationRepository().syncInstallationForUser(
                 currentUser.getUid(),
@@ -52,17 +66,34 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         Map<String, String> data = remoteMessage.getData();
 
+        FcmDebugLogger.info(
+                "FCM_MESSAGE_RECEIVED",
+                "FCM da den Android; dataKeys=" + data.keySet());
+
         if (data.isEmpty()) {
+            FcmDebugLogger.warning(
+                    "FCM_MESSAGE_DROPPED",
+                    "Payload khong co data; code nay dang cho data-only.");
             return;
         }
 
         String recipientId = data.get("recipientId");
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
 
-        // Tin nhắn cũ của tài khoản khác không được hiện trên thiết bị này.
-        if (currentUser == null
-                || recipientId == null
-                || !recipientId.equals(currentUser.getUid())) {
+        if (currentUser == null) {
+            FcmDebugLogger.warning(
+                    "FCM_MESSAGE_DROPPED",
+                    "Khong co user dang nhap khi message den.");
+            return;
+        }
+
+        if (recipientId == null || !recipientId.equals(currentUser.getUid())) {
+            FcmDebugLogger.warning(
+                    "FCM_MESSAGE_DROPPED",
+                    "recipientId khong trung UID hien tai; recipientMasked="
+                            + FcmDebugLogger.mask(recipientId)
+                            + ", currentUidMasked="
+                            + FcmDebugLogger.mask(currentUser.getUid()));
             return;
         }
 
@@ -71,8 +102,25 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
                         this,
                         Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
+            FcmDebugLogger.warning(
+                    "FCM_DISPLAY_BLOCKED",
+                    "Message da den nhung app chua duoc cap quyen POST_NOTIFICATIONS.");
             return;
         }
+
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            FcmDebugLogger.warning(
+                    "FCM_DISPLAY_BLOCKED",
+                    "Message da den nhung thong bao cua app dang bi tat trong Android Settings.");
+            return;
+        }
+
+        FcmDebugLogger.info(
+                "FCM_PAYLOAD_ACCEPTED",
+                "Payload hop le; type="
+                        + data.get("type")
+                        + ", notificationIdMasked="
+                        + FcmDebugLogger.mask(data.get("notificationId")));
 
         showNotification(data);
     }
@@ -125,8 +173,25 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
                 ? requestCode
                 : notificationId.hashCode();
 
-        NotificationManagerCompat.from(this)
-                .notify(systemNotificationId, builder.build());
+        try {
+            NotificationManagerCompat.from(this)
+                    .notify(systemNotificationId, builder.build());
+
+            FcmDebugLogger.info(
+                    "FCM_NOTIFICATION_POSTED",
+                    "Da goi notify() cho Android; notificationIdMasked="
+                            + FcmDebugLogger.mask(notificationId));
+        } catch (SecurityException exception) {
+            FcmDebugLogger.error(
+                    "FCM_NOTIFICATION_SECURITY_ERROR",
+                    "Android tu choi hien thi notification.",
+                    exception);
+        } catch (RuntimeException exception) {
+            FcmDebugLogger.error(
+                    "FCM_NOTIFICATION_ERROR",
+                    "Loi khi tao/hien thi notification.",
+                    exception);
+        }
     }
 
     private void createNotificationChannel() {
@@ -139,6 +204,9 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
                         Context.NOTIFICATION_SERVICE);
 
         if (manager == null) {
+            FcmDebugLogger.warning(
+                    "FCM_CHANNEL_FAIL",
+                    "Android NotificationManager la null.");
             return;
         }
 
