@@ -113,7 +113,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         if (headerBack != null) {
             headerBack.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     finish();
                 }
             });
@@ -122,7 +122,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         if (btnRetry != null) {
             btnRetry.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     loadFavorites();
                 }
             });
@@ -132,7 +132,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         if (navHome != null) {
             navHome.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     Intent intent = new Intent(FavoritesActivity.this, HomeActivity.class);
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                     startActivity(intent);
@@ -145,7 +145,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         if (navTrips != null) {
             navTrips.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     Intent intent = new Intent(FavoritesActivity.this, MyTripsActivity.class);
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                     startActivity(intent);
@@ -158,7 +158,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         if (navAccount != null) {
             navAccount.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
+                public void onClick(View view) {
                     Intent intent = new Intent(FavoritesActivity.this, AccountActivity.class);
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                     startActivity(intent);
@@ -222,10 +222,10 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                         }
 
                         List<Favorite> favorites = new ArrayList<>();
-                        for (QueryDocumentSnapshot doc : querySnapshot) {
+                        for (QueryDocumentSnapshot document : querySnapshot) {
                             Favorite favorite;
                             try {
-                                favorite = doc.toObject(Favorite.class);
+                                favorite = document.toObject(Favorite.class);
                             } catch (RuntimeException conversionError) {
                                 showErrorState();
                                 return;
@@ -234,7 +234,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                                 showErrorState();
                                 return;
                             }
-                            favorite.setId(doc.getId());
+                            favorite.setId(document.getId());
                             favorites.add(favorite);
                         }
 
@@ -243,7 +243,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
-                    public void onFailure(Exception e) {
+                    public void onFailure(Exception error) {
                         if (currentLoad(generation)) showErrorState();
                     }
                 });

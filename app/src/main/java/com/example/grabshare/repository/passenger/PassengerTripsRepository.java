@@ -358,8 +358,8 @@ public class PassengerTripsRepository {
                 }
             }
             for (String tripId : toRemove) {
-                ListenerRegistration reg = tripListenersMap.remove(tripId);
-                if (reg != null) reg.remove();
+                ListenerRegistration registration = tripListenersMap.remove(tripId);
+                if (registration != null) registration.remove();
                 tripDataMap.remove(tripId);
                 resolvedTripIds.remove(tripId);
                 failedTripIds.remove(tripId);
@@ -374,8 +374,8 @@ public class PassengerTripsRepository {
                 }
             }
             for (String driverId : toRemove) {
-                ListenerRegistration reg = profileListenersMap.remove(driverId);
-                if (reg != null) reg.remove();
+                ListenerRegistration registration = profileListenersMap.remove(driverId);
+                if (registration != null) registration.remove();
                 profileDataMap.remove(driverId);
                 resolvedProfileIds.remove(driverId);
                 failedProfileIds.remove(driverId);

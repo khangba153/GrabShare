@@ -121,7 +121,7 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
                 if (tvPickup != null) tvPickup.setText("Điểm đi: Không xác định");
                 if (tvDestination != null) tvDestination.setText("Điểm đến: Không xác định");
                 if (tvDepartureTime != null) tvDepartureTime.setText("Thời gian: --/--");
-                if (tvPrice != null) tvPrice.setText("0 VNĐ");
+                if (tvPrice != null) tvPrice.setText("Chưa có giá");
                 if (tvStatus != null) tvStatus.setText("Đã bị xóa hoặc hủy");
                 itemView.setAlpha(0.5f);
                 itemView.setOnClickListener(null);
@@ -172,10 +172,14 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
             }
 
             if (tvPrice != null) {
-                if (trip.getCostVnd() != null && trip.getCostVnd() > 0) {
-                    tvPrice.setText(String.format("%,d VNĐ", trip.getCostVnd()));
+                if (trip.getCostVnd() != null) {
+                    if (trip.getCostVnd() == 0) {
+                        tvPrice.setText("Miễn phí");
+                    } else {
+                        tvPrice.setText(String.format(java.util.Locale.getDefault(), "%,d VNĐ", trip.getCostVnd()));
+                    }
                 } else {
-                    tvPrice.setText("Miễn phí");
+                    tvPrice.setText("Chưa có giá");
                 }
             }
 
