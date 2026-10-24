@@ -3,6 +3,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
+import { getNotificationContent, isNonEmptyString } from "./notification-content.js";
 
 initializeApp();
 
@@ -19,41 +20,6 @@ const firestore = getFirestore();
  */
 const FIRESTORE_FUNCTION_REGION = "asia-southeast1";
 const MAX_INSTANCES = 1;
-
-/**
- * Notification documents currently created by GrabShare.
- * Keep these titles and bodies aligned with the Android inbox/service.
- */
-const NOTIFICATION_CONTENT = Object.freeze({
-  REQUEST_SENT: {
-    title: "Có yêu cầu đi chung mới",
-    body: "Bạn có một yêu cầu đi chung cần xem."
-  },
-  REQUEST_ACCEPTED: {
-    title: "Yêu cầu đã được chấp nhận",
-    body: "Yêu cầu đi chung của bạn đã được chấp nhận."
-  },
-  REQUEST_REJECTED: {
-    title: "Yêu cầu bị từ chối",
-    body: "Yêu cầu đi chung của bạn đã bị từ chối."
-  },
-  REQUEST_CANCELLED: {
-    title: "Yêu cầu đã bị hủy",
-    body: "Một yêu cầu đi chung đã bị hủy."
-  },
-  TRIP_CANCELLED: {
-    title: "Chuyến đi đã bị hủy",
-    body: "Chuyến đi liên quan đến yêu cầu của bạn đã bị hủy."
-  },
-  TRIP_COMPLETED: {
-    title: "Chuyến đi đã hoàn thành",
-    body: "Chuyến đi liên quan đến yêu cầu của bạn đã hoàn thành."
-  }
-});
-
-function isNonEmptyString(value) {
-  return typeof value === "string" && value.trim().length > 0;
-}
 
 /**
  * Fire only when an inbox document is created.
@@ -93,7 +59,7 @@ export const sendPushOnNotificationCreated = onDocumentCreated(
       return;
     }
 
-    const content = NOTIFICATION_CONTENT[type];
+    const content = getNotificationContent(type);
 
     if (!content) {
       logger.info("FCM push skipped: unsupported notification type.", {
