@@ -1,17 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" style="@style/Card">
-    <TextView android:id="@+id/driver_name" style="@style/Subtitle" android:text="Đang tải hồ sơ…" />
-    <TextView android:id="@+id/driver_meta" style="@style/Body" android:text="" />
-    <TextView android:id="@+id/search_driver_rating" style="@style/Caption" android:text="Đang tải đánh giá…" />
-    <TextView style="@style/Caption" android:text="Điểm đi" android:layout_marginTop="12dp" />
-    <TextView android:id="@+id/route_start" style="@style/BodyBold" android:layout_width="match_parent" android:text="" />
-    <TextView style="@style/Caption" android:text="Điểm đến" android:layout_marginTop="12dp" />
-    <TextView android:id="@+id/route_end" style="@style/BodyBold" android:layout_width="match_parent" android:text="" />
-    <TextView android:id="@+id/trip_time" style="@style/Body" android:layout_marginTop="12dp" android:text="" />
-    <TextView android:id="@+id/trip_seats" style="@style/Caption" android:text="" />
-    <TextView android:id="@+id/search_trip_state" style="@style/Badge" android:text="" />
-    <TextView android:id="@+id/search_trip_cost_label" style="@style/Caption" android:text="Mức tham khảo toàn tuyến" android:layout_marginTop="12dp" />
-    <TextView android:id="@+id/search_trip_cost" style="@style/Subtitle" android:text="" />
-    <TextView style="@style/Caption" android:text="Ghi chú của chủ xe" />
-    <TextView android:id="@+id/search_trip_note" style="@style/Body" android:layout_width="match_parent" android:text="" />
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Card">
+    <TextView
+        android:id="@+id/driver_name"
+        style="@style/Subtitle"
+        android:text="Đang tải hồ sơ…" />
+    <TextView
+        android:id="@+id/driver_meta"
+        style="@style/Body"
+        android:text="" />
+    <TextView
+        android:id="@+id/search_driver_rating"
+        style="@style/Caption"
+        android:text="Đang tải đánh giá…" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:tag="ui_section:search_driver_extra"
+        android:layout_marginBottom="12dp">
+        <TextView
+            style="@style/BodyBold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+            android:text="Tuyến chủ xe và mức toàn tuyến"
+            android:textColor="@color/primary"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <TextView
+                style="@style/Caption"
+                android:text="Điểm đi"
+                android:layout_marginTop="12dp" />
+            <TextView
+                android:id="@+id/route_start"
+                style="@style/BodyBold"
+                android:layout_width="match_parent"
+                android:text="" />
+            <TextView
+                style="@style/Caption"
+                android:text="Điểm đến"
+                android:layout_marginTop="12dp" />
+            <TextView
+                android:id="@+id/route_end"
+                style="@style/BodyBold"
+                android:layout_width="match_parent"
+                android:text="" />
+            <TextView
+                android:id="@+id/trip_time"
+                style="@style/Body"
+                android:layout_marginTop="12dp"
+                android:text="" />
+            <TextView
+                android:id="@+id/trip_seats"
+                style="@style/Caption"
+                android:text="" />
+            <TextView
+                android:id="@+id/search_trip_state"
+                style="@style/Badge"
+                android:text="" />
+            <TextView
+                android:id="@+id/search_trip_cost_label"
+                style="@style/Caption"
+                android:text="Mức tham khảo toàn tuyến"
+                android:layout_marginTop="12dp" />
+            <TextView
+                android:id="@+id/search_trip_cost"
+                style="@style/Subtitle"
+                android:text="" />
+            <TextView
+                style="@style/Caption"
+                android:text="Ghi chú của chủ xe" />
+            <TextView
+                android:id="@+id/search_trip_note"
+                style="@style/Body"
+                android:layout_width="match_parent"
+                android:text=""
+                android:textIsSelectable="true" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

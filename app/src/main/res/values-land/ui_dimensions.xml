@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="screen_header_height">48dp</dimen>
+    <dimen name="bottom_navigation_height">48dp</dimen>
+    <dimen name="home_intro_title_size">18sp</dimen>
+    <dimen name="home_intro_margin">4dp</dimen>
+</resources>

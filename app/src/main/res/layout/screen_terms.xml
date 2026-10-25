@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -8,7 +7,7 @@
     android:background="@color/background">
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp">
         <ImageButton
             android:id="@+id/header_back"
@@ -23,13 +22,21 @@
             android:layout_marginHorizontal="52dp"
             android:gravity="center"
             android:text="@string/account_terms_title" />
+        <ImageButton
+            android:id="@+id/header_action"
+            style="@style/IconButton"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="Thông báo"
+            android:layout_gravity="center_vertical|end" />
     </FrameLayout>
     <ScrollView
         android:id="@+id/terms_scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -58,7 +65,9 @@
             <androidx.appcompat.widget.AppCompatButton
                 style="@style/ButtonSecondary"
                 android:id="@+id/static_page_back"
-                android:text="@string/leader_back" />
+                android:text="@string/leader_back"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

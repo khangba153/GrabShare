@@ -5,13 +5,14 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">@color/ink</item>
         <item name="android:textSize">14sp</item>
-        <item name="android:lineSpacingExtra">4dp</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+        <item name="android:fontFamily">sans-serif</item>
     </style>
     <style name="BodyBold" parent="Body">
         <item name="android:textStyle">bold</item>
     </style>
     <style name="Title" parent="BodyBold">
-        <item name="android:textSize">26sp</item>
+        <item name="android:textSize">24sp</item>
         <item name="android:layout_marginBottom">8dp</item>
         <item name="android:fontFamily">sans-serif-medium</item>
     </style>
@@ -20,14 +21,14 @@
         <item name="android:layout_marginBottom">0dp</item>
     </style>
     <style name="Caption" parent="Body">
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">13sp</item>
         <item name="android:textColor">@color/muted</item>
         <item name="android:layout_marginBottom">4dp</item>
     </style>
     <style name="Hint" parent="Caption">
-        <item name="android:layout_marginTop">12dp</item>
-        <item name="android:layout_marginBottom">12dp</item>
-        <item name="android:lineSpacingExtra">5dp</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:lineSpacingExtra">2dp</item>
     </style>
     <style name="Badge" parent="BodyBold">
         <item name="android:textSize">11sp</item>
@@ -42,7 +43,7 @@
         <item name="android:orientation">vertical</item>
         <item name="android:background">@drawable/bg_card</item>
         <item name="android:padding">16dp</item>
-        <item name="android:layout_marginBottom">16dp</item>
+        <item name="android:layout_marginBottom">12dp</item>
     </style>
     <style name="Row">
         <item name="android:layout_width">match_parent</item>
@@ -67,6 +68,7 @@
         <item name="android:paddingHorizontal">14dp</item>
         <item name="android:paddingVertical">12dp</item>
         <item name="android:singleLine">true</item>
+        <item name="android:fontFamily">sans-serif</item>
     </style>
     <style name="ButtonPrimary" parent="Widget.AppCompat.Button">
         <item name="android:layout_width">match_parent</item>
@@ -83,6 +85,7 @@
         <item name="android:layout_marginTop">8dp</item>
         <item name="android:paddingHorizontal">12dp</item>
         <item name="android:paddingVertical">12dp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
     </style>
     <style name="ButtonSecondary" parent="ButtonPrimary">
         <item name="android:textColor">@color/button_secondary_text</item>

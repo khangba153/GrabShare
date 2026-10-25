@@ -1,49 +1,214 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:background="@color/background">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:paddingHorizontal="12dp">
-        <ImageButton android:id="@+id/header_back" style="@style/IconButton" android:src="@drawable/ic_back" android:contentDescription="Quay lại" />
-        <TextView style="@style/Subtitle" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="12dp" android:layout_marginBottom="0dp" android:paddingVertical="16dp" android:text="Chi tiết chuyến" />
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp">
+        <ImageButton
+            android:id="@+id/header_back"
+            style="@style/IconButton"
+            android:src="@drawable/ic_back"
+            android:contentDescription="Quay lại" />
+        <TextView
+            style="@style/Subtitle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:layout_marginBottom="0dp"
+            android:paddingVertical="16dp"
+            android:text="Chi tiết chuyến"
+            android:maxLines="1"
+            android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/header_action"
+            style="@style/IconButton"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="Thông báo" />
     </LinearLayout>
-    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:fillViewport="true">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
-            <TextView android:id="@+id/search_status" style="@style/Body" android:layout_width="match_parent" android:accessibilityLiveRegion="polite" android:text="Đang tải chuyến…" />
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/search_retry" style="@style/ButtonSecondary" android:text="Tải lại thông tin" />
-            <LinearLayout android:id="@+id/search_trip_content" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone" android:layout_marginTop="16dp">
-                <TextView style="@style/Subtitle" android:text="Chuyến của chủ xe" />
-                <include layout="@layout/view_search_trip" />
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:overScrollMode="ifContentScrolls">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+            <TextView
+                android:id="@+id/search_status"
+                style="@style/Body"
+                android:layout_width="match_parent"
+                android:accessibilityLiveRegion="polite"
+                android:text="Đang tải chuyến…" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/search_retry"
+                style="@style/ButtonSecondary"
+                android:text="Tải lại thông tin"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
+            <LinearLayout
+                android:id="@+id/search_trip_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginTop="16dp">
+                <TextView
+                    style="@style/Subtitle"
+                    android:text="Chuyến của chủ xe" />
+                <include
+                    layout="@layout/view_search_trip" />
             </LinearLayout>
-            <TextView android:id="@+id/detail_cache_status" style="@style/Caption"
-                android:layout_width="match_parent" android:accessibilityLiveRegion="polite" />
-            <include layout="@layout/view_passenger_search_route" />
-            <LinearLayout android:id="@+id/detail_contribution_card" style="@style/Card">
-                <TextView android:id="@+id/detail_contribution_title" style="@style/Subtitle" android:text="Khoản đóng góp của bạn" />
-                <TextView android:id="@+id/detail_passenger_distance" style="@style/Body" />
-                <TextView android:id="@+id/detail_driver_detour" style="@style/Body" />
-                <TextView android:id="@+id/detail_contribution_amount" style="@style/Subtitle" android:textColor="@color/primary" />
-                <TextView android:id="@+id/detail_contribution_status" style="@style/Caption" android:accessibilityLiveRegion="polite" />
-                <CheckBox android:id="@+id/detail_confirm_contribution" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:minHeight="48dp"
-                    android:text="Tôi đồng ý khoản đóng góp đang hiển thị" android:enabled="false"
+            <TextView
+                android:id="@+id/detail_cache_status"
+                style="@style/Caption"
+                android:layout_width="match_parent"
+                android:accessibilityLiveRegion="polite" />
+            <include
+                layout="@layout/view_passenger_search_route" />
+            <LinearLayout
+                android:id="@+id/detail_contribution_card"
+                style="@style/Card">
+                <TextView
+                    android:id="@+id/detail_contribution_title"
+                    style="@style/Subtitle"
+                    android:text="Khoản đóng góp của bạn" />
+                <TextView
+                    android:id="@+id/detail_passenger_distance"
+                    style="@style/Body" />
+                <TextView
+                    android:id="@+id/detail_driver_detour"
+                    style="@style/Body" />
+                <TextView
+                    android:id="@+id/detail_contribution_amount"
+                    style="@style/Subtitle"
+                    android:textColor="@color/primary" />
+                <TextView
+                    android:id="@+id/detail_contribution_status"
+                    style="@style/Caption"
+                    android:accessibilityLiveRegion="polite" />
+                <CheckBox
+                    android:id="@+id/detail_confirm_contribution"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="Tôi đồng ý khoản đóng góp đang hiển thị"
+                    android:enabled="false"
                     android:saveEnabled="false" />
             </LinearLayout>
-            <LinearLayout android:id="@+id/review_form" style="@style/Card">
-                <TextView android:id="@+id/review_pickup_label" style="@style/Caption" android:text="Điểm đón" />
-                <androidx.appcompat.widget.AppCompatButton android:id="@+id/review_pickup" style="@style/ButtonSecondary" android:text="Chọn điểm đón" />
-                <TextView android:id="@+id/review_pickup_value" style="@style/Body" android:layout_width="match_parent" android:text="Chưa chọn điểm đón" />
-                <TextView android:id="@+id/review_dropoff_label" style="@style/Caption" android:layout_marginTop="12dp" android:text="Điểm xuống" />
-                <androidx.appcompat.widget.AppCompatButton android:id="@+id/review_dropoff" style="@style/ButtonSecondary" android:text="Chọn điểm xuống" />
-                <TextView android:id="@+id/review_dropoff_value" style="@style/Body" android:layout_width="match_parent" android:text="Chưa chọn điểm xuống" />
-                <TextView style="@style/Body" android:layout_marginTop="12dp" android:text="Số người: 1 người" />
-                <TextView style="@style/Caption" android:layout_marginTop="12dp" android:text="Lời nhắn (không bắt buộc)" />
-                <EditText android:id="@+id/review_message" style="@style/Input" android:hint="Lời nhắn cho chủ xe, tối đa 500 ký tự" android:inputType="textCapSentences|textMultiLine" android:singleLine="false" android:minLines="2" android:maxLength="500" android:importantForAutofill="no" />
+            <LinearLayout
+                android:id="@+id/review_form"
+                style="@style/Card">
+                <TextView
+                    android:id="@+id/review_pickup_label"
+                    style="@style/Caption"
+                    android:text="Điểm đón" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/review_pickup"
+                    style="@style/ButtonSecondary"
+                    android:text="Chọn điểm đón"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp" />
+                <TextView
+                    android:id="@+id/review_pickup_value"
+                    style="@style/Body"
+                    android:layout_width="match_parent"
+                    android:text="Chưa chọn điểm đón" />
+                <TextView
+                    android:id="@+id/review_dropoff_label"
+                    style="@style/Caption"
+                    android:layout_marginTop="12dp"
+                    android:text="Điểm xuống" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/review_dropoff"
+                    style="@style/ButtonSecondary"
+                    android:text="Chọn điểm xuống"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp" />
+                <TextView
+                    android:id="@+id/review_dropoff_value"
+                    style="@style/Body"
+                    android:layout_width="match_parent"
+                    android:text="Chưa chọn điểm xuống" />
+                <TextView
+                    style="@style/Body"
+                    android:layout_marginTop="12dp"
+                    android:text="Số người: 1 người" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:tag="ui_section:request_optional_message"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        style="@style/BodyBold"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="12dp"
+                        android:text="Thêm lời nhắn (không bắt buộc)"
+                        android:textColor="@color/primary"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+                        <TextView
+                            style="@style/Caption"
+                            android:layout_marginTop="12dp"
+                            android:text="Lời nhắn (không bắt buộc)" />
+                        <EditText
+                            android:id="@+id/review_message"
+                            style="@style/Input"
+                            android:hint="Lời nhắn cho chủ xe, tối đa 500 ký tự"
+                            android:inputType="textCapSentences|textMultiLine"
+                            android:singleLine="false"
+                            android:minLines="2"
+                            android:maxLength="500"
+                            android:importantForAutofill="no"
+                            android:textColor="@color/ink"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
-            <TextView android:id="@+id/review_status" style="@style/Body" android:layout_width="match_parent" android:accessibilityLiveRegion="polite" android:text="" />
+            <TextView
+                android:id="@+id/review_status"
+                style="@style/Body"
+                android:layout_width="match_parent"
+                android:accessibilityLiveRegion="polite"
+                android:text="" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="0dp"
+                android:paddingBottom="12dp"
+                android:paddingTop="8dp">
+                <TextView
+                    android:id="@+id/search_action_hint"
+                    style="@style/Caption"
+                    android:layout_width="match_parent"
+                    android:text="" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/primary_action"
+                    style="@style/ButtonPrimary"
+                    android:text="Gửi yêu cầu"
+                    android:enabled="false"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingBottom="12dp">
-        <TextView android:id="@+id/search_action_hint" style="@style/Caption" android:layout_width="match_parent" android:text="" />
-        <androidx.appcompat.widget.AppCompatButton android:id="@+id/primary_action" style="@style/ButtonPrimary" android:text="Gửi yêu cầu" android:enabled="false" />
-    </LinearLayout>
 </LinearLayout>

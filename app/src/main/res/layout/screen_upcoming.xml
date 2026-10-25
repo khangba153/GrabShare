@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/background">
-
     <FrameLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp"
         android:visibility="visible">
-
         <ImageButton
             android:id="@+id/header_back"
             style="@style/IconButton"
@@ -22,7 +21,6 @@
             android:visibility="visible"
             android:clickable="true"
             android:focusable="true" />
-
         <TextView
             android:id="@+id/header_title"
             style="@style/Subtitle"
@@ -31,8 +29,9 @@
             android:layout_marginHorizontal="52dp"
             android:layout_marginBottom="0dp"
             android:gravity="center"
-            android:text="Chuyến sắp đi" />
-
+            android:text="Chuyến sắp đi"
+            android:maxLines="1"
+            android:ellipsize="end" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
@@ -43,14 +42,13 @@
             android:clickable="false"
             android:focusable="false" />
     </FrameLayout>
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:fillViewport="true"
         android:clipToPadding="false"
-        android:layout_weight="1">
-
+        android:layout_weight="1"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -58,45 +56,38 @@
             android:paddingHorizontal="20dp"
             android:paddingTop="8dp"
             android:paddingBottom="24dp">
-
             <TextView
                 android:id="@+id/upcoming_status"
                 style="@style/Badge"
                 android:text="Sắp khởi hành" />
-
             <TextView
                 android:id="@+id/upcoming_description"
                 style="@style/Hint"
                 android:text="Hẹn bạn tại điểm đón lúc 17:30." />
-
-            <include layout="@layout/view_map" />
-
-            <include layout="@layout/view_trip_summary" />
-            <TextView android:id="@+id/passenger_route_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="12dp" android:text="Điểm khách: Đang tải…" android:textColor="@color/primary" />
-
-            <!-- Bỏ nút chat giả theo checklist "Không để nút chat không có chức năng" -->
+            <include
+                layout="@layout/view_confirmed_passenger_trip" />
+            <include
+                layout="@layout/view_ride_progress_guidance" />
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/trip_chat"
                 style="@style/ButtonSecondary"
                 android:text="Nhắn tin"
                 android:visibility="gone"
                 android:clickable="false"
-                android:focusable="false" />
-
+                android:focusable="false"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/trip_call"
                 style="@style/ButtonSecondary"
                 android:text="Gọi điện"
                 android:visibility="visible"
                 android:clickable="true"
-                android:focusable="true" />
-
-            <TextView
-                style="@style/Hint"
-                android:text="Có mũ bảo hiểm cho người đi nhờ." />
+                android:focusable="true"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
         </LinearLayout>
     </ScrollView>
-
     <LinearLayout
         android:id="@+id/action_area"
         android:layout_width="match_parent"
@@ -107,23 +98,25 @@
         android:paddingBottom="12dp"
         android:background="@color/background"
         android:visibility="visible">
-
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/primary_action"
             style="@style/ButtonPrimary"
-            android:text="Hoàn thành chuyến"
+            android:text="Xem chuyến"
+            android:visibility="gone"
             android:clickable="true"
-            android:focusable="true" />
-
+            android:focusable="true"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/secondary_action"
             style="@style/ButtonSecondary"
             android:text="Hủy tham gia"
             android:visibility="visible"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
     </LinearLayout>
-
     <LinearLayout
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"
@@ -132,18 +125,16 @@
         android:background="@color/white"
         android:elevation="6dp"
         android:visibility="gone">
-
         <LinearLayout
             android:id="@+id/nav_home"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
             android:clickable="false"
             android:focusable="false"
             android:foreground="?attr/selectableItemBackground">
-
             <ImageView
                 android:id="@+id/nav_home_icon"
                 android:layout_width="22dp"
@@ -151,18 +142,63 @@
                 android:src="@drawable/ic_pin"
                 android:importantForAccessibility="no"
                 app:tint="@color/primary" />
-            <TextView android:id="@+id/nav_home_label" style="@style/Caption" android:text="Tìm chuyến" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/primary" />
+            <TextView
+                android:id="@+id/nav_home_label"
+                style="@style/Caption"
+                android:text="Tìm chuyến"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp"
+                android:textColor="@color/primary" />
         </LinearLayout>
-        <LinearLayout android:id="@+id/nav_trips" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
-            <ImageView android:id="@+id/nav_trips_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_calendar" android:importantForAccessibility="no"
+        <LinearLayout
+            android:id="@+id/nav_trips"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/bottom_navigation_height"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="false"
+            android:focusable="false"
+            android:foreground="?attr/selectableItemBackground">
+            <ImageView
+                android:id="@+id/nav_trips_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_calendar"
+                android:importantForAccessibility="no"
                 app:tint="@color/muted" />
-            <TextView android:id="@+id/nav_trips_label" style="@style/Caption" android:text="Chuyến của tôi" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/muted" />
+            <TextView
+                android:id="@+id/nav_trips_label"
+                style="@style/Caption"
+                android:text="Chuyến của tôi"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp"
+                android:textColor="@color/muted" />
         </LinearLayout>
-        <LinearLayout android:id="@+id/nav_account" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="false" android:focusable="false" android:foreground="?attr/selectableItemBackground">
-            <ImageView android:id="@+id/nav_account_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_user" android:importantForAccessibility="no"
+        <LinearLayout
+            android:id="@+id/nav_account"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/bottom_navigation_height"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="false"
+            android:focusable="false"
+            android:foreground="?attr/selectableItemBackground">
+            <ImageView
+                android:id="@+id/nav_account_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_user"
+                android:importantForAccessibility="no"
                 app:tint="@color/muted" />
-            <TextView android:id="@+id/nav_account_label" style="@style/Caption" android:text="Tài khoản" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/muted" />
+            <TextView
+                android:id="@+id/nav_account_label"
+                style="@style/Caption"
+                android:text="Tài khoản"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp"
+                android:textColor="@color/muted" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
-

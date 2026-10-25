@@ -39,7 +39,9 @@
         android:ellipsize="end" />
     <TextView
         android:id="@+id/trip_cost"
-        style="@style/Badge"
+        style="@style/BodyBold"
+        android:textColor="@color/primary"
+        android:layout_marginTop="6dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Chi phí"
@@ -48,10 +50,22 @@
     <TextView
         android:id="@+id/trip_status"
         style="@style/Badge"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="Trạng thái"
         android:maxLines="1"
         android:ellipsize="end" />
+    <TextView
+        android:id="@+id/trip_pending_requests"
+        style="@style/BodyBold"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:minHeight="48dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="8dp"
+        android:textColor="@color/primary"
+        android:background="?attr/selectableItemBackground"
+        android:text="Xem yêu cầu đi nhờ →" />
 </LinearLayout>

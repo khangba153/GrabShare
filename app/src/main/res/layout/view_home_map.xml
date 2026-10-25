@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="300dp"
     android:layout_marginBottom="16dp"
     android:background="@drawable/bg_lavender"
     android:clipToOutline="true">
-
-    <!-- Bản đồ tương tác do HomeActivity khởi tạo và quản lý vòng đời. -->
     <org.osmdroid.views.MapView
         android:id="@+id/map_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="Bản đồ tương tác" />
-
     <TextView
         android:id="@+id/home_route_distance"
         style="@style/BodyBold"
@@ -27,7 +25,6 @@
         android:saveEnabled="false"
         android:accessibilityLiveRegion="polite"
         android:text="Chọn điểm đi và điểm đến để xem quãng đường" />
-
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -36,5 +33,4 @@
         android:textSize="10sp"
         android:textColor="@color/muted"
         android:padding="4dp" />
-
 </FrameLayout>

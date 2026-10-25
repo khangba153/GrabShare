@@ -1,17 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     style="@style/Card"
     android:orientation="vertical">
-
-    <!-- Activity cập nhật hai nhãn bằng dữ liệu chuyến đọc từ Firestore. -->
     <TextView
         style="@style/Subtitle"
         android:text="Điểm đi và điểm đến" />
-
     <TextView
         style="@style/Caption"
         android:text="Điểm đi" />
-
     <TextView
         android:id="@+id/map_start_label"
         style="@style/Body"
@@ -19,16 +16,13 @@
         android:layout_height="wrap_content"
         android:text="Chưa có thông tin điểm đi"
         android:layout_marginBottom="12dp" />
-
     <TextView
         style="@style/Caption"
         android:text="Điểm đến" />
-
     <TextView
         android:id="@+id/map_end_label"
         style="@style/Body"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Chưa có thông tin điểm đến" />
-
 </LinearLayout>

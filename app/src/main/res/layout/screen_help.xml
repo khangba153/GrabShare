@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -8,7 +7,7 @@
     android:background="@color/background">
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp">
         <ImageButton
             android:id="@+id/header_back"
@@ -23,13 +22,21 @@
             android:layout_marginHorizontal="52dp"
             android:gravity="center"
             android:text="@string/account_help_title" />
+        <ImageButton
+            android:id="@+id/header_action"
+            style="@style/IconButton"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="Thông báo"
+            android:layout_gravity="center_vertical|end" />
     </FrameLayout>
     <ScrollView
         android:id="@+id/help_scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -46,50 +53,85 @@
                 android:text="@string/account_help_intro"
                 android:textIsSelectable="true" />
             <LinearLayout
-                style="@style/Card">
+                style="@style/Card"
+                android:tag="ui_section:screen_help_3">
                 <TextView
                     style="@style/Subtitle"
-                    android:text="@string/account_help_passenger_title" />
+                    android:text="@string/account_help_passenger_title"
+                    android:minHeight="48dp"
+                    android:layout_width="match_parent"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground" />
                 <TextView
                     style="@style/Body"
                     android:text="@string/account_help_passenger"
                     android:textIsSelectable="true" />
             </LinearLayout>
             <LinearLayout
-                style="@style/Card">
+                style="@style/Card"
+                android:tag="ui_section:screen_help_4">
                 <TextView
                     style="@style/Subtitle"
-                    android:text="@string/account_help_driver_title" />
+                    android:text="@string/account_help_driver_title"
+                    android:minHeight="48dp"
+                    android:layout_width="match_parent"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground" />
                 <TextView
                     style="@style/Body"
                     android:text="@string/account_help_driver"
                     android:textIsSelectable="true" />
             </LinearLayout>
             <LinearLayout
-                style="@style/Card">
+                style="@style/Card"
+                android:tag="ui_section:screen_help_5">
                 <TextView
                     style="@style/Subtitle"
-                    android:text="@string/account_help_profile_title" />
+                    android:text="@string/account_help_profile_title"
+                    android:minHeight="48dp"
+                    android:layout_width="match_parent"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground" />
                 <TextView
                     style="@style/Body"
                     android:text="@string/account_help_profile"
                     android:textIsSelectable="true" />
             </LinearLayout>
             <LinearLayout
-                style="@style/Card">
+                style="@style/Card"
+                android:tag="ui_section:screen_help_6">
                 <TextView
                     style="@style/Subtitle"
-                    android:text="@string/account_help_safety_title" />
+                    android:text="@string/account_help_safety_title"
+                    android:minHeight="48dp"
+                    android:layout_width="match_parent"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground" />
                 <TextView
                     style="@style/Body"
                     android:text="@string/account_help_safety"
                     android:textIsSelectable="true" />
             </LinearLayout>
             <LinearLayout
-                style="@style/Card">
+                style="@style/Card"
+                android:tag="ui_section:screen_help_7">
                 <TextView
                     style="@style/Subtitle"
-                    android:text="@string/account_help_problem_title" />
+                    android:text="@string/account_help_problem_title"
+                    android:minHeight="48dp"
+                    android:layout_width="match_parent"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground" />
                 <TextView
                     style="@style/Body"
                     android:text="@string/account_help_problem"
@@ -98,11 +140,15 @@
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/help_terms"
                 style="@style/ButtonSecondary"
-                android:text="@string/account_terms_title" />
+                android:text="@string/account_terms_title"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
             <androidx.appcompat.widget.AppCompatButton
                 style="@style/ButtonSecondary"
                 android:id="@+id/static_page_back"
-                android:text="@string/leader_back" />
+                android:text="@string/leader_back"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

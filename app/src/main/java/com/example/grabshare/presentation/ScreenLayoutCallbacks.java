@@ -16,6 +16,7 @@ import androidx.core.view.WindowInsetsCompat;
 /** Chừa vùng hệ thống cho màn thật, giữ nguyên padding thiết kế và hỗ trợ bàn phím. */
 public final class ScreenLayoutCallbacks implements Application.ActivityLifecycleCallbacks {
 
+
     /** Mỗi root được gắn một lần sau khi Activity đã dựng xong giao diện. */
     @Override
     public void onActivityPostCreated(@NonNull Activity activity, Bundle savedInstanceState) {
@@ -24,6 +25,7 @@ public final class ScreenLayoutCallbacks implements Application.ActivityLifecycl
             return;
         }
         final View screen = content.getChildAt(0);
+        ScreenSections.bind(screen, savedInstanceState);
         final int initialLeft = screen.getPaddingLeft();
         final int initialTop = screen.getPaddingTop();
         final int initialRight = screen.getPaddingRight();
@@ -76,6 +78,7 @@ public final class ScreenLayoutCallbacks implements Application.ActivityLifecycl
 
     @Override
     public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle state) {
+        ScreenSections.save(activity.findViewById(android.R.id.content), state);
     }
 
     @Override

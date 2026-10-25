@@ -1,42 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:background="@color/background">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-        android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp">
-        <ImageButton android:id="@+id/header_back" style="@style/IconButton"
-            android:src="@drawable/ic_back" android:contentDescription="Quay lại điều kiện tìm chuyến" />
-        <TextView style="@style/Subtitle" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="wrap_content" android:text="Chuyến phù hợp dọc tuyến" />
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp">
+        <ImageButton
+            android:id="@+id/header_back"
+            style="@style/IconButton"
+            android:src="@drawable/ic_back"
+            android:contentDescription="Quay lại điều kiện tìm chuyến" />
+        <TextView
+            style="@style/Subtitle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Chuyến phù hợp dọc tuyến"
+            android:maxLines="1"
+            android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/header_action"
+            style="@style/IconButton"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="Thông báo" />
     </LinearLayout>
-    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
-        android:fillViewport="true">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="vertical" android:padding="16dp">
-            <LinearLayout android:id="@+id/search_summary_card" style="@style/Card"
-                android:background="@drawable/bg_lavender" android:clickable="true" android:focusable="true"
-                android:foreground="?attr/selectableItemBackground" android:contentDescription="Đổi điều kiện tìm chuyến">
-                <include layout="@layout/view_route" />
-                <TextView android:id="@+id/search_summary" style="@style/Caption" />
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:overScrollMode="ifContentScrolls">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+            <LinearLayout
+                android:id="@+id/search_summary_card"
+                style="@style/Card"
+                android:background="@drawable/bg_lavender"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:contentDescription="Đổi điều kiện tìm chuyến">
+                <include
+                    layout="@layout/view_route" />
+                <TextView
+                    android:id="@+id/search_summary"
+                    style="@style/Caption" />
             </LinearLayout>
-            <Spinner android:id="@+id/en_route_sort" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:minHeight="48dp"
+            <Spinner
+                android:id="@+id/en_route_sort"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:contentDescription="Sắp xếp kết quả" />
-            <ProgressBar android:id="@+id/en_route_progress" style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:indeterminate="true" android:visibility="gone" />
-            <TextView android:id="@+id/status_text" style="@style/Body" android:accessibilityLiveRegion="polite"
-                android:text="Chuyến xe phù hợp: 0" android:paddingVertical="12dp" />
-            <TextView android:id="@+id/en_route_notice" style="@style/Caption"
-                android:accessibilityLiveRegion="polite" android:visibility="gone"
+            <ProgressBar
+                android:id="@+id/en_route_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:indeterminate="true"
+                android:visibility="gone" />
+            <TextView
+                android:id="@+id/status_text"
+                style="@style/Body"
+                android:accessibilityLiveRegion="polite"
+                android:text="Chuyến xe phù hợp: 0"
+                android:paddingVertical="12dp" />
+            <TextView
+                android:id="@+id/en_route_notice"
+                style="@style/Caption"
+                android:accessibilityLiveRegion="polite"
+                android:visibility="gone"
                 android:paddingBottom="12dp" />
-            <androidx.recyclerview.widget.RecyclerView android:id="@+id/ride_list"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/ride_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false" />
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/en_route_more"
-                style="@style/ButtonPrimary" android:text="Xem thêm ứng viên" android:enabled="false" />
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/en_route_refresh"
-                style="@style/ButtonSecondary" android:text="Làm mới từ máy chủ" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/en_route_more"
+                style="@style/ButtonPrimary"
+                android:text="Xem thêm ứng viên"
+                android:enabled="false"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/en_route_refresh"
+                style="@style/ButtonSecondary"
+                android:text="Làm mới từ máy chủ"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

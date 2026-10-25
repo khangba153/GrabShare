@@ -19,7 +19,9 @@
             android:text="Chuyến của tôi"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/ink" />
+            android:textColor="@color/ink"
+            android:maxLines="1"
+            android:ellipsize="end" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
@@ -40,7 +42,9 @@
             android:layout_weight="1"
             android:layout_marginEnd="4dp"
             android:text="Đi nhờ"
-            android:layout_marginTop="0dp" />
+            android:layout_marginTop="0dp"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/role_driver"
             style="@style/ButtonSecondary"
@@ -48,15 +52,47 @@
             android:layout_weight="1"
             android:layout_marginStart="4dp"
             android:text="Chủ xe"
-            android:layout_marginTop="0dp" />
+            android:layout_marginTop="0dp"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
     </LinearLayout>
-    <androidx.appcompat.widget.AppCompatButton
-        style="@style/ButtonSecondary"
-        android:id="@+id/trip_list_filter"
-        android:text="Lọc: Tất cả"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="0dp"
-        android:layout_marginBottom="8dp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/tab_upcoming"
+            style="@style/ButtonPrimary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="3dp"
+            android:layout_marginTop="0dp"
+            android:text="Đang theo dõi"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/tab_history"
+            style="@style/ButtonSecondary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="3dp"
+            android:layout_marginTop="0dp"
+            android:text="Lịch sử"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
+        <androidx.appcompat.widget.AppCompatButton
+            style="@style/ButtonSecondary"
+            android:id="@+id/trip_list_filter"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:text="Bộ lọc"
+            android:layout_marginHorizontal="3dp"
+            android:layout_marginTop="0dp"
+            android:layout_marginBottom="8dp"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
+    </LinearLayout>
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -79,7 +115,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="Bạn chưa có chuyến đi nhờ nào"
-            android:textColor="#6B7280"
+            android:textColor="@color/ink"
             android:textSize="16sp"
             android:visibility="gone" />
         <LinearLayout
@@ -114,7 +150,7 @@
         <LinearLayout
             android:id="@+id/nav_home"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -137,7 +173,7 @@
         <LinearLayout
             android:id="@+id/nav_trips"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -159,7 +195,7 @@
         <LinearLayout
             android:id="@+id/nav_account"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
