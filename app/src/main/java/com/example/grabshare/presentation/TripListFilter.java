@@ -2,6 +2,7 @@ package com.example.grabshare.presentation;
 
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
@@ -31,8 +32,29 @@ public final class TripListFilter {
         if (state != null) {
             statusIndex = Math.max(0, Math.min(state.getInt("list_status"), statusValues.length - 1));
             periodIndex = Math.max(0, Math.min(state.getInt("list_period"), 3));
-            orderIndex = Math.max(0, Math.min(state.getInt("list_order"), 1));
+            orderIndex = Math.max(0, Math.min(state.getInt("list_order"), 2));
         }
+    }
+
+    /** Lưu theo UID, vai trò và mục để chuyển màn không làm mất hoặc trộn bộ lọc. */
+    public void savePreferences(Context context, String key) {
+        context.getSharedPreferences("trip_list_preferences", Context.MODE_PRIVATE).edit()
+                .putInt(key + "_status", statusIndex)
+                .putInt(key + "_period", periodIndex)
+                .putInt(key + "_order", orderIndex).apply();
+    }
+
+    /** Không dùng lựa chọn của tài khoản khác làm điều kiện lọc cho phiên mới. */
+    public void restorePreferences(Context context, String key) {
+        SharedPreferences preferences = context.getSharedPreferences("trip_list_preferences", Context.MODE_PRIVATE);
+        statusIndex = Math.max(0, Math.min(preferences.getInt(key + "_status", 0), statusValues.length - 1));
+        periodIndex = Math.max(0, Math.min(preferences.getInt(key + "_period", 0), 3));
+        orderIndex = Math.max(0, Math.min(preferences.getInt(key + "_order", 0), 2));
+    }
+
+    /** Thứ tự đề xuất phụ thuộc mục đang quản lý hay lịch sử, do màn danh sách quyết định. */
+    public boolean automaticOrder() {
+        return orderIndex == 0;
     }
 
     public void save(Bundle state) {
@@ -99,7 +121,7 @@ public final class TripListFilter {
         if (second == null) {
             return -1;
         }
-        if (orderIndex == 1) {
+        if (orderIndex == 2) {
             return second.compareTo(first);
         }
         return first.compareTo(second);
@@ -113,8 +135,8 @@ public final class TripListFilter {
         final Spinner status = addChoice(context, content, "Trạng thái", statusLabels, statusIndex);
         final Spinner period = addChoice(context, content, "Ngày khởi hành",
                 new String[]{"Mọi ngày", "Hôm nay", "7 ngày từ hôm nay", "30 ngày đến hôm nay"}, periodIndex);
-        final Spinner order = addChoice(context, content, "Thứ tự ngày khởi hành",
-                new String[]{"Tăng dần", "Giảm dần"}, orderIndex);
+        final Spinner order = addChoice(context, content, "Sắp xếp",
+                new String[]{"Đề xuất", "Khởi hành sớm trước", "Khởi hành muộn trước"}, orderIndex);
         new AlertDialog.Builder(context).setTitle("Lọc danh sách chuyến").setView(content)
                 .setNegativeButton("Đóng", null)
                 .setNeutralButton("Đặt lại", new DialogInterface.OnClickListener() {

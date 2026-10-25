@@ -11,6 +11,7 @@ import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.presentation.ScreenFeedback;
+import com.example.grabshare.presentation.TripListState;
 import com.example.grabshare.repository.passenger.PassengerTripsRepository;
 import com.example.grabshare.repository.passenger.PassengerTripsRepository.SingleRequestDetails;
 import com.google.firebase.auth.FirebaseAuth;
@@ -98,10 +99,13 @@ public class CancelledRideActivity extends AppCompatActivity {
                     details.setText("");
                     return;
                 }
-                String effective = RideAdapter.RideViewHolder.resolveEffectiveStatus(result.getRequest(), result.getTrip());
-                String message = "Yêu cầu hoặc chuyến đã hủy. Đây là lịch sử, không phải một lần đặt chỗ mới.";
-                if (!"CANCELLED".equals(effective)) {
-                    message = "Trạng thái đã thay đổi: " + effective + ". Quay lại danh sách để mở màn tương ứng.";
+                String effective = TripListState.passengerStatus(result.getRequest(), result.getTrip(),
+                        System.currentTimeMillis());
+                String message = TripListState.label(effective, result.getTrip(), System.currentTimeMillis());
+                if ("EXPIRED".equals(effective)) {
+                    message = "Hết hạn · Chủ xe chưa nhận bạn trước khi chuyến khởi hành.";
+                } else if (!TripListState.history(effective)) {
+                    message = "Trạng thái đã thay đổi. Quay lại danh sách để xem chuyến hiện tại.";
                 }
                 ScreenFeedback.show(status, message, ScreenFeedback.Kind.INFORMATION);
                 String messageText = result.getRequest().getMessage();

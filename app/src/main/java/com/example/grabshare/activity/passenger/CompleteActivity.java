@@ -16,6 +16,7 @@ import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.RideProgressGuidance;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.PublicProfile;
@@ -426,6 +427,7 @@ public class CompleteActivity extends AppCompatActivity {
     private void bindTrip(SingleRequestDetails details) {
         Trip trip = details.getTrip();
         TripRequest request = details.getRequest();
+        RideProgressGuidance.bindPassenger(findViewById(R.id.ride_progress_guidance), request, trip);
         PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
         PublicProfile profile = details.getDriverProfile();
         String displayName = "Chủ xe";

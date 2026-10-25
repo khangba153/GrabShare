@@ -9,6 +9,7 @@ import android.widget.TextView;
 
 import com.example.grabshare.R;
 import com.example.grabshare.presentation.TripCardText;
+import com.example.grabshare.presentation.TripListState;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.presentation.PlaceNameFormatter;
@@ -19,6 +20,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Hiển thị danh sách chuyến của chủ xe.
@@ -27,6 +30,29 @@ public class DriverTripAdapter extends BaseAdapter {
 
     private final LayoutInflater layoutInflater;
     private final List<Trip> trips;
+    private final Map<String, Integer> pendingCounts = new HashMap<String, Integer>();
+    private boolean countsConfirmed;
+    private OnRequestsClickListener requestsClickListener;
+
+    /** Tách thao tác mở yêu cầu khỏi thao tác mở màn quản lý chuyến. */
+    public interface OnRequestsClickListener {
+        void onRequestsClick(Trip trip);
+    }
+
+    /** Nhận nơi xử lý điều hướng; adapter chỉ chịu trách nhiệm hiển thị. */
+    public void setOnRequestsClickListener(OnRequestsClickListener listener) {
+        requestsClickListener = listener;
+    }
+
+    /** Null biểu thị chưa xác nhận số lượng, không được hiển thị như không có yêu cầu. */
+    public void replacePendingCounts(Map<String, Integer> updatedCounts) {
+        pendingCounts.clear();
+        countsConfirmed = updatedCounts != null;
+        if (updatedCounts != null) {
+            pendingCounts.putAll(updatedCounts);
+        }
+        notifyDataSetChanged();
+    }
 
     /**
      * Khởi tạo adapter dùng chung cho danh sách chuyến.
@@ -142,13 +168,35 @@ public class DriverTripAdapter extends BaseAdapter {
                 "Toàn tuyến: " + formatContributionAmount(currentTrip.getCostVnd())
         );
 
-        if (TripCardText.pastDeparture(currentTrip)
-                && ("OPEN".equals(currentTrip.getStatus()) || "FULL".equals(currentTrip.getStatus()))) {
-            statusText.setText("Đã qua giờ · Chưa kết thúc");
-        } else {
-            statusText.setText(formatTripStatus(currentTrip.getStatus()));
+        long now = System.currentTimeMillis();
+        String displayStatus = TripListState.driverStatus(currentTrip, now);
+        statusText.setText(TripListState.label(displayStatus, currentTrip, now));
+        if ("EXPIRED".equals(displayStatus)) {
+            statusText.setText("Hết hạn · Không nhận khách");
         }
 
+        TextView requestsText = tripItemView.findViewById(R.id.trip_pending_requests);
+        Integer pendingCount = pendingCounts.get(currentTrip.getId());
+        String requestsLabel = "Xem yêu cầu · Chưa xác nhận số lượng →";
+        if (countsConfirmed) {
+            requestsLabel = "Xem yêu cầu đi nhờ →";
+            if (pendingCount != null && pendingCount > 0 && !TripListState.history(displayStatus)) {
+                requestsLabel = pendingCount + " yêu cầu chờ · Xem ngay →";
+            }
+        }
+        if (TripListState.history(displayStatus)) {
+            requestsLabel = "Xem lịch sử yêu cầu →";
+        }
+        requestsText.setText(requestsLabel);
+        requestsText.setOnClickListener(new View.OnClickListener() {
+            /** Mở đúng chuyến được gắn lại khi ListView tái sử dụng thẻ. */
+            @Override
+            public void onClick(View view) {
+                if (requestsClickListener != null) {
+                    requestsClickListener.onRequestsClick(currentTrip);
+                }
+            }
+        });
         return tripItemView;
     }
 
@@ -165,7 +213,7 @@ public class DriverTripAdapter extends BaseAdapter {
             return "Chưa có thông tin địa điểm";
         }
 
-        return PlaceNameFormatter.format(place.getName());
+        return TripCardText.place(place);
     }
 
     /**

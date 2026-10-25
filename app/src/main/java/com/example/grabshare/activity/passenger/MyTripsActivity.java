@@ -1,6 +1,7 @@
 package com.example.grabshare.activity.passenger;
 
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -15,6 +16,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.grabshare.R;
 import com.example.grabshare.presentation.MainNavigation;
 import com.example.grabshare.presentation.TripListFilter;
+import com.example.grabshare.presentation.TripListState;
+import com.example.grabshare.presentation.TripListTimeRefresh;
+import com.google.firebase.Timestamp;
 import com.example.grabshare.activity.account.LoginActivity;
 import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
@@ -52,9 +56,16 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     private PassengerSessionGuard sessionGuard;
     private int loadGeneration;
     private final List<PassengerRideItem> loadedTrips = new ArrayList<>();
-    private final TripListFilter listFilter = new TripListFilter(
-            new String[]{"Tất cả", "Chờ xác nhận", "Đã được nhận", "Hoàn thành", "Đã hủy", "Bị từ chối"},
-            new String[]{"", "PENDING", "ACCEPTED", "COMPLETED", "CANCELLED", "REJECTED"});
+    private final TripListFilter activeFilter = new TripListFilter(
+            new String[]{"Tất cả", "Chờ xác nhận", "Đã được nhận"},
+            new String[]{"", "PENDING", "ACCEPTED"});
+    private final TripListFilter historyFilter = new TripListFilter(
+            new String[]{"Tất cả", "Hoàn thành", "Đã hủy", "Bị từ chối", "Hết hạn", "Không khả dụng"},
+            new String[]{"", "COMPLETED", "CANCELLED", "REJECTED", "EXPIRED", "UNKNOWN"});
+    private TripListFilter listFilter = activeFilter;
+    private boolean showingHistory;
+    private boolean hasLoadedTrips;
+    private final TripListTimeRefresh timeRefresh = new TripListTimeRefresh();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,7 +96,16 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         sessionGuard = new PassengerSessionGuard(this);
 
         setupListeners();
-        listFilter.restore(savedInstanceState);
+        activeFilter.restorePreferences(this, filterKey("active"));
+        historyFilter.restorePreferences(this, filterKey("history"));
+        showingHistory = getSharedPreferences("trip_list_preferences", MODE_PRIVATE)
+                .getBoolean(filterKey("selected_history"), false);
+        if (savedInstanceState != null) {
+            showingHistory = savedInstanceState.getBoolean("passenger_showing_history", showingHistory);
+            activeFilter.restore(savedInstanceState.getBundle("passenger_active_filter"));
+            historyFilter.restore(savedInstanceState.getBundle("passenger_history_filter"));
+        }
+        selectGroup(showingHistory);
         updateFilterLabel();
     }
 
@@ -121,6 +141,18 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
 
         MainNavigation.bind(this);
         MainNavigation.bindNotifications(this, R.id.header_action);
+        findViewById(R.id.tab_upcoming).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View clickedView) {
+                selectGroup(false);
+            }
+        });
+        findViewById(R.id.tab_history).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View clickedView) {
+                selectGroup(true);
+            }
+        });
         findViewById(R.id.trip_list_filter).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -145,6 +177,8 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
 
     @Override
     protected void onStop() {
+        saveFilters();
+        timeRefresh.stop();
         if (sessionGuard != null) sessionGuard.stop();
         loadGeneration = loadGeneration + 1;
         if (tripsListener != null) {
@@ -158,7 +192,13 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     @Override
     protected void onSaveInstanceState(Bundle state) {
         state.putString(EXPECTED_UID, currentUserId);
-        listFilter.save(state);
+        state.putBoolean("passenger_showing_history", showingHistory);
+        Bundle activeState = new Bundle();
+        Bundle historyState = new Bundle();
+        activeFilter.save(activeState);
+        historyFilter.save(historyState);
+        state.putBundle("passenger_active_filter", activeState);
+        state.putBundle("passenger_history_filter", historyState);
         super.onSaveInstanceState(state);
     }
 
@@ -178,6 +218,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             public void onSuccess(List<PassengerRideItem> result) {
                 if (!sessionGuard.current(sessionToken) || generation != loadGeneration) return;
                 findViewById(R.id.trip_list_filter).setEnabled(true);
+                hasLoadedTrips = true;
                 loadedTrips.clear();
                 if (result != null) {
                     loadedTrips.addAll(result);
@@ -203,24 +244,20 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         TripRequest request = rideItem.getRequest();
         Trip trip = rideItem.getTrip();
 
-        if (trip == null) {
-            Toast.makeText(this, "Chuyến đi này không còn tồn tại.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         String requestId = request.getId();
-        String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
+        String effectiveStatus = TripListState.passengerStatus(request, trip, System.currentTimeMillis());
 
         Intent intent = null;
         if ("PENDING".equalsIgnoreCase(effectiveStatus)) {
             intent = new Intent(this, PendingActivity.class);
         } else if ("REJECTED".equalsIgnoreCase(effectiveStatus)) {
-            intent = new Intent(this, RejectedActivity.class);
+            intent = new Intent(this, CancelledRideActivity.class);
         } else if ("ACCEPTED".equalsIgnoreCase(effectiveStatus) || "FULL".equalsIgnoreCase(effectiveStatus)) {
             intent = new Intent(this, UpcomingActivity.class);
         } else if ("COMPLETED".equalsIgnoreCase(effectiveStatus)) {
             intent = new Intent(this, CompleteActivity.class);
-        } else if ("CANCELLED".equalsIgnoreCase(effectiveStatus)) {
+        } else if ("CANCELLED".equalsIgnoreCase(effectiveStatus) || "EXPIRED".equals(effectiveStatus)
+                || "UNKNOWN".equals(effectiveStatus)) {
             intent = new Intent(this, CancelledRideActivity.class);
         }
 
@@ -234,6 +271,8 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     }
 
     private void showLoadingState() {
+        hasLoadedTrips = false;
+        timeRefresh.stop();
         findViewById(R.id.trip_list_filter).setEnabled(false);
         if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
         if (recyclerView != null) recyclerView.setVisibility(View.GONE);
@@ -243,21 +282,44 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
 
     /** Lọc bản đã tải, giữ từng request_id và không thay đổi trạng thái trên server. */
     private void applyListFilter() {
+        if (!hasLoadedTrips) {
+            return;
+        }
+        final long now = System.currentTimeMillis();
+        long nextDeparture = Long.MAX_VALUE;
         List<PassengerRideItem> visibleTrips = new ArrayList<>();
         for (PassengerRideItem item : loadedTrips) {
+            if (item == null || item.getRequest() == null) {
+                continue;
+            }
             Trip trip = item.getTrip();
             com.google.firebase.Timestamp departure = null;
             if (trip != null) {
                 departure = trip.getDepartureAt();
             }
-            String status = RideAdapter.RideViewHolder.resolveEffectiveStatus(item.getRequest(), trip);
-            if (listFilter.matches(status, departure)) {
+            if (departure != null && departure.toDate().getTime() > now) {
+                nextDeparture = Math.min(nextDeparture, departure.toDate().getTime());
+            }
+            String status = TripListState.passengerStatus(item.getRequest(), trip, now);
+            if (showingHistory == TripListState.history(status) && listFilter.matches(status, departure)) {
                 visibleTrips.add(item);
             }
         }
         Collections.sort(visibleTrips, new Comparator<PassengerRideItem>() {
             @Override
             public int compare(PassengerRideItem first, PassengerRideItem second) {
+                if (showingHistory && listFilter.automaticOrder()) {
+                    return TripListState.compareTime(historyTime(first, now), historyTime(second, now), true);
+                }
+                if (!showingHistory) {
+                    int firstPriority = TripListState.attentionPriority(
+                            TripListState.passengerStatus(first.getRequest(), first.getTrip(), now), first.getTrip(), now);
+                    int secondPriority = TripListState.attentionPriority(
+                            TripListState.passengerStatus(second.getRequest(), second.getTrip(), now), second.getTrip(), now);
+                    if (firstPriority != secondPriority) {
+                        return Integer.compare(firstPriority, secondPriority);
+                    }
+                }
                 com.google.firebase.Timestamp firstTime = null;
                 com.google.firebase.Timestamp secondTime = null;
                 if (first.getTrip() != null) {
@@ -269,8 +331,24 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
                 return listFilter.compare(firstTime, secondTime);
             }
         });
+        timeRefresh.schedule(nextDeparture, new Runnable() {
+            /** Tự chuyển yêu cầu hết giờ sang lịch sử mà không cần ghi dữ liệu hay mở lại màn. */
+            @Override
+            public void run() {
+                if (sessionGuard != null && sessionGuard.current(sessionGuard.token())) {
+                    applyListFilter();
+                }
+            }
+        });
         if (visibleTrips.isEmpty()) {
-            tvEmptyState.setText("Không có chuyến phù hợp bộ lọc. Chọn Bộ lọc → Đặt lại để xem tất cả.");
+            String message = "Chưa có chuyến đang theo dõi.";
+            if (showingHistory) {
+                message = "Chưa có lịch sử đi nhờ.";
+            }
+            if (!"Bộ lọc".equals(listFilter.summary())) {
+                message = "Không có chuyến phù hợp. Chọn Bộ lọc → Đặt lại.";
+            }
+            tvEmptyState.setText(message);
             showEmptyState();
         } else {
             showDataState(visibleTrips);
@@ -299,10 +377,74 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     }
 
     private void showErrorState() {
+        hasLoadedTrips = false;
+        timeRefresh.stop();
         findViewById(R.id.trip_list_filter).setEnabled(false);
         if (progressBar != null) progressBar.setVisibility(View.GONE);
         if (recyclerView != null) recyclerView.setVisibility(View.GONE);
         if (tvEmptyState != null) tvEmptyState.setVisibility(View.GONE);
         if (layoutError != null) layoutError.setVisibility(View.VISIBLE);
+    }
+
+    /** Mỗi vai trò và tài khoản lưu bộ lọc riêng, kể cả khi MainNavigation tạo lại Activity. */
+    private String filterKey(String suffix) {
+        return "passenger_" + currentUserId + "_" + suffix;
+    }
+
+    private void saveFilters() {
+        if (currentUserId == null) {
+            return;
+        }
+        activeFilter.savePreferences(this, filterKey("active"));
+        historyFilter.savePreferences(this, filterKey("history"));
+        getSharedPreferences("trip_list_preferences", MODE_PRIVATE).edit()
+                .putBoolean(filterKey("selected_history"), showingHistory).apply();
+    }
+
+    /** Đổi mục chỉ lọc tại máy; không biến PENDING hết giờ thành CANCELLED. */
+    private void selectGroup(boolean history) {
+        showingHistory = history;
+        listFilter = activeFilter;
+        if (history) {
+            listFilter = historyFilter;
+        }
+        updateGroupButton(R.id.tab_upcoming, !history);
+        updateGroupButton(R.id.tab_history, history);
+        updateFilterLabel();
+        applyListFilter();
+    }
+
+    private void updateGroupButton(int identifier, boolean selected) {
+        Button button = findViewById(identifier);
+        int background = R.color.white;
+        int text = R.color.ink;
+        if (selected) {
+            background = R.color.primary;
+            text = R.color.white;
+        }
+        button.setSelected(selected);
+        button.setBackgroundTintList(ColorStateList.valueOf(getColor(background)));
+        button.setTextColor(getColor(text));
+    }
+
+    private Timestamp historyTime(PassengerRideItem item, long now) {
+        TripRequest request = item.getRequest();
+        if ("CANCELLED".equals(request.getStatus()) || "REJECTED".equals(request.getStatus())) {
+            // Chuyến đổi về sau không làm lịch sử hủy/từ chối cũ nhảy lên đầu danh sách.
+            if (request.getUpdatedAt() != null) {
+                return request.getUpdatedAt();
+            }
+            if (request.getCreatedAt() != null) {
+                return request.getCreatedAt();
+            }
+        }
+        return TripListState.historyTime(TripListState.passengerStatus(request, item.getTrip(), now),
+                request.getUpdatedAt(), request.getCreatedAt(), item.getTrip());
+    }
+
+    @Override
+    protected void onDestroy() {
+        timeRefresh.close();
+        super.onDestroy();
     }
 }

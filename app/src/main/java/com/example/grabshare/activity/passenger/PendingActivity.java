@@ -16,6 +16,8 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.TripListState;
+import com.example.grabshare.presentation.TripListTimeRefresh;
 import com.example.grabshare.activity.search.HomeActivity;
 import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
@@ -42,6 +44,7 @@ import java.util.Locale;
  * Activity hiển thị trạng thái Chờ chủ xe xác nhận (Pending) của Passenger (Thuận-2).
  */
 public class PendingActivity extends AppCompatActivity {
+    private final TripListTimeRefresh timeRefresh = new TripListTimeRefresh();
 
     private ImageButton headerBack;
     private TextView headerTitle;
@@ -221,6 +224,7 @@ public class PendingActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
+        timeRefresh.stop();
         if (sessionGuard != null) {
             sessionGuard.stop();
         }
@@ -292,7 +296,30 @@ public class PendingActivity extends AppCompatActivity {
                 currentDetails = details;
                 findViewById(R.id.pending_trip_summary).setVisibility(View.VISIBLE);
                 findViewById(R.id.pending_route_summary).setVisibility(View.VISIBLE);
-                String effectiveStatus = RideAdapter.RideViewHolder.resolveEffectiveStatus(request, trip);
+                String effectiveStatus = TripListState.passengerStatus(request, trip, System.currentTimeMillis());
+                if ("EXPIRED".equals(effectiveStatus)) {
+                    if (!hasNavigated) {
+                        hasNavigated = true;
+                        Intent historyIntent = new Intent(PendingActivity.this, CancelledRideActivity.class);
+                        historyIntent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+                        startActivity(historyIntent);
+                        finish();
+                    }
+                    return;
+                }
+                if ("PENDING".equals(effectiveStatus) && trip.getDepartureAt() != null) {
+                    timeRefresh.schedule(trip.getDepartureAt().toDate().getTime(), new Runnable() {
+                        /** Yêu cầu đang mở cũng hết hạn đúng giờ, không giữ nút hủy cũ trên màn. */
+                        @Override
+                        public void run() {
+                            if (sessionGuard.current(sessionToken)) {
+                                startListeningRequest();
+                            }
+                        }
+                    });
+                } else {
+                    timeRefresh.stop();
+                }
 
                 // Ưu tiên kiểm tra chuyến đi đã bị hủy bởi chủ xe
                 if ("CANCELLED".equalsIgnoreCase(effectiveStatus)) {
@@ -553,6 +580,13 @@ public class PendingActivity extends AppCompatActivity {
         return currentUserId.equals(request.getPassengerId()) && "PENDING".equals(request.getStatus())
                 && ("OPEN".equals(trip.getStatus()) || "FULL".equals(trip.getStatus()))
                 && trip.getDepartureAt() != null && trip.getDepartureAt().toDate().after(new Date());
+    }
+
+    /** Giải phóng lịch theo dõi thời gian khi màn bị đóng hoặc tạo lại. */
+    @Override
+    protected void onDestroy() {
+        timeRefresh.close();
+        super.onDestroy();
     }
 
     private String formatTimestamp(Timestamp timestamp) {

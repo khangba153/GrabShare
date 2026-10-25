@@ -16,12 +16,60 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.Source;
+import com.google.firebase.firestore.EventListener;
+import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.MetadataChanges;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 /** Đọc danh sách và chi tiết yêu cầu đi nhờ dành cho chủ xe. */
 public class DriverRequestRepository {
+    /** Theo dõi yêu cầu của đúng chủ xe; đếm tại máy để không cần index tổng hợp mới. */
+    public ListenerRegistration watchPendingCounts(
+            final String driverIdentifier,
+            final RepositoryCallback<Map<String, Integer>> callback) {
+        return firestore.collection("requests")
+                .whereEqualTo("driverId", driverIdentifier)
+                .addSnapshotListener(MetadataChanges.INCLUDE, new EventListener<QuerySnapshot>() {
+                    /** Chỉ công bố số lượng sau xác nhận máy chủ, không giả cache thành số không. */
+                    @Override
+                    public void onEvent(QuerySnapshot snapshot, FirebaseFirestoreException error) {
+                        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+                        if (currentUser == null || !driverIdentifier.equals(currentUser.getUid())) {
+                            return;
+                        }
+                        if (error != null) {
+                            callback.onError(error);
+                            return;
+                        }
+                        if (snapshot == null || snapshot.getMetadata().isFromCache()
+                                || snapshot.getMetadata().hasPendingWrites()) {
+                            callback.onError(new IllegalStateException("Chưa xác nhận số yêu cầu."));
+                            return;
+                        }
+                        Map<String, Integer> counts = new HashMap<String, Integer>();
+                        for (DocumentSnapshot document : snapshot.getDocuments()) {
+                            String tripIdentifier = document.getString("tripId");
+                            if ("PENDING".equals(document.getString("status"))
+                                    && driverIdentifier.equals(document.getString("driverId"))
+                                    && tripIdentifier != null && !tripIdentifier.isEmpty()) {
+                                Integer previousCount = counts.get(tripIdentifier);
+                                int updatedCount = 1;
+                                if (previousCount != null) {
+                                    updatedCount = previousCount + 1;
+                                }
+                                counts.put(tripIdentifier, updatedCount);
+                            }
+                        }
+                        callback.onSuccess(counts);
+                    }
+                });
+    }
+
     private final FirebaseFirestore firestore;
     private final FirebaseAuth firebaseAuth;
 

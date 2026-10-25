@@ -11,6 +11,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.RideProgressGuidance;
 import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -112,6 +113,7 @@ public class AcceptedActivity extends AppCompatActivity {
             primaryAction.setClickable(true);
             primaryAction.setFocusable(true);
             primaryAction.setText("Xem chuyến");
+            primaryAction.setEnabled(false);
         }
         if (secondaryAction != null) {
             secondaryAction.setClickable(true);
@@ -236,7 +238,7 @@ public class AcceptedActivity extends AppCompatActivity {
                 } else if ("COMPLETED".equalsIgnoreCase(effectiveStatus)) {
                     if (!hasNavigated) {
                         hasNavigated = true;
-                        Intent intent = new Intent(AcceptedActivity.this, UpcomingActivity.class);
+                        Intent intent = new Intent(AcceptedActivity.this, CompleteActivity.class);
                         intent.putExtra(NavigationKeys.REQUEST_ID, requestId);
                         startActivity(intent);
                         finish();
@@ -275,7 +277,23 @@ public class AcceptedActivity extends AppCompatActivity {
 
         TripRequest request = details.getRequest();
         Trip trip = details.getTrip();
+        RideProgressGuidance.bindPassenger(findViewById(R.id.ride_progress_guidance), request, trip);
         PublicProfile profile = details.getDriverProfile();
+        boolean acceptedRideConfirmed = request != null && trip != null
+                && "ACCEPTED".equals(request.getStatus()) && "FULL".equals(trip.getStatus())
+                && requestId.equals(trip.getAcceptedRequestId());
+        boolean cancelledRide = request != null && "CANCELLED".equals(request.getStatus());
+        if (trip != null && "CANCELLED".equals(trip.getStatus())) {
+            cancelledRide = true;
+        }
+        if (primaryAction != null) {
+            primaryAction.setEnabled(acceptedRideConfirmed || cancelledRide);
+        }
+        if (acceptedRideConfirmed && statusTitle != null) {
+            statusTitle.setText("Chủ xe đã xác nhận nhận bạn");
+        } else if (!cancelledRide && statusTitle != null) {
+            statusTitle.setText("Chưa xác nhận được chỗ của bạn");
+        }
 
         if (profile != null) {
             if (driverName != null) {
@@ -296,14 +314,20 @@ public class AcceptedActivity extends AppCompatActivity {
             if (tripTime != null && trip.getDepartureAt() != null) {
                 String formattedTime = formatTimestamp(trip.getDepartureAt());
                 tripTime.setText(formattedTime);
-                if (statusDescription != null && !"CANCELLED".equalsIgnoreCase(trip.getStatus())) {
-                    statusDescription.setText("Hẹn bạn tại điểm đón lúc " + formatTimeOnly(trip.getDepartureAt()) + ".");
+                if (statusDescription != null && acceptedRideConfirmed) {
+                    statusDescription.setText("Chủ xe khởi hành lúc "
+                            + formatTimeOnly(trip.getDepartureAt())
+                            + ". Hai bên cần thống nhất giờ đón; đây chưa phải giờ đón bạn.");
                 }
             }
 
             if (tripSeats != null) {
-                long seats = trip.getAvailableSeats() != null ? trip.getAvailableSeats() : 0;
-                tripSeats.setText(seats + " chỗ trống");
+                tripSeats.setText("Chưa xác nhận được chỗ");
+                if (acceptedRideConfirmed) {
+                    tripSeats.setText("Chỗ đã được giữ cho bạn");
+                } else if (cancelledRide) {
+                    tripSeats.setText("Đã hủy");
+                }
             }
 
             if (routeStart != null && trip.getOrigin() != null) {
