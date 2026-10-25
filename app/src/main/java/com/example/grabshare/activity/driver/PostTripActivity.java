@@ -34,6 +34,7 @@ import com.example.grabshare.activity.search.LocationActivity;
 import com.example.grabshare.activity.search.RouteDistanceFormatter;
 import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.contract.DetourLimit;
@@ -702,10 +703,12 @@ public class PostTripActivity extends AppCompatActivity {
     private void updateOriginPlaceDisplay() {
         if (selectedOriginPlace == null) {
             originPlaceValue.setText("Chọn điểm đi");
+            originPlaceValue.setContentDescription(null);
             return;
         }
 
-        originPlaceValue.setText(selectedOriginPlace.getName());
+        originPlaceValue.setText(PlaceNameFormatter.formatMultiline(selectedOriginPlace.getName()));
+        originPlaceValue.setContentDescription(selectedOriginPlace.getName());
     }
 
     /**
@@ -714,10 +717,13 @@ public class PostTripActivity extends AppCompatActivity {
     private void updateDestinationPlaceDisplay() {
         if (selectedDestinationPlace == null) {
             destinationPlaceValue.setText("Chọn điểm đến");
+            destinationPlaceValue.setContentDescription(null);
             return;
         }
 
-        destinationPlaceValue.setText(selectedDestinationPlace.getName());
+        destinationPlaceValue.setText(
+                PlaceNameFormatter.formatMultiline(selectedDestinationPlace.getName()));
+        destinationPlaceValue.setContentDescription(selectedDestinationPlace.getName());
     }
 
     /**

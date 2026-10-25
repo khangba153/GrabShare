@@ -20,12 +20,13 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
-import com.example.grabshare.presentation.MainNavigation;
-import com.example.grabshare.notifications.NotificationPermissionHelper;
 import com.example.grabshare.activity.account.LoginActivity;
 import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.model.Place;
+import com.example.grabshare.notifications.NotificationPermissionHelper;
+import com.example.grabshare.presentation.MainNavigation;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.repository.search.SearchTripPolicy;
 import com.google.firebase.auth.FirebaseAuth;
 
@@ -124,6 +125,7 @@ public class HomeActivity extends AppCompatActivity {
                         ".png",
                         new String[] {"https://maps.geoapify.com/v1/tile/osm-carto/"}) {
 
+                    /** Tạo địa chỉ ô bản đồ theo mức zoom và chỉ số ô từ osmdroid. */
                     @Override
                     public String getTileURLString(long pMapTileIndex) {
                         return getBaseUrl()
@@ -143,6 +145,7 @@ public class HomeActivity extends AppCompatActivity {
         mapView.setOnTouchListener(
                 new View.OnTouchListener() {
 
+                    /** Giữ thao tác vuốt trong map, trả cuộn về màn khi kết thúc chạm. */
                     @Override
                     public boolean onTouch(View clickedView, MotionEvent event) {
                         switch (event.getAction()) {
@@ -226,6 +229,7 @@ public class HomeActivity extends AppCompatActivity {
                 .setOnClickListener(
                         new View.OnClickListener() {
 
+                            /** Mở bộ chọn cho điểm đón, không thay điểm xuống đang có. */
                             @Override
                             public void onClick(View clickedView) {
                                 currentPickingField = 1;
@@ -236,6 +240,7 @@ public class HomeActivity extends AppCompatActivity {
                 .setOnClickListener(
                         new View.OnClickListener() {
 
+                            /** Mở bộ chọn cho điểm xuống, giữ nguyên điểm đón hiện tại. */
                             @Override
                             public void onClick(View clickedView) {
                                 currentPickingField = 2;
@@ -246,6 +251,7 @@ public class HomeActivity extends AppCompatActivity {
                 .setOnClickListener(
                         new View.OnClickListener() {
 
+                            /** Chọn ngày tài xế khởi hành muốn tìm. */
                             @Override
                             public void onClick(View clickedView) {
                                 openDatePicker();
@@ -255,6 +261,7 @@ public class HomeActivity extends AppCompatActivity {
                 .setOnClickListener(
                         new View.OnClickListener() {
 
+                            /** Chọn mốc bắt đầu khung giờ tìm chuyến. */
                             @Override
                             public void onClick(View clickedView) {
                                 openTimePicker();
@@ -264,6 +271,7 @@ public class HomeActivity extends AppCompatActivity {
                 .setOnClickListener(
                         new View.OnClickListener() {
 
+                            /** Kiểm tra điều kiện trước khi mở danh sách chuyến phù hợp. */
                             @Override
                             public void onClick(View clickedView) {
                                 validateAndSearch();
@@ -288,6 +296,7 @@ public class HomeActivity extends AppCompatActivity {
                         this,
                         new DatePickerDialog.OnDateSetListener() {
 
+                            /** Ghi ngày đã chọn vào điều kiện tìm kiếm và cập nhật nhãn. */
                             @Override
                             public void onDateSet(
                                     DatePicker view, int year, int month, int dayOfMonth) {
@@ -312,6 +321,7 @@ public class HomeActivity extends AppCompatActivity {
                         this,
                         new TimePickerDialog.OnTimeSetListener() {
 
+                            /** Ghi giờ và phút đã chọn, giữ nguyên ngày và địa điểm. */
                             @Override
                             public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
                                 searchTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
@@ -333,18 +343,22 @@ public class HomeActivity extends AppCompatActivity {
         // Giao diện chọn tới phút; bỏ giây ẩn để không loại nhầm chuyến đúng giờ đã chọn.
         searchTime.set(Calendar.SECOND, 0);
         searchTime.set(Calendar.MILLISECOND, 0);
-        if (origin == null) {
-            Toast.makeText(this, "Vui lòng chọn điểm đi!", Toast.LENGTH_SHORT).show();
+        if (!SearchTripPolicy.validPlace(origin)) {
+            Toast.makeText(this, "Vui lòng chọn điểm đón hợp lệ!", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (destination == null) {
-            Toast.makeText(this, "Vui lòng chọn điểm đến!", Toast.LENGTH_SHORT).show();
+        if (!SearchTripPolicy.validPlace(destination)) {
+            Toast.makeText(this, "Vui lòng chọn điểm xuống hợp lệ!", Toast.LENGTH_SHORT).show();
             return;
         }
-        // Kiểm tra khoảng cách / trùng tọa độ
-        if (Math.abs(origin.getLatitude() - destination.getLatitude()) < 0.0001
-                && Math.abs(origin.getLongitude() - destination.getLongitude()) < 0.0001) {
-            Toast.makeText(this, "Điểm đi và điểm đến không được trùng nhau!", Toast.LENGTH_SHORT)
+        // Hợp đồng chỉ chặn P/C trùng tọa độ, không tự thêm bán kính tối thiểu giữa hai điểm.
+        if (origin.getLatitude().doubleValue() == destination.getLatitude().doubleValue()
+                && origin.getLongitude().doubleValue()
+                        == destination.getLongitude().doubleValue()) {
+            Toast.makeText(
+                            this,
+                            "Điểm đón và điểm xuống không được trùng nhau!",
+                            Toast.LENGTH_SHORT)
                     .show();
             return;
         }
@@ -378,7 +392,8 @@ public class HomeActivity extends AppCompatActivity {
         GeoPoint startPoint = null;
         GeoPoint endPoint = null;
         if (origin != null) {
-            originValueTextView.setText(origin.getName());
+            originValueTextView.setText(PlaceNameFormatter.formatMultiline(origin.getName()));
+            originValueTextView.setContentDescription(origin.getName());
             startPoint = new GeoPoint(origin.getLatitude(), origin.getLongitude());
             Marker startMarker = new Marker(mapView);
             startMarker.setPosition(startPoint);
@@ -386,9 +401,12 @@ public class HomeActivity extends AppCompatActivity {
             mapView.getOverlays().add(startMarker);
         } else {
             originValueTextView.setText("Chọn điểm đón");
+            originValueTextView.setContentDescription(null);
         }
         if (destination != null) {
-            destinationValueTextView.setText(destination.getName());
+            destinationValueTextView.setText(
+                    PlaceNameFormatter.formatMultiline(destination.getName()));
+            destinationValueTextView.setContentDescription(destination.getName());
             endPoint = new GeoPoint(destination.getLatitude(), destination.getLongitude());
             Marker endMarker = new Marker(mapView);
             endMarker.setPosition(endPoint);
@@ -396,6 +414,7 @@ public class HomeActivity extends AppCompatActivity {
             mapView.getOverlays().add(endMarker);
         } else {
             destinationValueTextView.setText("Chọn điểm xuống");
+            destinationValueTextView.setContentDescription(null);
         }
         if (startPoint != null && endPoint != null) {
             // Zoom để thấy cả 2 điểm
@@ -569,18 +588,21 @@ public class HomeActivity extends AppCompatActivity {
         }
     }
 
+    /** Tiếp tục vòng đời bản đồ khi màn tìm chuyến trở lại phía trước. */
     @Override
     protected void onResume() {
         super.onResume();
         mapView.onResume();
     }
 
+    /** Tạm dừng bản đồ khi người dùng chuyển sang màn khác. */
     @Override
     protected void onPause() {
         super.onPause();
         mapView.onPause();
     }
 
+    /** Vô hiệu kết quả route cũ và giải phóng map cùng executor khi đóng màn. */
     @Override
     protected void onDestroy() {
         super.onDestroy();

@@ -94,6 +94,7 @@ public class TripSearchRepository {
 
     private final FirebaseFirestore firestore;
 
+    /** Dùng kết nối Firestore của ứng dụng cho các lượt đọc chuyến và hồ sơ công khai. */
     public TripSearchRepository() {
         firestore = FirebaseFirestore.getInstance();
     }
@@ -256,6 +257,7 @@ public class TripSearchRepository {
                 .addOnSuccessListener(
                         new OnSuccessListener<DocumentSnapshot>() {
 
+                            /** Ánh xạ hồ sơ công khai và giữ lỗi dữ liệu thay vì giả hồ sơ rỗng. */
                             @Override
                             public void onSuccess(DocumentSnapshot documentSnapshot) {
                                 if (documentSnapshot.exists()) {
@@ -279,6 +281,7 @@ public class TripSearchRepository {
                 .addOnFailureListener(
                         new OnFailureListener() {
 
+                            /** Trả lỗi đọc hồ sơ để màn có thể cho người dùng thử lại. */
                             @Override
                             public void onFailure(Exception error) {
                                 callback.onError(error);

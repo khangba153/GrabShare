@@ -409,9 +409,9 @@ public class LocationActivity extends AppCompatActivity {
             notifyDataSetChanged();
         }
 
+        /** Tạo dòng địa điểm từ layout của Thành. */
         @NonNull
         @Override
-        /** Tạo dòng địa điểm từ layout của Thành. */
         public PlaceViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view =
                     LayoutInflater.from(parent.getContext())

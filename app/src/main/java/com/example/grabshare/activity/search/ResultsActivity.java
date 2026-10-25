@@ -15,10 +15,10 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
-import com.example.grabshare.presentation.TripCardText;
 import com.example.grabshare.adapter.search.TripAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.model.Place;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.repository.search.EnRouteSearch;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -155,8 +155,10 @@ public class ResultsActivity extends AppCompatActivity {
             criteria = readCriteria(savedInstanceState);
             TextView pickupSummary = findViewById(R.id.route_start);
             TextView dropoffSummary = findViewById(R.id.route_end);
-            pickupSummary.setText(TripCardText.place(criteria.pickup));
-            dropoffSummary.setText(TripCardText.place(criteria.dropoff));
+            pickupSummary.setText(PlaceNameFormatter.format(criteria.pickup.getName()));
+            dropoffSummary.setText(PlaceNameFormatter.format(criteria.dropoff.getName()));
+            pickupSummary.setContentDescription(criteria.pickup.getName());
+            dropoffSummary.setContentDescription(criteria.dropoff.getName());
             pickupSummary.setMaxLines(1);
             dropoffSummary.setMaxLines(1);
             pickupSummary.setEllipsize(android.text.TextUtils.TruncateAt.END);

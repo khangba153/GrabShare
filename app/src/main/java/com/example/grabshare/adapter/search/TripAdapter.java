@@ -9,8 +9,8 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
-import com.example.grabshare.presentation.TripCardText;
 import com.example.grabshare.activity.search.RouteDistanceFormatter;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.repository.search.EnRouteSearch.Match;
 
 import java.text.SimpleDateFormat;
@@ -108,10 +108,14 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
                             fullTripCostVnd));
         }
         tripViewHolder.driverRouteTextView.setText(
-                ""
-                        + TripCardText.place(matchedTrip.trip.getOrigin())
+                PlaceNameFormatter.format(matchedTrip.trip.getOrigin().getName())
                         + " → "
-                        + TripCardText.place(matchedTrip.trip.getDestination()));
+                        + PlaceNameFormatter.format(matchedTrip.trip.getDestination().getName()));
+        tripViewHolder.driverRouteTextView.setContentDescription(
+                "Tuyến tài xế: "
+                        + matchedTrip.trip.getOrigin().getName()
+                        + " → "
+                        + matchedTrip.trip.getDestination().getName());
         tripViewHolder.startGapTextView.setText(
                 "Từ điểm xuất phát tài xế đến điểm đón bạn: "
                         + RouteDistanceFormatter.formatKilometers(matchedTrip.startGapMeters)

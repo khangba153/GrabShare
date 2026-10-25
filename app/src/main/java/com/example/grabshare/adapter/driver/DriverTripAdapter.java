@@ -11,6 +11,7 @@ import com.example.grabshare.R;
 import com.example.grabshare.presentation.TripCardText;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.Trip;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.google.firebase.Timestamp;
 
 import java.text.NumberFormat;
@@ -126,11 +127,11 @@ public class DriverTripAdapter extends BaseAdapter {
         );
 
         originText.setText(
-                "Đi: " + TripCardText.place(currentTrip.getOrigin())
+                "Đi: " + getPlaceName(currentTrip.getOrigin())
         );
 
         destinationText.setText(
-                "Đến: " + TripCardText.place(currentTrip.getDestination())
+                "Đến: " + getPlaceName(currentTrip.getDestination())
         );
 
         departureTimeText.setText(
@@ -164,7 +165,7 @@ public class DriverTripAdapter extends BaseAdapter {
             return "Chưa có thông tin địa điểm";
         }
 
-        return place.getName();
+        return PlaceNameFormatter.format(place.getName());
     }
 
     /**
