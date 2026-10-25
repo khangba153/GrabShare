@@ -1,66 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     style="@style/Card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp"
+    android:layout_marginHorizontal="8dp"
     android:layout_marginTop="8dp"
     android:layout_marginBottom="4dp"
     android:orientation="vertical"
     android:clickable="false"
     android:focusable="false"
     android:foreground="?attr/selectableItemBackground">
-
     <TextView
         android:id="@+id/trip_origin"
         style="@style/BodyBold"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Điểm đi" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingVertical="4dp"
-        android:text="↓"
-        android:textColor="@color/muted" />
-
+        android:text="Điểm đi"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="14sp" />
     <TextView
         android:id="@+id/trip_destination"
         style="@style/BodyBold"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Điểm đến" />
-
-    <LinearLayout
-        style="@style/Row"
+        android:text="Điểm đến"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="14sp" />
+    <TextView
+        android:id="@+id/trip_departure_time"
+        style="@style/Caption"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp">
-
-        <TextView
-            android:id="@+id/trip_departure_time"
-            style="@style/Caption"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Thời gian khởi hành" />
-
-        <TextView
-            android:id="@+id/trip_cost"
-            style="@style/Badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Chi phí" />
-
-    </LinearLayout>
-
+        android:text="Thời gian khởi hành"
+        android:maxLines="1"
+        android:ellipsize="end" />
+    <TextView
+        android:id="@+id/trip_cost"
+        style="@style/Badge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Chi phí"
+        android:maxLines="1"
+        android:ellipsize="end" />
     <TextView
         android:id="@+id/trip_status"
         style="@style/Badge"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Trạng thái" />
-
+        android:text="Trạng thái"
+        android:maxLines="1"
+        android:ellipsize="end" />
 </LinearLayout>

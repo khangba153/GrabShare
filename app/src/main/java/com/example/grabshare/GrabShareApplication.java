@@ -4,13 +4,14 @@ import android.app.Application;
 
 import androidx.annotation.NonNull;
 
+import com.example.grabshare.presentation.ScreenLayoutCallbacks;
 import com.example.grabshare.repository.notifications.FcmInstallationRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 /**
- * Đồng bộ Firebase Installation ID khi trạng thái đăng nhập thay đổi.
- * Không giữ tham chiếu Activity và không thực hiện thao tác UI.
+ * Đăng ký bố cục dùng chung và đồng bộ Firebase Installation ID theo phiên.
+ * Không lưu Activity hoặc View trong Application.
  */
 public class GrabShareApplication extends Application {
 
@@ -21,6 +22,7 @@ public class GrabShareApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        registerActivityLifecycleCallbacks(new ScreenLayoutCallbacks());
 
         firebaseAuth = FirebaseAuth.getInstance();
         fcmInstallationRepository = new FcmInstallationRepository();

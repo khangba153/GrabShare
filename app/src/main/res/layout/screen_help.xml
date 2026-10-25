@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/background">
-    <!-- Nội dung tĩnh, không cần Auth hoặc kết nối mạng. -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="64dp"
@@ -39,8 +39,12 @@
                 style="@style/Title"
                 android:text="Đi cùng GrabShare" />
             <TextView
+                style="@style/Hint"
+                android:text="@string/leader_local_content" />
+            <TextView
                 style="@style/Body"
-                android:text="@string/account_help_intro" />
+                android:text="@string/account_help_intro"
+                android:textIsSelectable="true" />
             <LinearLayout
                 style="@style/Card">
                 <TextView
@@ -48,7 +52,8 @@
                     android:text="@string/account_help_passenger_title" />
                 <TextView
                     style="@style/Body"
-                    android:text="@string/account_help_passenger" />
+                    android:text="@string/account_help_passenger"
+                    android:textIsSelectable="true" />
             </LinearLayout>
             <LinearLayout
                 style="@style/Card">
@@ -57,7 +62,8 @@
                     android:text="@string/account_help_driver_title" />
                 <TextView
                     style="@style/Body"
-                    android:text="@string/account_help_driver" />
+                    android:text="@string/account_help_driver"
+                    android:textIsSelectable="true" />
             </LinearLayout>
             <LinearLayout
                 style="@style/Card">
@@ -66,7 +72,8 @@
                     android:text="@string/account_help_profile_title" />
                 <TextView
                     style="@style/Body"
-                    android:text="@string/account_help_profile" />
+                    android:text="@string/account_help_profile"
+                    android:textIsSelectable="true" />
             </LinearLayout>
             <LinearLayout
                 style="@style/Card">
@@ -75,7 +82,8 @@
                     android:text="@string/account_help_safety_title" />
                 <TextView
                     style="@style/Body"
-                    android:text="@string/account_help_safety" />
+                    android:text="@string/account_help_safety"
+                    android:textIsSelectable="true" />
             </LinearLayout>
             <LinearLayout
                 style="@style/Card">
@@ -84,12 +92,17 @@
                     android:text="@string/account_help_problem_title" />
                 <TextView
                     style="@style/Body"
-                    android:text="@string/account_help_problem" />
+                    android:text="@string/account_help_problem"
+                    android:textIsSelectable="true" />
             </LinearLayout>
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/help_terms"
                 style="@style/ButtonSecondary"
                 android:text="@string/account_terms_title" />
+            <androidx.appcompat.widget.AppCompatButton
+                style="@style/ButtonSecondary"
+                android:id="@+id/static_page_back"
+                android:text="@string/leader_back" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

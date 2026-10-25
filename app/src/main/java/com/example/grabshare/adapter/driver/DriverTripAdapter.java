@@ -8,6 +8,7 @@ import android.widget.BaseAdapter;
 import android.widget.TextView;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.TripCardText;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.Trip;
 import com.google.firebase.Timestamp;
@@ -97,11 +98,10 @@ public class DriverTripAdapter extends BaseAdapter {
             View convertView,
             ViewGroup parent
     ) {
-        View tripItemView = (convertView != null) ? convertView : layoutInflater.inflate(
-                R.layout.item_driver_trip,
-                parent,
-                false
-        );
+        View tripItemView = convertView;
+        if (tripItemView == null) {
+            tripItemView = layoutInflater.inflate(R.layout.item_driver_trip, parent, false);
+        }
 
         Trip currentTrip = getItem(position);
 
@@ -126,11 +126,11 @@ public class DriverTripAdapter extends BaseAdapter {
         );
 
         originText.setText(
-                getPlaceName(currentTrip.getOrigin())
+                "Đi: " + TripCardText.place(currentTrip.getOrigin())
         );
 
         destinationText.setText(
-                getPlaceName(currentTrip.getDestination())
+                "Đến: " + TripCardText.place(currentTrip.getDestination())
         );
 
         departureTimeText.setText(
@@ -138,12 +138,15 @@ public class DriverTripAdapter extends BaseAdapter {
         );
 
         costText.setText(
-                formatContributionAmount(currentTrip.getCostVnd())
+                "Toàn tuyến: " + formatContributionAmount(currentTrip.getCostVnd())
         );
 
-        statusText.setText(
-                formatTripStatus(currentTrip.getStatus())
-        );
+        if (TripCardText.pastDeparture(currentTrip)
+                && ("OPEN".equals(currentTrip.getStatus()) || "FULL".equals(currentTrip.getStatus()))) {
+            statusText.setText("Đã qua giờ · Chưa kết thúc");
+        } else {
+            statusText.setText(formatTripStatus(currentTrip.getStatus()));
+        }
 
         return tripItemView;
     }

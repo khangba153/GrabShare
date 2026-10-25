@@ -156,9 +156,6 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
             onlineTrip = tripState.trip;
             cachedTrip = null;
             cacheMessage = "";
-            if (!favoriteReadAttempted) {
-                refreshFavorite();
-            }
             cacheExecutor.execute(
                     new Runnable() {
                         /** Kiểm tra phiên và vòng đời ngay trước khi gọi API cache đồng bộ. */

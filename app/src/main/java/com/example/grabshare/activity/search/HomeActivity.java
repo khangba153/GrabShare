@@ -20,10 +20,9 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.MainNavigation;
 import com.example.grabshare.notifications.NotificationPermissionHelper;
-import com.example.grabshare.activity.account.AccountActivity;
 import com.example.grabshare.activity.account.LoginActivity;
-import com.example.grabshare.activity.passenger.MyTripsActivity;
 import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.model.Place;
@@ -270,32 +269,8 @@ public class HomeActivity extends AppCompatActivity {
                                 validateAndSearch();
                             }
                         });
-        findViewById(R.id.nav_trips)
-                .setOnClickListener(
-                        new View.OnClickListener() {
-
-                            /** Mở danh sách chuyến đi nhờ của tài khoản hiện tại. */
-                            @Override
-                            public void onClick(View view) {
-                                Intent intent =
-                                        new Intent(HomeActivity.this, MyTripsActivity.class);
-                                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                                startActivity(intent);
-                            }
-                        });
-        findViewById(R.id.nav_account)
-                .setOnClickListener(
-                        new View.OnClickListener() {
-
-                            @Override
-                            public void onClick(View clickedView) {
-                                // Sẽ chuyển sang Account của Leader
-                                Intent intent =
-                                        new Intent(HomeActivity.this, AccountActivity.class);
-                                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                                startActivity(intent);
-                            }
-                        });
+        MainNavigation.bind(this);
+        MainNavigation.bindNotifications(this, R.id.home_notifications);
     }
 
     /** Khởi chạy LocationActivity để người dùng tìm kiếm và chọn địa điểm. */

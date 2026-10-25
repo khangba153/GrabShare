@@ -11,6 +11,9 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.TripCardText;
+import com.example.grabshare.contract.RequestRouteResolver;
+import com.example.grabshare.model.Place;
 import com.example.grabshare.activity.passenger.PassengerRouteText;
 import com.example.grabshare.activity.passenger.PassengerContributionText;
 import com.example.grabshare.model.PublicProfile;
@@ -95,9 +98,8 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
             TripRequest request = item.getRequest();
             Trip trip = item.getTrip();
             PublicProfile profile = item.getDriverProfile();
-            tvPassengerRoute.setVisibility(View.VISIBLE);
-            PassengerRouteText.bind(tvPassengerRoute, request, trip);
-
+            tvPassengerRoute.setVisibility(View.GONE);
+            tvRideSeats.setVisibility(View.GONE);
             if (trip == null) {
                 if (tvDriverName != null) tvDriverName.setText("Chưa rõ chủ xe");
                 if (tvDriverMeta != null) tvDriverMeta.setText("");
@@ -131,23 +133,14 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
                 }
             }
 
-            // Bind số chỗ trống
-            if (tvRideSeats != null) {
-                if (trip.getAvailableSeats() != null) {
-                    tvRideSeats.setText(trip.getAvailableSeats() + " chỗ trống");
-                } else {
-                    tvRideSeats.setText("");
-                }
+            // Danh sách ưu tiên tuyến khách P/C; không lặp địa chỉ tuyến chủ xe.
+            tvPickup.setText("Đón: " + TripCardText.place(request.getPickup()));
+            try {
+                Place dropoff = RequestRouteResolver.resolveDropoff(request, trip);
+                tvDestination.setText("Xuống: " + TripCardText.place(dropoff));
+            } catch (IllegalArgumentException error) {
+                tvDestination.setText("Điểm xuống chưa hợp lệ · Xem chi tiết");
             }
-
-            if (tvPickup != null) {
-                tvPickup.setText(trip.getOrigin() != null ? "Điểm đi: " + trip.getOrigin().getName() : "Điểm đi chưa rõ");
-            }
-
-            if (tvDestination != null) {
-                tvDestination.setText(trip.getDestination() != null ? "Điểm đến: " + trip.getDestination().getName() : "Điểm đến chưa rõ");
-            }
-
             if (tvDepartureTime != null) {
                 if (trip.getDepartureAt() != null) {
                     CharSequence timeFormatted = DateFormat.format("HH:mm - dd/MM/yyyy", trip.getDepartureAt().toDate());
@@ -161,7 +154,12 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
 
             String effectiveStatus = resolveEffectiveStatus(request, trip);
             if (tvStatus != null) {
-                tvStatus.setText(getVietnameseStatusText(effectiveStatus));
+                if (("ACCEPTED".equals(effectiveStatus) || "PENDING".equals(effectiveStatus))
+                        && TripCardText.pastDeparture(trip)) {
+                    tvStatus.setText("Đã qua giờ");
+                } else {
+                    tvStatus.setText(getVietnameseStatusText(effectiveStatus));
+                }
             }
 
             itemView.setOnClickListener(new View.OnClickListener() {
@@ -207,7 +205,7 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
 
         private String getVietnameseStatusText(String status) {
             if ("PENDING".equals(status)) return "Chờ xác nhận";
-            if ("ACCEPTED".equals(status)) return "Sắp đi";
+            if ("ACCEPTED".equals(status)) return "Đã được nhận";
             if ("REJECTED".equals(status)) return "Bị từ chối";
             if ("COMPLETED".equals(status)) return "Hoàn thành";
             if ("CANCELLED".equals(status)) return "Đã hủy";

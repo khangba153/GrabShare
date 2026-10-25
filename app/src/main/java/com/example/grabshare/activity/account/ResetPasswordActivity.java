@@ -11,6 +11,7 @@ import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.ScreenFeedback;
 
 /** Nhập email và theo dõi yêu cầu khôi phục mật khẩu. */
 public class ResetPasswordActivity extends AppCompatActivity {
@@ -93,16 +94,23 @@ public class ResetPasswordActivity extends AppCompatActivity {
                             submitButton.setText("Gửi email khôi phục");
                         }
 
-                        statusText.setText(state.message);
-                        statusText.setTextColor(getColor(
-                                state.error
-                                        ? android.R.color.holo_red_dark
-                                        : R.color.ink));
-
-                        statusText.setVisibility(
-                                state.message.isEmpty()
-                                        ? View.GONE
-                                        : View.VISIBLE);
+                        ScreenFeedback.Kind feedbackKind = ScreenFeedback.Kind.INFORMATION;
+                        if (state.error) {
+                            feedbackKind = ScreenFeedback.Kind.ERROR;
+                        } else if (state.sent) {
+                            feedbackKind = ScreenFeedback.Kind.SUCCESS;
+                        }
+                        ScreenFeedback.show(statusText, state.message, feedbackKind);
+                        if (state.busy) {
+                            findViewById(R.id.reset_progress).setVisibility(View.VISIBLE);
+                        } else {
+                            findViewById(R.id.reset_progress).setVisibility(View.GONE);
+                        }
+                        if (state.sent) {
+                            findViewById(R.id.reset_sent_hint).setVisibility(View.VISIBLE);
+                        } else {
+                            findViewById(R.id.reset_sent_hint).setVisibility(View.GONE);
+                        }
                     }
                 });
     }

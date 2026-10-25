@@ -19,13 +19,15 @@ public class HelpActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_help);
 
-        findViewById(R.id.header_back).setOnClickListener(new View.OnClickListener() {
+        View.OnClickListener backListener = new View.OnClickListener() {
             /** Trở về đúng màn đã mở Trợ giúp. */
             @Override
             public void onClick(View view) {
                 finish();
             }
-        });
+        };
+        findViewById(R.id.header_back).setOnClickListener(backListener);
+        findViewById(R.id.static_page_back).setOnClickListener(backListener);
 
         findViewById(R.id.help_terms).setOnClickListener(new View.OnClickListener() {
             /** Mở cùng trang điều khoản được dùng ở menu Tài khoản. */
