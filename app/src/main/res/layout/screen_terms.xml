@@ -23,6 +23,14 @@
             android:gravity="center"
             android:text="@string/account_terms_title" />
         <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="48dp" />
+        <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
             android:src="@drawable/ic_bell"

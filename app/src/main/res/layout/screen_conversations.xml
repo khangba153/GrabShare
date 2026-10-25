@@ -25,6 +25,12 @@
             android:text="Tin nhắn"
             android:layout_marginStart="12dp" />
         <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone" />
+        <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
             android:src="@drawable/ic_bell"

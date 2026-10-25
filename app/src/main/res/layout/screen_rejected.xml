@@ -26,12 +26,21 @@
             style="@style/Subtitle"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginHorizontal="52dp"
+            android:layout_marginStart="52dp"
+            android:layout_marginEnd="104dp"
             android:layout_marginBottom="0dp"
             android:gravity="center"
             android:text="Yêu cầu bị từ chối"
             android:maxLines="1"
             android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="48dp" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
