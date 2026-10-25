@@ -13,9 +13,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.MainNavigation;
 import com.example.grabshare.activity.account.LoginActivity;
-import com.example.grabshare.activity.driver.DriverTripsActivity;
-import com.example.grabshare.activity.search.HomeActivity;
 import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -29,8 +28,6 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.List;
-
-import com.example.grabshare.activity.account.AccountActivity;
 
 /**
  * Activity hiển thị danh sách tất cả chuyến đi nhờ của Hành khách (Tab MyTrips).
@@ -112,55 +109,8 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             });
         }
 
-        View roleDriver = findViewById(R.id.role_driver);
-        if (roleDriver != null) {
-            roleDriver.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    Intent intent = new Intent(MyTripsActivity.this, DriverTripsActivity.class);
-                    startActivity(intent);
-                    finish();
-                }
-            });
-        }
-
-        View navHome = findViewById(R.id.nav_home);
-        if (navHome != null) {
-            navHome.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    // Quay về Home đang có để giữ form và tránh tạo màn trùng.
-                    Intent intent = new Intent(
-                            MyTripsActivity.this,
-                            HomeActivity.class);
-
-                    intent.addFlags(
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-                    startActivity(intent);
-                    finish();
-                }
-            });
-        }
-
-        View navAccount = findViewById(R.id.nav_account);
-        if (navAccount != null) {
-            navAccount.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    Intent intent = new Intent(
-                            MyTripsActivity.this,
-                            AccountActivity.class);
-
-                    intent.addFlags(
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-                    startActivity(intent);
-                }
-            });
-        }
+        MainNavigation.bind(this);
+        MainNavigation.bindNotifications(this, R.id.header_action);
     }
 
     @Override

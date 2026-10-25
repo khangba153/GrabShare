@@ -9,6 +9,8 @@ import android.widget.Toast;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.example.grabshare.R;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -32,7 +34,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException;
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
-import com.example.grabshare.repository.account.LoginProfileRepository;
+import java.util.concurrent.TimeoutException;
 
 import android.content.Intent;
 import com.example.grabshare.activity.search.HomeActivity;
@@ -50,9 +52,15 @@ public class LoginActivity extends AppCompatActivity {
     private boolean submitting;
     private Button googleButton;
     private CancellationSignal googleCancellation;
+    private LoginProfileViewModel profileViewModel;
+    private boolean homeOpened;
 
     /** Mở màn chính sau khi đăng nhập và kiểm tra có hai hồ sơ. */
     private void openHome() {
+        if (homeOpened) {
+            return;
+        }
+        homeOpened = true;
         Intent intent = new Intent(LoginActivity.this, HomeActivity.class);
         startActivity(intent);
         finish();
@@ -73,6 +81,14 @@ public class LoginActivity extends AppCompatActivity {
         googleButton = findViewById(R.id.login_google);
 
         registerButton = findViewById(R.id.go_register);
+        profileViewModel = new ViewModelProvider(this).get(LoginProfileViewModel.class);
+        profileViewModel.getState().observe(this,
+                new Observer<LoginProfileViewModel.State>() {
+                    @Override
+                    public void onChanged(LoginProfileViewModel.State state) {
+                        showProfileState(state);
+                    }
+                });
 
         findViewById(R.id.forgot_password).setOnClickListener(
                 new View.OnClickListener() {
@@ -101,6 +117,7 @@ public class LoginActivity extends AppCompatActivity {
 
                 passwordInput.setText("");
 
+                profileViewModel.clearProfile();
                 Intent intent = new Intent(
                         LoginActivity.this, RegisterActivity.class);
                 startActivity(intent);
@@ -127,6 +144,12 @@ public class LoginActivity extends AppCompatActivity {
     /** Kiểm tra dữ liệu rồi gửi yêu cầu đăng nhập một lần. */
     private void submitLogin() {
         if (submitting) {
+            return;
+        }
+
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            profileViewModel.checkProfile(currentUser.getUid(), true);
             return;
         }
 
@@ -206,7 +229,13 @@ public class LoginActivity extends AppCompatActivity {
         googleButton.setEnabled(!value);
         registerButton.setEnabled(!value);
         findViewById(R.id.forgot_password).setEnabled(!value);
-        loginButton.setText(value ? "Đang đăng nhập..." : "Đăng nhập");
+        if (value) {
+            loginButton.setText("Đang xử lý...");
+        } else if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+            loginButton.setText("Kiểm tra lại hồ sơ");
+        } else {
+            loginButton.setText("Đăng nhập");
+        }
     }
 
     /** Mở trình chọn tài khoản Google bằng Credential Manager. */
@@ -348,65 +377,70 @@ public class LoginActivity extends AppCompatActivity {
 
     /** Đọc hồ sơ sau khi Firebase đã xác thực tài khoản. */
     private void checkLoginProfile(final FirebaseUser user) {
-        setSubmitting(true);
-        showStatus("Đã đăng nhập. Đang kiểm tra hồ sơ...");
-
-        LoginProfileRepository repository = new LoginProfileRepository();
-
-        repository.checkProfile(user.getUid(),
-                new RepositoryCallback<Boolean>() {
-
-                    /** Hiển thị kết quả tồn tại của hai document hồ sơ. */
-                    @Override
-                    public void onSuccess(Boolean hasProfile) {
-                        if (isFinishing() || isDestroyed()) {
-                            return;
-                        }
-
-                        setSubmitting(false);
-                        if (Boolean.TRUE.equals(hasProfile)) {
-                            openHome();
-                        } else {
-                            registerButton.setText("Hoàn thiện hồ sơ");
-
-                            showStatus(
-                                    "Bạn đã đăng nhập nhưng chưa có đủ hồ sơ. "
-                                            + "Bấm Hoàn thiện hồ sơ để tiếp tục.");
-                        }
-                    }
-
-                    /** Báo lỗi đọc dữ liệu nhưng vẫn giữ phiên đăng nhập. */
-                    @Override
-                    public void onError(Exception error) {
-                        if (isFinishing() || isDestroyed()) {
-                            return;
-                        }
-
-                        setSubmitting(false);
-                        showStatus("Đã đăng nhập với: " + user.getEmail()
-                                + "\nKhông đọc được hồ sơ. "
-                                + "Kiểm tra mạng và quyền Firestore.");
-                    }
-                });
+        profileViewModel.checkProfile(user.getUid(), true);
     }
 
-    //Bổ sung AuthStateListener để nhận thay đổi phiên
+    /** Hiển thị tiến trình giữ trong ViewModel; không dùng kết quả của UID cũ. */
+    private void showProfileState(LoginProfileViewModel.State state) {
+        if (state == null || state.userIdentifier == null
+                || isFinishing() || isDestroyed()) {
+            return;
+        }
+
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null || !state.userIdentifier.equals(currentUser.getUid())) {
+            return;
+        }
+
+        setSubmitting(state.loading);
+        if (state.loading) {
+            showStatus("Đã đăng nhập. Đang kiểm tra hồ sơ...");
+        } else if (state.error != null) {
+            if (state.error instanceof TimeoutException) {
+                showStatus("Kiểm tra hồ sơ quá thời gian chờ. "
+                        + "Kiểm tra mạng rồi bấm Kiểm tra lại hồ sơ.");
+            } else {
+                showStatus("Không đọc được hồ sơ. Kiểm tra mạng và quyền Firestore, "
+                        + "rồi bấm Kiểm tra lại hồ sơ.");
+            }
+        } else if (Boolean.TRUE.equals(state.hasBothProfiles)) {
+            openHome();
+        } else {
+            registerButton.setText("Hoàn thiện hồ sơ");
+            showStatus("Bạn đã đăng nhập nhưng chưa có đủ hồ sơ. "
+                    + "Bấm Hoàn thiện hồ sơ để tiếp tục.");
+        }
+    }
+
     private final FirebaseAuth.AuthStateListener authStateListener =
             new FirebaseAuth.AuthStateListener() {
 
                 /** Nhận phiên mới, kể cả khi xác thực hoàn tất sau khi xoay. */
                 @Override
                 public void onAuthStateChanged(@NonNull FirebaseAuth auth) {
-                    if (isFinishing() || isDestroyed() || submitting) {
+                    if (isFinishing() || isDestroyed()) {
                         return;
                     }
 
                     FirebaseUser user = auth.getCurrentUser();
+                    LoginProfileViewModel.State profileState =
+                            profileViewModel.getState().getValue();
 
                     if (user != null) {
-                        checkLoginProfile(user);
+                        if (submitting && (profileState == null
+                                || profileState.userIdentifier == null)) {
+                            return;
+                        }
+                        profileViewModel.checkProfile(user.getUid(), false);
                     } else {
-                        showStatus("Bạn chưa đăng nhập.");
+                        if (profileState != null && profileState.userIdentifier != null) {
+                            profileViewModel.clearProfile();
+                            setSubmitting(false);
+                        }
+                        if (!submitting) {
+                            registerButton.setText("Đăng ký");
+                            showStatus("Bạn chưa đăng nhập.");
+                        }
                     }
                 }
             };

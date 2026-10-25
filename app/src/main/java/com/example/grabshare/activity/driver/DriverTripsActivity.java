@@ -2,7 +2,6 @@ package com.example.grabshare.activity.driver;
 
 //region Imports
 
-import android.app.Activity;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
@@ -17,8 +16,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
-import com.example.grabshare.activity.account.AccountActivity;
-import com.example.grabshare.activity.search.HomeActivity;
+import com.example.grabshare.presentation.MainNavigation;
 import com.example.grabshare.adapter.driver.DriverTripAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -119,29 +117,8 @@ public class DriverTripsActivity extends AppCompatActivity {
 
     /** Nối các tab dưới để chuyển màn trực tiếp từ danh sách chuyến chủ xe. */
     private void connectBottomNavigation() {
-        findViewById(R.id.nav_home).setOnClickListener(new View.OnClickListener() {
-            /** Quay về màn tìm chuyến và giữ lại form nếu Home đã có trong stack. */
-            @Override
-            public void onClick(View view) {
-                openNavigationTab(HomeActivity.class);
-            }
-        });
-
-        findViewById(R.id.nav_account).setOnClickListener(new View.OnClickListener() {
-            /** Mở tài khoản trực tiếp mà không cần quay lại màn đã mở danh sách. */
-            @Override
-            public void onClick(View view) {
-                openNavigationTab(AccountActivity.class);
-            }
-        });
-    }
-
-    /** Dùng lại tab hiện có, đóng danh sách chủ xe để tránh nhân màn khi đổi tab. */
-    private void openNavigationTab(Class<? extends Activity> destinationActivity) {
-        Intent navigationIntent = new Intent(DriverTripsActivity.this, destinationActivity);
-        navigationIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        startActivity(navigationIntent);
-        finish();
+        MainNavigation.bind(this);
+        MainNavigation.bindNotifications(this, R.id.header_action);
     }
 
     /**

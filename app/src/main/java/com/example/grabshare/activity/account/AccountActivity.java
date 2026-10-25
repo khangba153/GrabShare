@@ -14,6 +14,7 @@ import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.MainNavigation;
 import com.example.grabshare.activity.driver.DriverTripsActivity;
 import com.example.grabshare.activity.notifications.NotificationsActivity;
 import com.example.grabshare.activity.passenger.MyTripsActivity;
@@ -178,11 +179,7 @@ public class AccountActivity extends AppCompatActivity {
         if (logoutInProgress() || !isExpectedUserSignedIn()) {
             return;
         }
-
-        Intent intent = new Intent(this, screen);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        startActivity(intent);
-        finish();
+        MainNavigation.openTab(this, screen);
     }
 
     //endregion

@@ -5,7 +5,9 @@
     <color name="primary">#4F46E5</color>
     <color name="primary_dark">#3730A3</color>
     <color name="ink">#172033</color>
-    <color name="muted">#7A8194</color>
+    <color name="muted">#596579</color>
+    <color name="disabled_background">#E5E8F0</color>
+    <color name="disabled_text">#596579</color>
     <color name="background">#F7F8FC</color>
     <color name="lavender">#EEF0FF</color>
     <color name="coral">#F47C67</color>

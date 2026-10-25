@@ -3,19 +3,52 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F8F9FA">
+    android:background="@color/background">
 
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:paddingHorizontal="12dp">
     <TextView
         android:id="@+id/tv_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:text="Chuyến đi nhờ của tôi"
-        android:textSize="20sp"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:layout_marginHorizontal="52dp"
+        android:text="Chuyến của tôi"
+        android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="#111827"
-        android:background="#FFFFFF"
-        android:elevation="2dp" />
+        android:textColor="@color/ink" />
+        <ImageButton
+            android:id="@+id/header_action"
+            style="@style/IconButton"
+            android:layout_gravity="center_vertical|end"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="Thông báo" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="12dp">
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/role_passenger"
+            style="@style/ButtonPrimary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="Đi nhờ" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/role_driver"
+            style="@style/ButtonSecondary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="Chủ xe" />
+    </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
