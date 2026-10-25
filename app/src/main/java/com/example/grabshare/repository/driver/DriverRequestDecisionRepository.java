@@ -3,6 +3,9 @@ package com.example.grabshare.repository.driver;
 import androidx.annotation.NonNull;
 
 import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.api.VietnamDetourChecker;
+import com.example.grabshare.contract.DetourCheckResult;
+import android.os.SystemClock;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
@@ -24,8 +27,12 @@ import java.util.Map;
  */
 public class DriverRequestDecisionRepository {
 
+    private static final long ROUTE_VALIDITY_MILLISECONDS = 60000L;
+
     private final FirebaseFirestore firestore;
     private final FirebaseAuth firebaseAuth;
+    private final VietnamDetourChecker routeChecker = new VietnamDetourChecker();
+    private volatile boolean closed;
 
     public DriverRequestDecisionRepository(
             FirebaseFirestore firestore,
@@ -37,10 +44,79 @@ public class DriverRequestDecisionRepository {
 
     /** Chấp nhận yêu cầu và chuyển chuyến sang FULL trong cùng transaction. */
     public void acceptRequest(
-            String requestId,
-            RepositoryCallback<Void> callback
+            final String requestId,
+            final RepositoryCallback<Void> callback
     ) {
-        respondToRequest(requestId, "ACCEPTED", callback);
+        final FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        if (currentUser == null || requestId == null || requestId.trim().isEmpty()
+                || requestId.contains("/") || closed) {
+            callback.onError(new IllegalStateException("Thiếu yêu cầu hoặc phiên đăng nhập hợp lệ."));
+            return;
+        }
+        final String driverIdentifier = currentUser.getUid();
+        final DocumentReference requestReference = firestore.collection("requests").document(requestId.trim());
+        firestore.runTransaction(new Transaction.Function<DriverAcceptanceSnapshot>() {
+            /** Đọc nhất quán yêu cầu và chuyến; không gọi HTTP trong transaction. */
+            @Override
+            public DriverAcceptanceSnapshot apply(@NonNull Transaction transaction)
+                    throws FirebaseFirestoreException {
+                requireSession(driverIdentifier);
+                DocumentSnapshot requestDocument = transaction.get(requestReference);
+                String tripIdentifier = requestDocument.getString("tripId");
+                if (!requestDocument.exists() || tripIdentifier == null
+                        || tripIdentifier.trim().isEmpty() || tripIdentifier.contains("/")) {
+                    throw new IllegalArgumentException("Không tìm thấy chuyến của yêu cầu.");
+                }
+                DocumentSnapshot tripDocument = transaction.get(
+                        firestore.collection("trips").document(tripIdentifier));
+                return new DriverAcceptanceSnapshot(requestDocument, tripDocument, driverIdentifier);
+            }
+        }).addOnSuccessListener(new OnSuccessListener<DriverAcceptanceSnapshot>() {
+            /** Chỉ đo tuyến sau khi đọc server, không dùng dữ liệu hiển thị cũ của Activity. */
+            @Override
+            public void onSuccess(final DriverAcceptanceSnapshot prepared) {
+                if (!sameSession(driverIdentifier)) {
+                    callback.onError(new IllegalStateException("Phiên đăng nhập đã đổi."));
+                    return;
+                }
+                if (prepared.alreadyAccepted) {
+                    callback.onSuccess(null);
+                    return;
+                }
+                routeChecker.checkDetour(prepared.trip.getOrigin(), prepared.request.getPickup(),
+                        prepared.dropoff, prepared.trip.getDestination(),
+                        prepared.trip.getMaxDetourMeters(), new RepositoryCallback<DetourCheckResult>() {
+                            /** Kết quả mới chỉ có giá trị với đúng snapshot đã đọc trước khi đo. */
+                            @Override
+                            public void onSuccess(DetourCheckResult result) {
+                                if (!sameSession(driverIdentifier)) {
+                                    callback.onError(new IllegalStateException("Phiên đăng nhập đã đổi."));
+                                    return;
+                                }
+                                if (result == null || !result.isWithinLimit()) {
+                                    callback.onError(new IllegalStateException("Tuyến đón/trả vượt giới hạn"
+                                            + " đi thêm của chuyến. Chưa thể chấp nhận khách này."));
+                                    return;
+                                }
+                                respondToRequest(requestId, "ACCEPTED", prepared,
+                                        SystemClock.elapsedRealtime(), callback);
+                            }
+
+                            /** Lỗi mạng hoặc API không được bỏ qua kiểm tra hay thay bằng 0 km. */
+                            @Override
+                            public void onError(Exception error) {
+                                callback.onError(new IllegalStateException("Chưa kiểm tra được tuyến"
+                                        + " đón/trả. Kiểm tra mạng và thử chấp nhận lại.", error));
+                            }
+                        });
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            /** Chưa xác nhận được dữ liệu đầu vào thì không tạo quyết định hoặc thông báo. */
+            @Override
+            public void onFailure(@NonNull Exception error) {
+                callback.onError(error);
+            }
+        });
     }
 
     /** Từ chối yêu cầu; không thay đổi trạng thái chuyến. */
@@ -48,7 +124,7 @@ public class DriverRequestDecisionRepository {
             String requestId,
             RepositoryCallback<Void> callback
     ) {
-        respondToRequest(requestId, "REJECTED", callback);
+        respondToRequest(requestId, "REJECTED", null, 0L, callback);
     }
 
     /**
@@ -58,6 +134,8 @@ public class DriverRequestDecisionRepository {
     private void respondToRequest(
             String requestId,
             final String targetStatus,
+            final DriverAcceptanceSnapshot prepared,
+            final long routeCheckedAt,
             final RepositoryCallback<Void> callback
     ) {
         FirebaseUser currentUser = firebaseAuth.getCurrentUser();
@@ -82,6 +160,7 @@ public class DriverRequestDecisionRepository {
             @Override
             public Void apply(@NonNull Transaction transaction)
                     throws FirebaseFirestoreException {
+                requireSession(currentDriverId);
                 DocumentSnapshot requestSnapshot = transaction.get(requestReference);
 
                 if (!requestSnapshot.exists()) {
@@ -115,11 +194,12 @@ public class DriverRequestDecisionRepository {
 
                 // Cho phép đối soát an toàn nếu máy chủ đã ghi thành công nhưng
                 // ứng dụng không nhận được kết quả lần trước.
-                if (targetStatus.equals(currentStatus)) {
+                if (targetStatus.equals(currentStatus) && !"ACCEPTED".equals(targetStatus)) {
                     return null;
                 }
 
-                if (!"PENDING".equals(currentStatus)) {
+                if (!"PENDING".equals(currentStatus)
+                        && !("ACCEPTED".equals(targetStatus) && "ACCEPTED".equals(currentStatus))) {
                     throw new FirebaseFirestoreException(
                             "Yêu cầu không còn ở trạng thái Chờ duyệt.",
                             FirebaseFirestoreException.Code.FAILED_PRECONDITION
@@ -149,6 +229,19 @@ public class DriverRequestDecisionRepository {
                             "Yêu cầu không thuộc chuyến do bạn quản lý.",
                             FirebaseFirestoreException.Code.PERMISSION_DENIED
                     );
+                }
+
+                if ("ACCEPTED".equals(targetStatus)) {
+                    if ("ACCEPTED".equals(currentStatus)
+                            && safeRequestId.equals(acceptedRequestId)
+                            && ("FULL".equals(tripStatus) || "COMPLETED".equals(tripStatus))) {
+                        return null;
+                    }
+                    if (prepared == null || !prepared.matches(requestSnapshot, tripSnapshot)
+                            || SystemClock.elapsedRealtime() - routeCheckedAt > ROUTE_VALIDITY_MILLISECONDS) {
+                        throw new IllegalStateException("Dữ liệu chuyến hoặc yêu cầu đã đổi, hoặc"
+                                + " kết quả kiểm tra đã hết hạn. Hãy tải lại và chấp nhận lại.");
+                    }
                 }
 
                 if (departureAt == null
@@ -184,9 +277,10 @@ public class DriverRequestDecisionRepository {
                     );
                 }
 
-                String notificationType = "ACCEPTED".equals(targetStatus)
-                        ? "REQUEST_ACCEPTED"
-                        : "REQUEST_REJECTED";
+                String notificationType = "REQUEST_REJECTED";
+                if ("ACCEPTED".equals(targetStatus)) {
+                    notificationType = "REQUEST_ACCEPTED";
+                }
                 DocumentReference notificationReference = firestore
                         .collection("notifications")
                         .document(safeRequestId + "_" + notificationType);
@@ -228,5 +322,24 @@ public class DriverRequestDecisionRepository {
                 callback.onError(error);
             }
         });
+    }
+
+    /** Kiểm tra cả UID và trạng thái đóng để callback muộn không ghi cho tài khoản khác. */
+    private boolean sameSession(String driverIdentifier) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        return !closed && currentUser != null && driverIdentifier.equals(currentUser.getUid());
+    }
+
+    /** Firestore có thể chạy lại transaction; mỗi lượt đều phải kiểm tra lại phiên. */
+    private void requireSession(String driverIdentifier) {
+        if (!sameSession(driverIdentifier)) {
+            throw new IllegalStateException("Phiên đăng nhập đã đổi hoặc màn đã đóng.");
+        }
+    }
+
+    /** Giải phóng worker khi ViewModel không còn được sử dụng. */
+    public void close() {
+        closed = true;
+        routeChecker.close();
     }
 }
