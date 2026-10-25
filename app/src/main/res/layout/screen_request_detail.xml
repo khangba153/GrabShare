@@ -189,6 +189,16 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/release_passenger"
+                    style="@style/ButtonSecondary"
+                    android:text="Hủy nhận khách"
+                    android:visibility="gone" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/view_other_requests"
+                    style="@style/ButtonPrimary"
+                    android:text="Xem yêu cầu khác"
+                    android:visibility="gone" />
                 <TextView
                     android:id="@+id/request_decision_notice"
                     style="@style/Body"

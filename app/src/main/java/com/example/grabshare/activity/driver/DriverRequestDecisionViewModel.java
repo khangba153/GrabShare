@@ -32,6 +32,37 @@ public final class DriverRequestDecisionViewModel extends ViewModel {
             FirebaseFirestore.getInstance(), authentication);
     private boolean closed;
 
+    /** Giữ cùng tác vụ hủy nhận qua xoay và khóa nhấn kép như thao tác nhận/từ chối. */
+    public void releaseAcceptedPassenger(String requestIdentifier) {
+        State currentState = state.getValue();
+        if (closed || (currentState != null && currentState.busy)) {
+            return;
+        }
+        FirebaseUser currentUser = authentication.getCurrentUser();
+        if (currentUser == null) {
+            state.setValue(new State(false, true, "Bạn cần đăng nhập lại."));
+            return;
+        }
+        final String driverIdentifier = currentUser.getUid();
+        state.setValue(new State(true, false, "Đang hủy nhận khách và mở lại chuyến…"));
+        new com.example.grabshare.repository.driver.DriverPassengerReleaseRepository()
+                .release(requestIdentifier, driverIdentifier, new RepositoryCallback<Void>() {
+                    @Override
+                    public void onSuccess(Void unused) {
+                        finish(driverIdentifier, "Đã hủy nhận khách. Chuyến đã mở lại để bạn chọn khách khác.");
+                    }
+
+                    @Override
+                    public void onError(Exception error) {
+                        String message = "Chưa xác nhận được hủy nhận khách. Kiểm tra mạng và thử lại.";
+                        if (error.getMessage() != null && !error.getMessage().trim().isEmpty()) {
+                            message = error.getMessage();
+                        }
+                        finish(driverIdentifier, message);
+                    }
+                });
+    }
+
     /** Activity quan sát trạng thái, không sở hữu tác vụ định tuyến hoặc transaction. */
     public LiveData<State> getState() {
         return state;
