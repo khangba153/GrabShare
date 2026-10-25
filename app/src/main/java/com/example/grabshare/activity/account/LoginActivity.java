@@ -11,8 +11,12 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.fragment.app.FragmentResultListener;
+import androidx.activity.OnBackPressedCallback;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.ScreenFeedback;
+import com.example.grabshare.presentation.PasswordVisibility;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.repository.account.AuthRepository;
 import com.google.firebase.FirebaseNetworkException;
@@ -54,6 +58,7 @@ public class LoginActivity extends AppCompatActivity {
     private CancellationSignal googleCancellation;
     private LoginProfileViewModel profileViewModel;
     private boolean homeOpened;
+    private LogoutViewModel logoutViewModel;
 
     /** Mở màn chính sau khi đăng nhập và kiểm tra có hai hồ sơ. */
     private void openHome() {
@@ -82,6 +87,9 @@ public class LoginActivity extends AppCompatActivity {
 
         registerButton = findViewById(R.id.go_register);
         profileViewModel = new ViewModelProvider(this).get(LoginProfileViewModel.class);
+        logoutViewModel = new ViewModelProvider(this).get(LogoutViewModel.class);
+        PasswordVisibility.bind(passwordInput, (TextView) findViewById(R.id.login_toggle_password));
+        connectSessionLogout();
         profileViewModel.getState().observe(this,
                 new Observer<LoginProfileViewModel.State>() {
                     @Override
@@ -162,14 +170,14 @@ public class LoginActivity extends AppCompatActivity {
         if (email.isEmpty()
                 || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             emailInput.setError("Nhập email hợp lệ.");
-            showStatus("Nhập email hợp lệ để đăng nhập.");
+            showError("Nhập email hợp lệ để đăng nhập.");
             emailInput.requestFocus();
             return;
         }
 
         if (password.isEmpty()) {
             passwordInput.setError("Nhập mật khẩu.");
-            showStatus("Bạn chưa nhập mật khẩu.");
+            showError("Bạn chưa nhập mật khẩu.");
             passwordInput.requestFocus();
             return;
         }
@@ -205,7 +213,7 @@ public class LoginActivity extends AppCompatActivity {
                         if (error instanceof FirebaseNetworkException) {
                             message = "Không kết nối được mạng. Hãy thử lại.";
                         }
-                        showStatus(message);
+                        showError(message);
 
                         Toast.makeText(LoginActivity.this,
                                 message,
@@ -216,19 +224,53 @@ public class LoginActivity extends AppCompatActivity {
 
     /** Hiển thị trạng thái ngay trên form để người dùng không bỏ lỡ kết quả. */
     private void showStatus(String message) {
-        loginStatus.setText(message);
-        loginStatus.setVisibility(View.VISIBLE);
+        ScreenFeedback.show(loginStatus, message, ScreenFeedback.Kind.INFORMATION);
+    }
+
+    /** Lỗi có màu và nội dung hướng dẫn, không chỉ xuất hiện trong Toast. */
+    private void showError(String message) {
+        ScreenFeedback.show(loginStatus, message, ScreenFeedback.Kind.ERROR);
     }
 
     /** Khóa form trong lúc chờ để tránh bấm gửi nhiều lần. */
     private void setSubmitting(boolean value) {
         submitting = value;
-        emailInput.setEnabled(!value);
-        passwordInput.setEnabled(!value);
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        boolean hasSession = currentUser != null;
+        emailInput.setEnabled(!value && !hasSession);
+        passwordInput.setEnabled(!value && !hasSession);
         loginButton.setEnabled(!value);
-        googleButton.setEnabled(!value);
+        googleButton.setEnabled(!value && !hasSession);
         registerButton.setEnabled(!value);
         findViewById(R.id.forgot_password).setEnabled(!value);
+        findViewById(R.id.login_toggle_password).setEnabled(!value && !hasSession);
+        findViewById(R.id.login_logout).setEnabled(!value);
+        if (value) {
+            findViewById(R.id.login_progress).setVisibility(View.VISIBLE);
+        } else {
+            findViewById(R.id.login_progress).setVisibility(View.GONE);
+        }
+        TextView sessionAccount = findViewById(R.id.login_session_account);
+        if (hasSession) {
+            findViewById(R.id.login_credentials).setVisibility(View.GONE);
+            googleButton.setVisibility(View.GONE);
+            findViewById(R.id.login_alternative).setVisibility(View.GONE);
+            findViewById(R.id.login_logout).setVisibility(View.VISIBLE);
+            registerButton.setVisibility(View.GONE);
+            String accountLabel = currentUser.getEmail();
+            if (accountLabel == null || accountLabel.isEmpty()) {
+                accountLabel = getString(R.string.profile_account_placeholder);
+            }
+            sessionAccount.setText(getString(R.string.leader_session_account, accountLabel));
+            sessionAccount.setVisibility(View.VISIBLE);
+        } else {
+            findViewById(R.id.login_credentials).setVisibility(View.VISIBLE);
+            googleButton.setVisibility(View.VISIBLE);
+            findViewById(R.id.login_alternative).setVisibility(View.VISIBLE);
+            findViewById(R.id.login_logout).setVisibility(View.GONE);
+            registerButton.setVisibility(View.VISIBLE);
+            sessionAccount.setVisibility(View.GONE);
+        }
         if (value) {
             loginButton.setText("Đang xử lý...");
         } else if (FirebaseAuth.getInstance().getCurrentUser() != null) {
@@ -288,12 +330,12 @@ public class LoginActivity extends AppCompatActivity {
                                         googleCredential.getIdToken());
                             } catch (Exception error) {
                                 setSubmitting(false);
-                                showStatus(
+                                showError(
                                         "Không đọc được tài khoản Google. Hãy thử lại.");
                             }
                         } else {
                             setSubmitting(false);
-                            showStatus("Thông tin đăng nhập Google không hợp lệ.");
+                            showError("Thông tin đăng nhập Google không hợp lệ.");
                         }
                     }
 
@@ -309,7 +351,7 @@ public class LoginActivity extends AppCompatActivity {
                         if (error instanceof GetCredentialCancellationException) {
                             showStatus("Bạn đã hủy đăng nhập Google.");
                         } else {
-                            showStatus(
+                            showError(
                                     "Không mở được đăng nhập Google. Kiểm tra mạng "
                                             + "và tài khoản Google trên thiết bị.");
                         }
@@ -344,7 +386,7 @@ public class LoginActivity extends AppCompatActivity {
                         }
 
                         setSubmitting(false);
-                        showStatus(
+                        showError(
                                 "Firebase chưa xác thực được Google. "
                                         + "Kiểm tra mạng hoặc cấu hình đăng nhập.");
                     }
@@ -383,7 +425,7 @@ public class LoginActivity extends AppCompatActivity {
     /** Hiển thị tiến trình giữ trong ViewModel; không dùng kết quả của UID cũ. */
     private void showProfileState(LoginProfileViewModel.State state) {
         if (state == null || state.userIdentifier == null
-                || isFinishing() || isDestroyed()) {
+                || isFinishing() || isDestroyed() || logoutInProgress()) {
             return;
         }
 
@@ -397,16 +439,17 @@ public class LoginActivity extends AppCompatActivity {
             showStatus("Đã đăng nhập. Đang kiểm tra hồ sơ...");
         } else if (state.error != null) {
             if (state.error instanceof TimeoutException) {
-                showStatus("Kiểm tra hồ sơ quá thời gian chờ. "
+                showError("Kiểm tra hồ sơ quá thời gian chờ. "
                         + "Kiểm tra mạng rồi bấm Kiểm tra lại hồ sơ.");
             } else {
-                showStatus("Không đọc được hồ sơ. Kiểm tra mạng và quyền Firestore, "
+                showError("Không đọc được hồ sơ. Kiểm tra mạng và quyền Firestore, "
                         + "rồi bấm Kiểm tra lại hồ sơ.");
             }
         } else if (Boolean.TRUE.equals(state.hasBothProfiles)) {
             openHome();
         } else {
             registerButton.setText("Hoàn thiện hồ sơ");
+            registerButton.setVisibility(View.VISIBLE);
             showStatus("Bạn đã đăng nhập nhưng chưa có đủ hồ sơ. "
                     + "Bấm Hoàn thiện hồ sơ để tiếp tục.");
         }
@@ -418,7 +461,7 @@ public class LoginActivity extends AppCompatActivity {
                 /** Nhận phiên mới, kể cả khi xác thực hoàn tất sau khi xoay. */
                 @Override
                 public void onAuthStateChanged(@NonNull FirebaseAuth auth) {
-                    if (isFinishing() || isDestroyed()) {
+                    if (isFinishing() || isDestroyed() || logoutInProgress()) {
                         return;
                     }
 
@@ -438,10 +481,77 @@ public class LoginActivity extends AppCompatActivity {
                             setSubmitting(false);
                         }
                         if (!submitting) {
+                            setSubmitting(false);
                             registerButton.setText("Đăng ký");
                             showStatus("Bạn chưa đăng nhập.");
                         }
                     }
                 }
             };
+
+    /** Cùng cơ chế dọn cache với Account; không đổi tài khoản bằng cách bỏ qua logout. */
+    private void connectSessionLogout() {
+        getSupportFragmentManager().setFragmentResultListener(
+                LogoutConfirmationDialog.RESULT_KEY, this, new FragmentResultListener() {
+                    @Override
+                    public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle result) {
+                        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                        if (!submitting && currentUser != null && currentUser.getUid().equals(
+                                result.getString(LogoutConfirmationDialog.USER_IDENTIFIER))) {
+                            profileViewModel.clearProfile();
+                            logoutViewModel.submit();
+                        }
+                    }
+                });
+        findViewById(R.id.login_logout).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                if (!submitting && currentUser != null
+                        && !getSupportFragmentManager().isStateSaved()
+                        && getSupportFragmentManager().findFragmentByTag(
+                                LogoutConfirmationDialog.TAG) == null) {
+                    LogoutConfirmationDialog.create(currentUser.getUid()).show(
+                            getSupportFragmentManager(), LogoutConfirmationDialog.TAG);
+                }
+            }
+        });
+        final OnBackPressedCallback logoutBackCallback = new OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                showStatus(getString(R.string.profile_logging_out));
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, logoutBackCallback);
+        logoutViewModel.getState().observe(this, new Observer<LogoutViewModel.State>() {
+            @Override
+            public void onChanged(LogoutViewModel.State state) {
+                if (state == null || isFinishing() || isDestroyed()) {
+                    return;
+                }
+                logoutBackCallback.setEnabled(state.busy || state.completed);
+                if (state.completed) {
+                    Intent intent = new Intent(LoginActivity.this, LoginActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(intent);
+                    finish();
+                } else if (state.busy) {
+                    setSubmitting(true);
+                    showStatus(getString(R.string.profile_logging_out));
+                } else if (state.error != null) {
+                    setSubmitting(false);
+                    showError(ProfileMessages.explain(LoginActivity.this, state.error));
+                }
+            }
+        });
+    }
+
+    /** Observer Auth không được mở Home khi đang kết thúc phiên cũ. */
+    private boolean logoutInProgress() {
+        if (logoutViewModel == null) {
+            return false;
+        }
+        LogoutViewModel.State state = logoutViewModel.getState().getValue();
+        return state != null && (state.busy || state.completed);
+    }
 }

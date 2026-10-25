@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -43,12 +44,10 @@
         android:id="@+id/logout_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="12dp"
-        android:textSize="14sp"
-        android:textColor="@color/primary"
         android:accessibilityLiveRegion="polite"
-        android:visibility="gone" />
+        android:visibility="gone"
+        style="@style/AccountFeedback"
+        android:layout_marginHorizontal="20dp" />
     <ScrollView
         android:id="@+id/account_scroll"
         android:layout_width="match_parent"
@@ -103,7 +102,7 @@
                         android:visibility="gone" />
                     <TextView
                         android:id="@+id/account_profile_status"
-                        style="@style/Body"
+                        style="@style/AccountFeedback"
                         android:layout_width="match_parent"
                         android:accessibilityLiveRegion="polite"
                         android:visibility="gone" />
@@ -126,6 +125,9 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:id="@+id/account_menu">
+                    <TextView
+                        style="@style/AccountSectionTitle"
+                        android:text="@string/leader_account_menu" />
                     <LinearLayout
                         android:id="@+id/account_driver_trips"
                         style="@style/Picker"
@@ -284,33 +286,37 @@
                             android:src="@drawable/ic_chevron"
                             android:importantForAccessibility="no" />
                     </LinearLayout>
-                    <LinearLayout
-                        android:id="@+id/account_logout"
-                        style="@style/Picker"
-                        android:paddingHorizontal="12dp"
-                        android:minHeight="58dp"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackground">
-                        <ImageView
-                            android:id="@+id/menu_icon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_logout"
-                            android:importantForAccessibility="no" />
-                        <TextView
-                            android:id="@+id/menu_label"
-                            style="@style/Body"
-                            android:text="Đăng xuất"
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_marginStart="12dp" />
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_chevron"
-                            android:importantForAccessibility="no" />
-                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+            <LinearLayout
+                style="@style/Card">
+                <LinearLayout
+                    android:id="@+id/account_logout"
+                    style="@style/Picker"
+                    android:paddingHorizontal="12dp"
+                    android:minHeight="58dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+                    <ImageView
+                        android:id="@+id/menu_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_logout"
+                        android:importantForAccessibility="no" />
+                    <TextView
+                        android:id="@+id/menu_label"
+                        style="@style/Body"
+                        android:text="Đăng xuất"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:textColor="@color/feedback_error_text" />
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_chevron"
+                        android:importantForAccessibility="no" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>

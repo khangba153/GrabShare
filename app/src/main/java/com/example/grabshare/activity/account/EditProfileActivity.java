@@ -17,6 +17,7 @@ import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.ScreenFeedback;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -260,9 +261,7 @@ public class EditProfileActivity extends AppCompatActivity {
         String message = getString(messageResourceIdentifier);
         field.setError(message);
         field.requestFocus();
-        statusText.setText(message);
-        statusText.setVisibility(View.VISIBLE);
-        statusText.setTextColor(getColor(android.R.color.holo_red_dark));
+        ScreenFeedback.show(statusText, message, ScreenFeedback.Kind.ERROR);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
         return false;
     }
@@ -320,18 +319,11 @@ public class EditProfileActivity extends AppCompatActivity {
         if (state.error != null) {
             message = ProfileMessages.explain(this, state.error);
         }
-        statusText.setText(message);
-        if (state.error == null) {
-            statusText.setTextColor(getColor(R.color.muted));
-        } else {
-            statusText.setTextColor(getColor(android.R.color.holo_red_dark));
+        ScreenFeedback.Kind feedbackKind = ScreenFeedback.Kind.INFORMATION;
+        if (state.error != null) {
+            feedbackKind = ScreenFeedback.Kind.ERROR;
         }
-
-        if (message.isEmpty()) {
-            statusText.setVisibility(View.GONE);
-        } else {
-            statusText.setVisibility(View.VISIBLE);
-        }
+        ScreenFeedback.show(statusText, message, feedbackKind);
 
         TextView saveProfileButton = findViewById(R.id.primary_action);
         if (state.saving) {

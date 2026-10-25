@@ -18,13 +18,15 @@ public class TermsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_terms);
 
-        findViewById(R.id.header_back).setOnClickListener(new View.OnClickListener() {
+        View.OnClickListener backListener = new View.OnClickListener() {
             /** Đóng trang tĩnh, không tạo lại màn Tài khoản hoặc Trợ giúp. */
             @Override
             public void onClick(View view) {
                 finish();
             }
-        });
+        };
+        findViewById(R.id.header_back).setOnClickListener(backListener);
+        findViewById(R.id.static_page_back).setOnClickListener(backListener);
     }
 
     //endregion

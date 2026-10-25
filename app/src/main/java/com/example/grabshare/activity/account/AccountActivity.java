@@ -12,9 +12,11 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.fragment.app.FragmentResultListener;
 
 import com.example.grabshare.R;
 import com.example.grabshare.presentation.MainNavigation;
+import com.example.grabshare.presentation.ScreenFeedback;
 import com.example.grabshare.activity.driver.DriverTripsActivity;
 import com.example.grabshare.activity.notifications.NotificationsActivity;
 import com.example.grabshare.activity.passenger.MyTripsActivity;
@@ -265,18 +267,11 @@ public class AccountActivity extends AppCompatActivity {
             message = getString(R.string.profile_missing);
         }
 
-        status.setText(message);
-        if (state.error == null) {
-            status.setTextColor(getColor(R.color.muted));
-        } else {
-            status.setTextColor(getColor(android.R.color.holo_red_dark));
+        ScreenFeedback.Kind feedbackKind = ScreenFeedback.Kind.INFORMATION;
+        if (state.error != null) {
+            feedbackKind = ScreenFeedback.Kind.ERROR;
         }
-
-        if (message.isEmpty()) {
-            status.setVisibility(View.GONE);
-        } else {
-            status.setVisibility(View.VISIBLE);
-        }
+        ScreenFeedback.show(status, message, feedbackKind);
 
         if (allowed && state.loading) {
             findViewById(R.id.account_profile_loading).setVisibility(View.VISIBLE);
@@ -328,12 +323,30 @@ public class AccountActivity extends AppCompatActivity {
     /** Giữ nguyên cơ chế logout đã bàn giao và kết hợp khóa các mục mới. */
     private void setupLogout() {
         final TextView logoutStatus = findViewById(R.id.logout_status);
+        getSupportFragmentManager().setFragmentResultListener(
+                LogoutConfirmationDialog.RESULT_KEY, this, new FragmentResultListener() {
+                    /** Xác nhận cũ không được áp dụng cho UID mới hoặc tác vụ đang chạy. */
+                    @Override
+                    public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle result) {
+                        if (isExpectedUserSignedIn() && !logoutInProgress()
+                                && expectedUserIdentifier.equals(result.getString(
+                                        LogoutConfirmationDialog.USER_IDENTIFIER))) {
+                            logoutViewModel.submit();
+                        }
+                    }
+                });
 
         findViewById(R.id.account_logout).setOnClickListener(new View.OnClickListener() {
-            /** Tác vụ xóa cache và signOut vẫn do LogoutViewModel thực hiện. */
+            /** Hỏi trước khi xóa cache; bấm Ở lại không khởi tạo tác vụ nào. */
             @Override
             public void onClick(View view) {
-                logoutViewModel.submit();
+                if (isExpectedUserSignedIn() && !logoutInProgress()
+                        && !getSupportFragmentManager().isStateSaved()
+                        && getSupportFragmentManager().findFragmentByTag(
+                                LogoutConfirmationDialog.TAG) == null) {
+                    LogoutConfirmationDialog.create(expectedUserIdentifier).show(
+                            getSupportFragmentManager(), LogoutConfirmationDialog.TAG);
+                }
             }
         });
 
@@ -361,13 +374,12 @@ public class AccountActivity extends AppCompatActivity {
                 }
 
                 if (state.busy) {
-                    logoutStatus.setTextColor(getColor(R.color.primary));
-                    logoutStatus.setText(R.string.profile_logging_out);
-                    logoutStatus.setVisibility(View.VISIBLE);
+                    ScreenFeedback.show(logoutStatus, getString(R.string.profile_logging_out),
+                            ScreenFeedback.Kind.INFORMATION);
                 } else if (state.error != null) {
-                    logoutStatus.setTextColor(getColor(android.R.color.holo_red_dark));
-                    logoutStatus.setText(ProfileMessages.explain(AccountActivity.this, state.error));
-                    logoutStatus.setVisibility(View.VISIBLE);
+                    ScreenFeedback.show(logoutStatus,
+                            ProfileMessages.explain(AccountActivity.this, state.error),
+                            ScreenFeedback.Kind.ERROR);
                     if (isExpectedUserSignedIn()) {
                         profileViewModel.loadProfile(expectedUserIdentifier);
                     }

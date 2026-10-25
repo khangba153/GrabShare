@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/background">
-    <!-- Tiêu đề và nút quay về đúng màn gọi. -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="64dp"
@@ -24,7 +24,6 @@
             android:gravity="center"
             android:text="Chỉnh sửa hồ sơ" />
     </FrameLayout>
-    <!-- Chỉ hiển thị các field thuộc schema hồ sơ hiện tại. -->
     <ScrollView
         android:id="@+id/profile_edit_scroll"
         android:layout_width="match_parent"
@@ -36,6 +35,12 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="20dp">
+            <TextView
+                style="@style/Title"
+                android:text="@string/leader_profile_intro" />
+            <TextView
+                style="@style/Hint"
+                android:text="@string/leader_profile_draft_hint" />
             <ImageView
                 android:layout_width="72dp"
                 android:layout_height="72dp"
@@ -50,7 +55,7 @@
                 android:visibility="gone" />
             <TextView
                 android:id="@+id/profile_edit_status"
-                style="@style/Body"
+                style="@style/AccountFeedback"
                 android:layout_width="match_parent"
                 android:accessibilityLiveRegion="polite"
                 android:visibility="gone" />
@@ -71,7 +76,8 @@
                     android:hint="Từ 1 đến 80 ký tự"
                     android:inputType="textPersonName"
                     android:importantForAutofill="no"
-                    android:saveEnabled="false" />
+                    android:saveEnabled="false"
+                    android:imeOptions="actionNext" />
                 <TextView
                     style="@style/Caption"
                     android:layout_marginTop="16dp"
@@ -98,7 +104,8 @@
                     android:hint="Ví dụ: Honda Wave"
                     android:inputType="textCapWords"
                     android:importantForAutofill="no"
-                    android:saveEnabled="false" />
+                    android:saveEnabled="false"
+                    android:imeOptions="actionNext" />
                 <TextView
                     style="@style/Caption"
                     android:layout_marginTop="16dp"
@@ -110,7 +117,8 @@
                     android:hint="Tối đa 20 ký tự"
                     android:inputType="textCapCharacters"
                     android:importantForAutofill="no"
-                    android:saveEnabled="false" />
+                    android:saveEnabled="false"
+                    android:imeOptions="actionDone" />
                 <TextView
                     style="@style/Hint"
                     android:layout_width="match_parent"
@@ -120,23 +128,22 @@
                     android:layout_width="match_parent"
                     android:text="@string/profile_private_hint" />
             </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="0dp"
+                android:paddingBottom="12dp">
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/primary_action"
+                    style="@style/ButtonPrimary"
+                    android:enabled="false"
+                    android:text="@string/profile_save" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/secondary_action"
+                    style="@style/ButtonSecondary"
+                    android:text="@string/profile_cancel" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
-    <!-- Hai thao tác rõ ràng; Cancel không ghi dữ liệu. -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingHorizontal="20dp"
-        android:paddingBottom="12dp">
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/primary_action"
-            style="@style/ButtonPrimary"
-            android:enabled="false"
-            android:text="@string/profile_save" />
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/secondary_action"
-            style="@style/ButtonSecondary"
-            android:text="@string/profile_cancel" />
-    </LinearLayout>
 </LinearLayout>

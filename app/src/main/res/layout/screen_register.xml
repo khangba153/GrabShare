@@ -1,68 +1,295 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/background">
-    <FrameLayout android:id="@+id/header" android:layout_width="match_parent" android:layout_height="64dp" android:paddingHorizontal="12dp" android:visibility="visible">
-        <ImageButton android:id="@+id/header_back" style="@style/IconButton" android:layout_gravity="center_vertical|start" android:src="@drawable/ic_back" android:contentDescription="Quay lại" android:visibility="visible" />
-        <TextView android:id="@+id/header_title" style="@style/Subtitle" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginHorizontal="52dp" android:layout_marginBottom="0dp" android:gravity="center" android:text="Đăng ký" />
-        <ImageButton android:id="@+id/header_action" style="@style/IconButton" android:layout_gravity="center_vertical|end" android:src="@drawable/ic_bell" android:contentDescription="Thông báo" android:visibility="invisible" />
-    </FrameLayout>
-    <TextView
-        android:id="@+id/register_status"
+<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+    <FrameLayout
+        android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginVertical="8dp"
-        android:textColor="@color/ink"
-        android:textSize="14sp"
-        android:accessibilityLiveRegion="polite"
-        android:visibility="gone" />
-    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:fillViewport="true" android:clipToPadding="false" android:layout_weight="1">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="8dp" android:paddingBottom="24dp">
-            <TextView style="@style/Title" android:text="Tạo tài khoản" />
-            <TextView style="@style/Hint" android:text="Cùng cộng đồng chia sẻ những hành trình." />
-            <LinearLayout style="@style/Card">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
-                    <TextView style="@style/Caption" android:text="Họ và tên" />
-                    <EditText android:id="@+id/register_name" android:maxLength="80" style="@style/Input" android:inputType="textPersonName" android:hint="Tên hiển thị của bạn" android:importantForAutofill="no" />
+        android:layout_height="64dp"
+        android:paddingHorizontal="12dp"
+        android:visibility="visible">
+        <ImageButton
+            android:id="@+id/header_back"
+            style="@style/IconButton"
+            android:layout_gravity="center_vertical|start"
+            android:src="@drawable/ic_back"
+            android:contentDescription="Quay lại"
+            android:visibility="visible" />
+        <TextView
+            android:id="@+id/header_title"
+            style="@style/Subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginHorizontal="52dp"
+            android:layout_marginBottom="0dp"
+            android:gravity="center"
+            android:text="Đăng ký" />
+        <ImageButton
+            android:id="@+id/header_action"
+            style="@style/IconButton"
+            android:layout_gravity="center_vertical|end"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="Thông báo"
+            android:visibility="invisible" />
+    </FrameLayout>
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:layout_weight="1">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="24dp">
+            <TextView
+                style="@style/Title"
+                android:text="Tạo tài khoản"
+                android:id="@+id/register_form_title" />
+            <TextView
+                style="@style/Hint"
+                android:text="@string/leader_register_intro"
+                android:id="@+id/register_form_intro" />
+            <LinearLayout
+                style="@style/Card">
+                <TextView
+                    style="@style/AccountSectionTitle"
+                    android:text="@string/leader_auth_identity" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        style="@style/Caption"
+                        android:text="Họ và tên"
+                        android:labelFor="@id/register_name" />
+                    <EditText
+                        android:id="@+id/register_name"
+                        android:maxLength="80"
+                        style="@style/Input"
+                        android:inputType="textPersonName"
+                        android:hint="Tên hiển thị của bạn"
+                        android:importantForAutofill="no"
+                        android:imeOptions="actionNext" />
                 </LinearLayout>
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
-                    <TextView style="@style/Caption" android:text="Email" />
-                    <EditText android:id="@+id/register_email" android:maxLength="254" style="@style/Input" android:inputType="textEmailAddress" android:hint="Email" android:importantForAutofill="no" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        style="@style/Caption"
+                        android:text="Email"
+                        android:labelFor="@id/register_email" />
+                    <EditText
+                        android:id="@+id/register_email"
+                        android:maxLength="254"
+                        style="@style/Input"
+                        android:inputType="textEmailAddress"
+                        android:hint="Email"
+                        android:importantForAutofill="no"
+                        android:imeOptions="actionNext" />
                 </LinearLayout>
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
-                    <TextView style="@style/Caption" android:text="Tên xe — không bắt buộc" />
-                    <EditText android:id="@+id/register_vehicle_name" style="@style/Input" android:inputType="textCapWords" android:maxLength="80" android:hint="Ví dụ: Honda Wave" android:importantForAutofill="no" />
-                    <TextView style="@style/Caption" android:layout_marginTop="12dp" android:text="Biển số — nhập khi có tên xe" />
-                    <EditText android:id="@+id/register_vehicle_plate" style="@style/Input" android:inputType="textCapCharacters" android:maxLength="20" android:hint="Biển số xe" android:importantForAutofill="no" />
-                    <TextView style="@style/Hint" android:text="Nếu chỉ đi nhờ, bạn có thể để trống cả hai ô." />
+                <TextView
+                    style="@style/AccountSectionTitle"
+                    android:text="@string/leader_auth_vehicle" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        style="@style/Caption"
+                        android:text="Tên xe — không bắt buộc"
+                        android:labelFor="@id/register_vehicle_name" />
+                    <EditText
+                        android:id="@+id/register_vehicle_name"
+                        style="@style/Input"
+                        android:inputType="textCapWords"
+                        android:maxLength="80"
+                        android:hint="Ví dụ: Honda Wave"
+                        android:importantForAutofill="no"
+                        android:imeOptions="actionNext" />
+                    <TextView
+                        style="@style/Caption"
+                        android:layout_marginTop="12dp"
+                        android:text="Biển số — nhập khi có tên xe"
+                        android:labelFor="@id/register_vehicle_plate" />
+                    <EditText
+                        android:id="@+id/register_vehicle_plate"
+                        style="@style/Input"
+                        android:inputType="textCapCharacters"
+                        android:maxLength="20"
+                        android:hint="Biển số xe"
+                        android:importantForAutofill="no"
+                        android:imeOptions="actionNext" />
+                    <TextView
+                        style="@style/Hint"
+                        android:text="Nếu chỉ đi nhờ, bạn có thể để trống cả hai ô." />
                 </LinearLayout>
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
-                    <TextView style="@style/Caption" android:text="Mật khẩu" />
-                    <EditText android:id="@+id/register_password" android:saveEnabled="false" style="@style/Input" android:inputType="textPassword" android:hint="Mật khẩu" android:importantForAutofill="no" />
+                <TextView
+                    style="@style/AccountSectionTitle"
+                    android:text="@string/leader_auth_security"
+                    android:id="@+id/register_security_title" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        style="@style/Caption"
+                        android:text="Mật khẩu"
+                        android:labelFor="@id/register_password" />
+                    <EditText
+                        android:id="@+id/register_password"
+                        android:saveEnabled="false"
+                        style="@style/Input"
+                        android:inputType="textPassword"
+                        android:hint="@string/leader_password_hint"
+                        android:importantForAutofill="no"
+                        android:imeOptions="actionDone" />
+                    <androidx.appcompat.widget.AppCompatButton
+                        style="@style/ButtonSecondary"
+                        android:id="@+id/register_toggle_password"
+                        android:text="@string/leader_password_show" />
                 </LinearLayout>
-                <CheckBox android:id="@+id/register_terms" style="@style/Radio" android:text="Tôi đồng ý với Điều khoản sử dụng" android:checked="false" />
-                <androidx.appcompat.widget.AppCompatButton android:id="@+id/open_terms" style="@style/ButtonSecondary" android:text="Xem điều khoản sử dụng" />
+                <CheckBox
+                    android:id="@+id/register_terms"
+                    style="@style/Radio"
+                    android:text="Tôi đồng ý với Điều khoản sử dụng"
+                    android:checked="false" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/open_terms"
+                    style="@style/ButtonSecondary"
+                    android:text="Xem điều khoản sử dụng" />
             </LinearLayout>
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/register_submit" style="@style/ButtonPrimary" android:text="Đăng ký" />
-            <ProgressBar android:id="@+id/register_progress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:layout_marginTop="12dp" android:visibility="gone" />
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/go_login" style="@style/ButtonSecondary" android:text="Đã có tài khoản? Đăng nhập" />
+            <TextView
+                android:id="@+id/register_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
+                android:visibility="gone"
+                style="@style/AccountFeedback" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/register_submit"
+                style="@style/ButtonPrimary"
+                android:text="Đăng ký" />
+            <ProgressBar
+                android:id="@+id/register_progress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="12dp"
+                android:visibility="gone" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/go_login"
+                style="@style/ButtonSecondary"
+                android:text="Đã có tài khoản? Đăng nhập" />
         </LinearLayout>
     </ScrollView>
-    <LinearLayout android:id="@+id/action_area" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="4dp" android:paddingBottom="12dp" android:background="@color/background" android:visibility="gone">
-        <androidx.appcompat.widget.AppCompatButton android:id="@+id/primary_action" style="@style/ButtonPrimary" android:text="Tiếp tục" />
-        <androidx.appcompat.widget.AppCompatButton android:id="@+id/secondary_action" style="@style/ButtonSecondary" android:text="Quay lại" />
+    <LinearLayout
+        android:id="@+id/action_area"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="12dp"
+        android:background="@color/background"
+        android:visibility="gone">
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/primary_action"
+            style="@style/ButtonPrimary"
+            android:text="Tiếp tục" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/secondary_action"
+            style="@style/ButtonSecondary"
+            android:text="Quay lại" />
     </LinearLayout>
-    <LinearLayout android:id="@+id/bottom_nav" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:background="@color/white" android:elevation="6dp" android:visibility="gone">
-        <LinearLayout android:id="@+id/nav_home" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:foreground="?attr/selectableItemBackground">
-            <ImageView android:id="@+id/nav_home_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_pin" android:importantForAccessibility="no" android:tint="@color/primary" />
-            <TextView android:id="@+id/nav_home_label" style="@style/Caption" android:text="Tìm chuyến" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/primary" />
+    <LinearLayout
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/white"
+        android:elevation="6dp"
+        android:visibility="gone">
+        <LinearLayout
+            android:id="@+id/nav_home"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:foreground="?attr/selectableItemBackground">
+            <ImageView
+                android:id="@+id/nav_home_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_pin"
+                android:importantForAccessibility="no"
+                android:tint="@color/primary" />
+            <TextView
+                android:id="@+id/nav_home_label"
+                style="@style/Caption"
+                android:text="Tìm chuyến"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp"
+                android:textColor="@color/primary" />
         </LinearLayout>
-        <LinearLayout android:id="@+id/nav_trips" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:foreground="?attr/selectableItemBackground">
-            <ImageView android:id="@+id/nav_trips_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_calendar" android:importantForAccessibility="no" android:tint="@color/muted" />
-            <TextView android:id="@+id/nav_trips_label" style="@style/Caption" android:text="Chuyến của tôi" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/muted" />
+        <LinearLayout
+            android:id="@+id/nav_trips"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:foreground="?attr/selectableItemBackground">
+            <ImageView
+                android:id="@+id/nav_trips_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_calendar"
+                android:importantForAccessibility="no"
+                android:tint="@color/muted" />
+            <TextView
+                android:id="@+id/nav_trips_label"
+                style="@style/Caption"
+                android:text="Chuyến của tôi"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp"
+                android:textColor="@color/muted" />
         </LinearLayout>
-        <LinearLayout android:id="@+id/nav_account" android:layout_width="0dp" android:layout_height="64dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:foreground="?attr/selectableItemBackground">
-            <ImageView android:id="@+id/nav_account_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_user" android:importantForAccessibility="no" android:tint="@color/muted" />
-            <TextView android:id="@+id/nav_account_label" style="@style/Caption" android:text="Tài khoản" android:layout_marginTop="5dp" android:layout_marginBottom="0dp" android:textColor="@color/muted" />
+        <LinearLayout
+            android:id="@+id/nav_account"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:foreground="?attr/selectableItemBackground">
+            <ImageView
+                android:id="@+id/nav_account_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_user"
+                android:importantForAccessibility="no"
+                android:tint="@color/muted" />
+            <TextView
+                android:id="@+id/nav_account_label"
+                style="@style/Caption"
+                android:text="Tài khoản"
+                android:layout_marginTop="5dp"
+                android:layout_marginBottom="0dp"
+                android:textColor="@color/muted" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
