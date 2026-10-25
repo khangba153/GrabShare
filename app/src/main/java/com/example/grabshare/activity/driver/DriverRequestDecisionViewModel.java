@@ -49,7 +49,7 @@ public final class DriverRequestDecisionViewModel extends ViewModel {
                 .release(requestIdentifier, driverIdentifier, new RepositoryCallback<Void>() {
                     @Override
                     public void onSuccess(Void unused) {
-                        finish(driverIdentifier, "Đã hủy nhận khách. Chuyến đã mở lại để bạn chọn khách khác.");
+                        finish(driverIdentifier, "Khách này không còn giữ chỗ. Bạn có thể chọn yêu cầu khác khi chuyến còn mở.");
                     }
 
                     @Override
