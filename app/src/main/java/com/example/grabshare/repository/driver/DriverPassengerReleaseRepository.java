@@ -49,17 +49,12 @@ public final class DriverPassengerReleaseRepository {
                 }
                 DocumentReference tripReference = firestore.collection("trips").document(tripId);
                 DocumentSnapshot trip = transaction.get(tripReference);
-                DocumentSnapshot notice = transaction.get(noticeReference);
                 if (!trip.exists() || !driverId.equals(trip.getString("driverId"))) {
                     throw new IllegalStateException("Không tìm thấy chuyến do bạn quản lý.");
                 }
-                // Lần trước đã commit nhưng mất phản hồi: chỉ xác nhận, không trả chỗ lần hai.
-                if ("CANCELLED".equals(request.getString("status")) && notice.exists()
-                        && "REQUEST_RELEASED".equals(notice.getString("type"))
-                        && driverId.equals(notice.getString("actorId"))
-                        && passengerId.equals(notice.getString("recipientId"))
-                        && tripId.equals(notice.getString("tripId"))
-                        && requestId.equals(notice.getString("requestId"))) {
+                // Yêu cầu đã hủy thì chỉ đối soát, không mở lại chuyến đang giữ khách mới.
+                // Không đọc thông báo gửi cho khách: chủ xe không có quyền đọc Inbox của khách.
+                if ("CANCELLED".equals(request.getString("status"))) {
                     return null;
                 }
                 Timestamp departureAt = trip.getTimestamp("departureAt");
@@ -69,7 +64,7 @@ public final class DriverPassengerReleaseRepository {
                 if (!"ACCEPTED".equals(request.getString("status"))
                         || !"FULL".equals(trip.getString("status"))
                         || !Long.valueOf(0L).equals(trip.getLong("availableSeats"))
-                        || !requestId.equals(trip.getString("acceptedRequestId")) || notice.exists()) {
+                        || !requestId.equals(trip.getString("acceptedRequestId"))) {
                     throw new IllegalStateException("Khách không còn là người đang được nhận. Hãy tải lại chuyến.");
                 }
                 Map<String, Object> requestUpdates = new HashMap<String, Object>();
