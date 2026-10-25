@@ -130,3 +130,53 @@ export const sendPushOnNotificationCreated = onDocumentCreated(
     }
   }
 );
+
+/** Push chat độc lập với Inbox nghiệp vụ; nội dung tin không đưa lên màn hình khóa. */
+export const sendPushOnChatMessageCreated = onDocumentCreated(
+  {
+    document: "conversations/{requestId}/messages/{messageId}",
+    region: FIRESTORE_FUNCTION_REGION,
+    maxInstances: MAX_INSTANCES,
+    retry: false
+  },
+  async function handleChatMessageCreated(event) {
+    if (!event.data) {
+      return;
+    }
+    const message = event.data.data();
+    const requestId = event.params.requestId;
+    const conversation = await firestore.collection("conversations").doc(requestId).get();
+    if (!conversation.exists) {
+      return;
+    }
+    const data = conversation.data();
+    let recipientId;
+    if (message.senderId === data.driverId) {
+      recipientId = data.passengerId;
+    } else if (message.senderId === data.passengerId) {
+      recipientId = data.driverId;
+    } else {
+      return;
+    }
+    if (!isNonEmptyString(recipientId) || data.requestId !== requestId) {
+      return;
+    }
+    const installation = await firestore.collection("fcmInstallations").doc(recipientId).get();
+    const fid = installation.get("fid");
+    if (!isNonEmptyString(fid)) {
+      return;
+    }
+    await getMessaging().send({
+      fid,
+      data: {
+        recipientId,
+        requestId,
+        notificationId: "chat_" + requestId + "_" + event.params.messageId,
+        type: "CHAT_MESSAGE",
+        title: "Bạn có tin nhắn mới",
+        body: "Mở trò chuyện trong GrabShare để xem và trả lời."
+      },
+      android: { priority: "high" }
+    });
+  }
+);

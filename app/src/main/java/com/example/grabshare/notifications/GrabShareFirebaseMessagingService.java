@@ -16,6 +16,9 @@ import androidx.core.content.ContextCompat;
 
 import com.example.grabshare.R;
 import com.example.grabshare.activity.notifications.NotificationsActivity;
+import com.example.grabshare.activity.chat.ChatActivity;
+import com.example.grabshare.contract.NavigationKeys;
+import com.example.grabshare.repository.chat.ChatRepository;
 import com.example.grabshare.repository.notifications.FcmInstallationRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -31,6 +34,7 @@ import java.util.Map;
 public class GrabShareFirebaseMessagingService extends FirebaseMessagingService {
 
     public static final String CHANNEL_ID = "grabshare_updates";
+    private static final String CHAT_CHANNEL_ID = "grabshare_chat_messages_v1";
     private static final String CHANNEL_NAME = "Thông báo GrabShare";
 
     @Override
@@ -74,6 +78,10 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
             return;
         }
 
+        if ("CHAT_MESSAGE".equals(data.get("type"))
+                && ChatActivity.isViewing(currentUser.getUid(), data.get("requestId"))) {
+            return;
+        }
         showNotification(data);
     }
 
@@ -84,6 +92,17 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
         String title = data.get("title");
         String body = data.get("body");
         String notificationId = data.get("notificationId");
+        String channelId = CHANNEL_ID;
+        if ("CHAT_MESSAGE".equals(type)) {
+            channelId = CHAT_CHANNEL_ID;
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                NotificationChannel channel = new NotificationChannel(CHAT_CHANNEL_ID,
+                        "Tin nhắn chuyến đi", NotificationManager.IMPORTANCE_HIGH);
+                channel.setDescription("Tin nhắn giữa chủ xe và hành khách đã được nhận");
+                manager.createNotificationChannel(channel);
+            }
+        }
 
         if (title == null || title.trim().isEmpty()) {
             title = getTitleForType(type);
@@ -95,9 +114,19 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
 
         Intent openInboxIntent =
                 new Intent(this, NotificationsActivity.class);
-        openInboxIntent.addFlags(
-                Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if ("CHAT_MESSAGE".equals(type)) {
+            String requestId = data.get("requestId");
+            if (!ChatRepository.validId(requestId)) {
+                return;
+            }
+            openInboxIntent = new Intent(this, ChatActivity.class);
+            openInboxIntent.putExtra(NavigationKeys.REQUEST_ID, requestId);
+            openInboxIntent.setData(android.net.Uri.parse("grabshare://chat/" + android.net.Uri.encode(requestId)));
+            // Tạo lại đúng hội thoại khi đang mở chat khác; không giữ Intent cũ bằng SINGLE_TOP.
+            openInboxIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        } else {
+            openInboxIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        }
 
         int requestCode = notificationId == null
                 ? (int) System.currentTimeMillis()
@@ -110,7 +139,7 @@ public class GrabShareFirebaseMessagingService extends FirebaseMessagingService 
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder builder =
-                new NotificationCompat.Builder(this, CHANNEL_ID)
+                new NotificationCompat.Builder(this, channelId)
                         .setSmallIcon(android.R.drawable.ic_dialog_info)
                         .setContentTitle(title)
                         .setContentText(body)
