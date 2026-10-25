@@ -18,20 +18,25 @@ import androidx.appcompat.widget.AppCompatButton;
 import com.example.grabshare.R;
 import com.example.grabshare.presentation.MainNavigation;
 import com.example.grabshare.presentation.TripListFilter;
+import com.example.grabshare.presentation.TripListState;
+import com.example.grabshare.presentation.TripListTimeRefresh;
 import com.example.grabshare.adapter.driver.DriverTripAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.repository.driver.DriverTripRepository;
+import com.example.grabshare.repository.driver.DriverRequestRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Map;
 
 //endregion
 
@@ -72,6 +77,10 @@ public class DriverTripsActivity extends AppCompatActivity {
     private DriverTripAdapter tripAdapter;
     private DriverTripRepository tripRepository;
     private FirebaseAuth firebaseAuth;
+    private DriverRequestRepository requestRepository;
+    private ListenerRegistration requestCountsListener;
+    private FirebaseAuth.AuthStateListener sessionListener;
+    private int screenGeneration;
 
     private final List<Trip> allTrips = new ArrayList<>();
 
@@ -81,9 +90,15 @@ public class DriverTripsActivity extends AppCompatActivity {
     //region 4. Screen state
 
     private int selectedFilter = FILTER_UPCOMING;
-    private final TripListFilter listFilter = new TripListFilter(
-            new String[]{"Tất cả", "Đang nhận yêu cầu", "Đã nhận khách", "Hoàn thành", "Đã hủy"},
-            new String[]{"", "OPEN", "FULL", "COMPLETED", "CANCELLED"});
+    private final TripListFilter activeFilter = new TripListFilter(
+            new String[]{"Tất cả", "Đang nhận yêu cầu", "Đã nhận khách"},
+            new String[]{"", "OPEN", "FULL"});
+    private final TripListFilter historyFilter = new TripListFilter(
+            new String[]{"Tất cả", "Hoàn thành", "Đã hủy", "Hết hạn"},
+            new String[]{"", "COMPLETED", "CANCELLED", "EXPIRED"});
+    private TripListFilter listFilter = activeFilter;
+    private String filterOwnerIdentifier;
+    private final TripListTimeRefresh timeRefresh = new TripListTimeRefresh();
 
     private boolean isLoading;
     private boolean hasLoadedSuccessfully;
@@ -105,7 +120,7 @@ public class DriverTripsActivity extends AppCompatActivity {
         initializeViews();
         initializeRepository();
         initializeAdapter();
-        listFilter.restore(savedInstanceState);
+        restoreFilters(savedInstanceState);
         ((TextView) findViewById(R.id.trip_list_filter)).setText(listFilter.summary());
         findViewById(R.id.trip_list_filter).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -121,13 +136,6 @@ public class DriverTripsActivity extends AppCompatActivity {
                 });
             }
         });
-
-        if (savedInstanceState != null) {
-            selectedFilter = savedInstanceState.getInt(
-                    STATE_SELECTED_FILTER,
-                    FILTER_UPCOMING
-            );
-        }
 
         updateFilterAppearance();
 
@@ -149,7 +157,87 @@ public class DriverTripsActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        loadTrips();
+        sessionListener = new FirebaseAuth.AuthStateListener() {
+            /** Xóa dữ liệu tài khoản cũ trước khi tải lại cho phiên hiện tại. */
+            @Override
+            public void onAuthStateChanged(@NonNull FirebaseAuth authentication) {
+                stopRequestCounts();
+                FirebaseUser currentUser = authentication.getCurrentUser();
+                String userIdentifier = null;
+                if (currentUser != null) {
+                    userIdentifier = currentUser.getUid();
+                }
+                if (!java.util.Objects.equals(filterOwnerIdentifier, userIdentifier)) {
+                    saveFilters();
+                    restoreFilters(null);
+                    updateFilterAppearance();
+                }
+                allTrips.clear();
+                tripAdapter.replaceTrips(new ArrayList<Trip>());
+                tripAdapter.replacePendingCounts(null);
+                loadTrips();
+                watchRequestCounts();
+            }
+        };
+        firebaseAuth.addAuthStateListener(sessionListener);
+    }
+
+    /** Dừng listener và vô hiệu callback khi chuyển màn hoặc đăng xuất. */
+    @Override
+    protected void onPause() {
+        saveFilters();
+        timeRefresh.stop();
+        if (sessionListener != null) {
+            firebaseAuth.removeAuthStateListener(sessionListener);
+            sessionListener = null;
+        }
+        stopRequestCounts();
+        super.onPause();
+    }
+
+    /** Một listener dùng chung cho tất cả thẻ chuyến của chủ xe đang đăng nhập. */
+    private void watchRequestCounts() {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        if (currentUser == null) {
+            return;
+        }
+        final String driverIdentifier = currentUser.getUid();
+        final int expectedGeneration = screenGeneration;
+        requestCountsListener = requestRepository.watchPendingCounts(
+                driverIdentifier, new RepositoryCallback<Map<String, Integer>>() {
+                    /** Nhận số lượng mới khi khách gửi, hủy hoặc chủ xe phản hồi yêu cầu. */
+                    @Override
+                    public void onSuccess(Map<String, Integer> counts) {
+                        if (isCurrentSession(expectedGeneration, driverIdentifier)) {
+                            tripAdapter.replacePendingCounts(counts);
+                        }
+                    }
+
+                    /** Giữ lối mở danh sách nhưng không công bố số lượng cũ khi lỗi hoặc offline. */
+                    @Override
+                    public void onError(Exception error) {
+                        if (isCurrentSession(expectedGeneration, driverIdentifier)) {
+                            tripAdapter.replacePendingCounts(null);
+                        }
+                    }
+                });
+    }
+
+    /** Kiểm tra cả vòng đời màn và UID để callback muộn không thay dữ liệu phiên khác. */
+    private boolean isCurrentSession(int expectedGeneration, String driverIdentifier) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        return expectedGeneration == screenGeneration
+                && !isFinishing() && !isDestroyed()
+                && currentUser != null && driverIdentifier.equals(currentUser.getUid());
+    }
+
+    /** Đóng kết nối theo dõi và vô hiệu cả tác vụ tải chuyến đang chạy. */
+    private void stopRequestCounts() {
+        screenGeneration = screenGeneration + 1;
+        if (requestCountsListener != null) {
+            requestCountsListener.remove();
+            requestCountsListener = null;
+        }
     }
 
     /**
@@ -164,8 +252,14 @@ public class DriverTripsActivity extends AppCompatActivity {
                 selectedFilter
         );
 
+        Bundle activeState = new Bundle();
+        Bundle historyState = new Bundle();
+        activeFilter.save(activeState);
+        historyFilter.save(historyState);
+        savedInstanceState.putBundle("driver_active_filter", activeState);
+        savedInstanceState.putBundle("driver_history_filter", historyState);
+        savedInstanceState.putString("driver_filter_uid", filterOwnerIdentifier);
         super.onSaveInstanceState(savedInstanceState);
-        listFilter.save(savedInstanceState);
     }
 
     //endregion
@@ -191,6 +285,8 @@ public class DriverTripsActivity extends AppCompatActivity {
      */
     private void initializeRepository() {
         firebaseAuth = FirebaseAuth.getInstance();
+        requestRepository = new DriverRequestRepository(
+                FirebaseFirestore.getInstance(), firebaseAuth);
 
         tripRepository = new DriverTripRepository(
                 FirebaseFirestore.getInstance(),
@@ -203,6 +299,22 @@ public class DriverTripsActivity extends AppCompatActivity {
      */
     private void initializeAdapter() {
         tripAdapter = new DriverTripAdapter(this);
+        tripAdapter.setOnRequestsClickListener(new DriverTripAdapter.OnRequestsClickListener() {
+            /** Thẻ chuyến vẫn mở quản lý; nhãn yêu cầu mở trực tiếp danh sách của chuyến đó. */
+            @Override
+            public void onRequestsClick(Trip trip) {
+                FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+                if (currentUser == null || trip == null
+                        || !currentUser.getUid().equals(trip.getDriverId())
+                        || trip.getId() == null || trip.getId().trim().isEmpty()) {
+                    return;
+                }
+                Intent requestsIntent = new Intent(
+                        DriverTripsActivity.this, DriverRequestsActivity.class);
+                requestsIntent.putExtra(NavigationKeys.TRIP_ID, trip.getId());
+                startActivity(requestsIntent);
+            }
+        });
         tripListView.setAdapter(tripAdapter);
     }
 
@@ -232,6 +344,8 @@ public class DriverTripsActivity extends AppCompatActivity {
 
         isLoading = true;
         hasLoadError = false;
+        final int expectedGeneration = screenGeneration;
+        final String driverIdentifier = currentUser.getUid();
 
         showLoadingState();
 
@@ -243,7 +357,9 @@ public class DriverTripsActivity extends AppCompatActivity {
                      */
                     @Override
                     public void onSuccess(List<Trip> loadedTrips) {
-                        handleTripsLoaded(loadedTrips);
+                        if (isCurrentSession(expectedGeneration, driverIdentifier)) {
+                            handleTripsLoaded(loadedTrips);
+                        }
                     }
 
                     /**
@@ -251,7 +367,9 @@ public class DriverTripsActivity extends AppCompatActivity {
                      */
                     @Override
                     public void onError(Exception error) {
-                        handleTripsLoadError(error);
+                        if (isCurrentSession(expectedGeneration, driverIdentifier)) {
+                            handleTripsLoadError(error);
+                        }
                     }
                 }
         );
@@ -268,6 +386,7 @@ public class DriverTripsActivity extends AppCompatActivity {
         isLoading = false;
         hasLoadedSuccessfully = true;
         hasLoadError = false;
+        findViewById(R.id.trip_list_filter).setEnabled(true);
 
         allTrips.clear();
 
@@ -308,6 +427,11 @@ public class DriverTripsActivity extends AppCompatActivity {
      */
     private void selectFilter(int requestedFilter) {
         selectedFilter = requestedFilter;
+        listFilter = activeFilter;
+        if (selectedFilter == FILTER_HISTORY) {
+            listFilter = historyFilter;
+        }
+        ((TextView) findViewById(R.id.trip_list_filter)).setText(listFilter.summary());
 
         updateFilterAppearance();
 
@@ -362,26 +486,62 @@ public class DriverTripsActivity extends AppCompatActivity {
      * Điều phối việc lọc dữ liệu và cập nhật danh sách trên màn hình.
      */
     private void displayFilteredTrips() {
+        final long now = System.currentTimeMillis();
         List<Trip> filteredTrips = filterTripsForSelectedTab();
 
         List<Trip> matchedTrips = new ArrayList<>();
         for (Trip trip : filteredTrips) {
-            if (listFilter.matches(trip.getStatus(), trip.getDepartureAt())) {
+            if (listFilter.matches(TripListState.driverStatus(trip, now), trip.getDepartureAt())) {
                 matchedTrips.add(trip);
             }
         }
         Collections.sort(matchedTrips, new Comparator<Trip>() {
             @Override
             public int compare(Trip first, Trip second) {
+                if (selectedFilter == FILTER_HISTORY && listFilter.automaticOrder()) {
+                    return TripListState.compareTime(
+                            TripListState.historyTime(TripListState.driverStatus(first, now),
+                                    first.getUpdatedAt(), first.getCreatedAt(), first),
+                            TripListState.historyTime(TripListState.driverStatus(second, now),
+                                    second.getUpdatedAt(), second.getCreatedAt(), second), true);
+                }
+                if (selectedFilter == FILTER_UPCOMING) {
+                    int firstPriority = TripListState.attentionPriority(first.getStatus(), first, now);
+                    int secondPriority = TripListState.attentionPriority(second.getStatus(), second, now);
+                    if (firstPriority != secondPriority) {
+                        return Integer.compare(firstPriority, secondPriority);
+                    }
+                }
                 return listFilter.compare(first.getDepartureAt(), second.getDepartureAt());
             }
         });
         filteredTrips = matchedTrips;
         tripAdapter.replaceTrips(filteredTrips);
+        long nextDeparture = Long.MAX_VALUE;
+        for (Trip trip : allTrips) {
+            if (trip.getDepartureAt() != null && trip.getDepartureAt().toDate().getTime() > now) {
+                nextDeparture = Math.min(nextDeparture, trip.getDepartureAt().toDate().getTime());
+            }
+        }
+        timeRefresh.schedule(nextDeparture, new Runnable() {
+            /** Tới giờ khởi hành tự chuyển nhóm hiển thị, không sửa trạng thái chuyến. */
+            @Override
+            public void run() {
+                if (hasLoadedSuccessfully && !isLoading && !hasLoadError) {
+                    displayFilteredTrips();
+                }
+            }
+        });
 
         if (filteredTrips.isEmpty()) {
-            showStatusMessage("Không có chuyến phù hợp mục và bộ lọc đang chọn. "
-                    + "Chọn Bộ lọc → Đặt lại để bỏ các điều kiện lọc.", false);
+            String message = "Chưa có chuyến đang quản lý.";
+            if (selectedFilter == FILTER_HISTORY) {
+                message = "Chưa có lịch sử đăng chuyến.";
+            }
+            if (!"Bộ lọc".equals(listFilter.summary())) {
+                message = "Không có chuyến phù hợp. Chọn Bộ lọc → Đặt lại.";
+            }
+            showStatusMessage(message, false);
             return;
         }
 
@@ -417,14 +577,7 @@ public class DriverTripsActivity extends AppCompatActivity {
      * không suy ra COMPLETED từ thời gian khởi hành.
      */
     private boolean isHistoryTrip(Trip trip) {
-        String tripStatus = trip.getStatus();
-
-        String normalizedStatus = tripStatus == null
-                ? ""
-                : tripStatus.trim().toUpperCase(Locale.ROOT);
-
-        return normalizedStatus.equals("COMPLETED")
-                || normalizedStatus.equals("CANCELLED");
+        return TripListState.history(TripListState.driverStatus(trip, System.currentTimeMillis()));
     }
 
     /**
@@ -458,6 +611,8 @@ public class DriverTripsActivity extends AppCompatActivity {
      * Hiển thị trạng thái đang tải dữ liệu.
      */
     private void showLoadingState() {
+        timeRefresh.stop();
+        findViewById(R.id.trip_list_filter).setEnabled(false);
         loadingProgressBar.setVisibility(View.VISIBLE);
         tripListView.setVisibility(View.GONE);
         messageTextView.setVisibility(View.GONE);
@@ -610,6 +765,52 @@ public class DriverTripsActivity extends AppCompatActivity {
         );
 
         startActivity(postTripIntent);
+    }
+
+    /** Phục hồi riêng hai mục và đúng tài khoản, không dùng chung với bộ lọc Đi nhờ. */
+    private void restoreFilters(Bundle state) {
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        filterOwnerIdentifier = null;
+        if (currentUser != null) {
+            filterOwnerIdentifier = currentUser.getUid();
+        }
+        activeFilter.restorePreferences(this, filterKey("active"));
+        historyFilter.restorePreferences(this, filterKey("history"));
+        selectedFilter = getSharedPreferences("trip_list_preferences", MODE_PRIVATE)
+                .getInt(filterKey("selected_group"), FILTER_UPCOMING);
+        if (state != null && java.util.Objects.equals(filterOwnerIdentifier, state.getString("driver_filter_uid"))) {
+            selectedFilter = state.getInt(STATE_SELECTED_FILTER, selectedFilter);
+            activeFilter.restore(state.getBundle("driver_active_filter"));
+            historyFilter.restore(state.getBundle("driver_history_filter"));
+        }
+        if (selectedFilter != FILTER_HISTORY) {
+            selectedFilter = FILTER_UPCOMING;
+        }
+        listFilter = activeFilter;
+        if (selectedFilter == FILTER_HISTORY) {
+            listFilter = historyFilter;
+        }
+        ((TextView) findViewById(R.id.trip_list_filter)).setText(listFilter.summary());
+    }
+
+    private String filterKey(String suffix) {
+        return "driver_" + filterOwnerIdentifier + "_" + suffix;
+    }
+
+    private void saveFilters() {
+        if (filterOwnerIdentifier == null) {
+            return;
+        }
+        activeFilter.savePreferences(this, filterKey("active"));
+        historyFilter.savePreferences(this, filterKey("history"));
+        getSharedPreferences("trip_list_preferences", MODE_PRIVATE).edit()
+                .putInt(filterKey("selected_group"), selectedFilter).apply();
+    }
+
+    @Override
+    protected void onDestroy() {
+        timeRefresh.close();
+        super.onDestroy();
     }
 
     //endregion

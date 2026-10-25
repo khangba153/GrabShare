@@ -13,6 +13,10 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.RideProgressGuidance;
+import com.example.grabshare.presentation.PlaceNameFormatter;
+import com.example.grabshare.presentation.MainNavigation;
+import com.example.grabshare.contract.RequestRouteResolver;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Place;
@@ -52,13 +56,9 @@ public class UpcomingActivity extends AppCompatActivity {
     private TextView driverName;
     private TextView driverMeta;
     private TextView tripTime;
-    private TextView tripSeats;
     private TextView routeStart;
     private TextView routeEnd;
-    private TextView tripPickup;
     private TextView tripCost;
-    private TextView mapStartLabel;
-    private TextView mapEndLabel;
 
     private PassengerTripsRepository tripsRepository;
     private RequestCancellationRepository cancellationRepository;
@@ -71,11 +71,15 @@ public class UpcomingActivity extends AppCompatActivity {
     private PassengerSessionGuard sessionGuard;
     private boolean cancellationInFlight;
     private AlertDialog cancelDialog;
+    private boolean fullAddressesVisible;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_upcoming);
+        if (savedInstanceState != null) {
+            fullAddressesVisible = savedInstanceState.getBoolean("full_addresses_visible", false);
+        }
 
         // Đọc requestId từ Intent Extra theo NavigationKeys.REQUEST_ID
         if (getIntent() != null) {
@@ -105,6 +109,7 @@ public class UpcomingActivity extends AppCompatActivity {
 
         initRepositories();
         initViews();
+        MainNavigation.bindNotifications(this, R.id.header_action);
         setupListeners();
     }
 
@@ -135,6 +140,7 @@ public class UpcomingActivity extends AppCompatActivity {
         if (primaryAction != null) {
             primaryAction.setClickable(true);
             primaryAction.setFocusable(true);
+            primaryAction.setVisibility(View.GONE);
         }
 
         if (secondaryAction != null) {
@@ -151,13 +157,30 @@ public class UpcomingActivity extends AppCompatActivity {
         driverName = findViewById(R.id.driver_name);
         driverMeta = findViewById(R.id.driver_meta);
         tripTime = findViewById(R.id.trip_time);
-        tripSeats = findViewById(R.id.trip_seats);
         routeStart = findViewById(R.id.route_start);
         routeEnd = findViewById(R.id.route_end);
-        tripPickup = findViewById(R.id.trip_pickup);
         tripCost = findViewById(R.id.trip_cost);
-        mapStartLabel = findViewById(R.id.map_start_label);
-        mapEndLabel = findViewById(R.id.map_end_label);
+        updateAddressDisclosure();
+        findViewById(R.id.passenger_route_toggle).setOnClickListener(new View.OnClickListener() {
+            /** Địa chỉ đầy đủ chỉ mở theo nhu cầu, không lặp tuyến dài trong màn mặc định. */
+            @Override
+            public void onClick(View clickedView) {
+                fullAddressesVisible = !fullAddressesVisible;
+                updateAddressDisclosure();
+            }
+        });
+    }
+
+    /** Giữ tuyến rút gọn ở thẻ chính và cho phép mở nguyên văn địa chỉ đã lưu. */
+    private void updateAddressDisclosure() {
+        TextView routeSummary = findViewById(R.id.passenger_route_summary);
+        TextView toggle = findViewById(R.id.passenger_route_toggle);
+        routeSummary.setVisibility(View.GONE);
+        toggle.setText("Xem địa chỉ đầy đủ");
+        if (fullAddressesVisible) {
+            routeSummary.setVisibility(View.VISIBLE);
+            toggle.setText("Thu gọn địa chỉ");
+        }
     }
 
     private void setupListeners() {
@@ -195,6 +218,9 @@ public class UpcomingActivity extends AppCompatActivity {
         if (sessionGuard != null && sessionGuard.start(currentUserId)) {
             cancellationInFlight = false;
             currentDetails = null;
+            if (primaryAction != null) {
+                primaryAction.setVisibility(View.GONE);
+            }
             if (secondaryAction != null) {
                 secondaryAction.setEnabled(false);
             }
@@ -222,6 +248,7 @@ public class UpcomingActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(Bundle state) {
         state.putString("passenger_expected_uid", currentUserId);
+        state.putBoolean("full_addresses_visible", fullAddressesVisible);
         super.onSaveInstanceState(state);
     }
 
@@ -273,8 +300,22 @@ public class UpcomingActivity extends AppCompatActivity {
                 if (!sessionGuard.current(sessionToken)) {
                     return;
                 }
-                Toast.makeText(UpcomingActivity.this, "Không thể tải dữ liệu: " + error.getMessage(), Toast.LENGTH_SHORT).show();
-                finish();
+                currentDetails = null;
+                upcomingStatus.setText("Chưa tải được chuyến");
+                upcomingDescription.setText("Kiểm tra kết nối rồi thử lại.");
+                secondaryAction.setVisibility(View.GONE);
+                primaryAction.setText("Thử lại");
+                primaryAction.setEnabled(true);
+                primaryAction.setVisibility(View.VISIBLE);
+                primaryAction.setOnClickListener(new View.OnClickListener() {
+                    /** Thử đọc lại dữ liệu, không tự gửi hoặc xác nhận bất kỳ yêu cầu nào. */
+                    @Override
+                    public void onClick(View clickedView) {
+                        primaryAction.setVisibility(View.GONE);
+                        upcomingStatus.setText("Đang tải chuyến…");
+                        startListeningRequest();
+                    }
+                });
             }
         });
     }
@@ -304,6 +345,17 @@ public class UpcomingActivity extends AppCompatActivity {
         TripRequest request = details.getRequest();
         Trip trip = details.getTrip();
         PassengerRouteText.bind(findViewById(R.id.passenger_route_summary), request, trip);
+        if (primaryAction != null) {
+            primaryAction.setVisibility(View.VISIBLE);
+            primaryAction.setOnClickListener(new View.OnClickListener() {
+                /** Gắn lại hành động theo dữ liệu mới, không giữ nút Quay lại của trạng thái lỗi cũ. */
+                @Override
+                public void onClick(View clickedView) {
+                    handlePrimaryAction();
+                }
+            });
+        }
+        RideProgressGuidance.bindPassenger(findViewById(R.id.ride_progress_guidance), request, trip);
         PublicProfile profile = details.getDriverProfile();
 
         bindDriverProfile(profile);
@@ -434,17 +486,16 @@ public class UpcomingActivity extends AppCompatActivity {
                 secondaryAction.setVisibility(View.GONE); // Chặn hoàn toàn nút Hủy sau giờ đi
             }
             if (primaryAction != null) {
-                primaryAction.setText("Chờ chủ xe hoàn thành");
-                primaryAction.setEnabled(false); // Passenger không tự complete
+                primaryAction.setVisibility(View.GONE);
             }
         } else {
             if (headerTitle != null) {
                 headerTitle.setText("Chuyến đã được nhận");
             }
-            if (upcomingStatus != null) upcomingStatus.setText("Sắp khởi hành");
+            if (upcomingStatus != null) upcomingStatus.setText("Đã được nhận · Đã giữ chỗ");
             if (upcomingDescription != null && trip.getDepartureAt() != null) {
                 upcomingDescription.setText("Chủ xe khởi hành lúc " + formatTimeOnly(trip.getDepartureAt())
-                        + ". Đây chưa phải giờ đón bạn; hai bên cần thống nhất trước khi đi.");
+                        + ". Cần thống nhất riêng giờ đón.");
             }
 
             if (secondaryAction != null) {
@@ -453,8 +504,7 @@ public class UpcomingActivity extends AppCompatActivity {
                 secondaryAction.setEnabled(true);
             }
             if (primaryAction != null) {
-                primaryAction.setText("Đã xác nhận chuyến đi");
-                primaryAction.setEnabled(false);
+                primaryAction.setVisibility(View.GONE);
             }
         }
     }
@@ -482,35 +532,27 @@ public class UpcomingActivity extends AppCompatActivity {
                 tripTime.setText(formatTimestamp(trip.getDepartureAt()));
             }
 
-            if (tripSeats != null) {
-                long seats = trip.getAvailableSeats() != null ? trip.getAvailableSeats() : 0;
-                tripSeats.setText(seats + " chỗ trống");
+            if (routeStart != null) {
+                routeStart.setText("Chưa xác nhận được điểm đón");
+                if (request != null && request.getPickup() != null) {
+                    routeStart.setText(PlaceNameFormatter.format(request.getPickup().getName()));
+                    routeStart.setContentDescription(request.getPickup().getName());
+                }
+            }
+            if (routeEnd != null) {
+                routeEnd.setText("Chưa xác nhận được điểm xuống");
+                try {
+                    Place dropoff = RequestRouteResolver.resolveDropoff(request, trip);
+                    routeEnd.setText(PlaceNameFormatter.format(dropoff.getName()));
+                    routeEnd.setContentDescription(dropoff.getName());
+                } catch (IllegalArgumentException error) {
+                    routeEnd.setText("Điểm xuống chưa hợp lệ");
+                }
             }
 
-            if (routeStart != null && trip.getOrigin() != null) {
-                routeStart.setText(trip.getOrigin().getName() != null ? trip.getOrigin().getName() : "Điểm đi");
-            }
-
-            if (routeEnd != null && trip.getDestination() != null) {
-                routeEnd.setText(trip.getDestination().getName() != null ? trip.getDestination().getName() : "Điểm đến");
-            }
-
-            if (mapStartLabel != null && trip.getOrigin() != null) {
-                mapStartLabel.setText(trip.getOrigin().getName() != null ? trip.getOrigin().getName() : "Điểm đi");
-            }
-
-            if (mapEndLabel != null && trip.getDestination() != null) {
-                mapEndLabel.setText(trip.getDestination().getName() != null ? trip.getDestination().getName() : "Điểm đến");
-            }
         }
 
-        if (tripCost != null) tripCost.setText(PassengerContributionText.format(request));
-        if (request != null && request.getPickup() != null) {
-            Place pickupPlace = request.getPickup();
-            if (tripPickup != null) {
-                tripPickup.setText("Điểm đón: " + (pickupPlace.getName() != null ? pickupPlace.getName() : "Điểm hẹn đã chọn"));
-            }
-        }
+        PassengerContributionText.bindAmount(tripCost, request);
     }
 
     /**

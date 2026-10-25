@@ -1,6 +1,7 @@
 package com.example.grabshare.activity.driver;
 
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
@@ -13,6 +14,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.TripListState;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.adapter.driver.RequestAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -52,6 +55,7 @@ public class DriverRequestsActivity extends AppCompatActivity
     private String tripId;
     private int selectedTab = TAB_PENDING;
     private boolean isLoading;
+    private boolean loadFailed;
 
     /** Khởi tạo giao diện, phục hồi trạng thái và kết nối dữ liệu. */
     @Override
@@ -155,7 +159,7 @@ public class DriverRequestsActivity extends AppCompatActivity
             }
         });
 
-        respondedTabButton.setText("Đã phản hồi");
+        respondedTabButton.setText("Tất cả");
         respondedTabButton.setClickable(true);
         respondedTabButton.setFocusable(true);
         respondedTabButton.setOnClickListener(new View.OnClickListener() {
@@ -211,6 +215,11 @@ public class DriverRequestsActivity extends AppCompatActivity
         }
 
         isLoading = true;
+        loadFailed = false;
+        requestList.removeAllViews();
+        TextView loadingText = new TextView(this);
+        loadingText.setText("Đang tải yêu cầu…");
+        requestList.addView(loadingText);
         requestRepository.loadRequestsForCurrentDriver(
                 tripId,
                 new RepositoryCallback<List<DriverRequestItem>>() {
@@ -221,6 +230,7 @@ public class DriverRequestsActivity extends AppCompatActivity
                         }
 
                         isLoading = false;
+                        loadFailed = false;
                         adapter.replaceItems(items);
                         renderRequests();
 
@@ -238,9 +248,10 @@ public class DriverRequestsActivity extends AppCompatActivity
                         }
 
                         isLoading = false;
+                        loadFailed = true;
                         adapter.replaceItems(new ArrayList<DriverRequestItem>());
-                        renderRequests();
                         summaryText.setText("Không thể tải yêu cầu");
+                        showRequestLoadError();
                         Toast.makeText(
                                 DriverRequestsActivity.this,
                                 readableError(error),
@@ -253,22 +264,43 @@ public class DriverRequestsActivity extends AppCompatActivity
 
     /** Cập nhật trạng thái trực quan của tab đang chọn. */
     private void updateTabAppearance() {
-        pendingTabButton.setEnabled(selectedTab != TAB_PENDING);
-        respondedTabButton.setEnabled(selectedTab != TAB_RESPONDED);
+        styleTab(pendingTabButton, selectedTab == TAB_PENDING);
+        styleTab(respondedTabButton, selectedTab == TAB_RESPONDED);
+    }
+
+    /** Tab đang chọn dùng màu và selected, không giả thành nút bị vô hiệu hóa. */
+    private void styleTab(AppCompatButton button, boolean selected) {
+        int background = R.color.white;
+        int text = R.color.ink;
+        if (selected) {
+            background = R.color.primary;
+            text = R.color.white;
+        }
+        button.setEnabled(true);
+        button.setSelected(selected);
+        button.setBackgroundTintList(ColorStateList.valueOf(getColor(background)));
+        button.setTextColor(getColor(text));
     }
 
     /** Hiển thị item theo trạng thái; mọi trạng thái không phải PENDING nằm ở tab đã phản hồi. */
     private void renderRequests() {
+        if (isLoading) {
+            return;
+        }
+        if (loadFailed) {
+            showRequestLoadError();
+            return;
+        }
         requestList.removeAllViews();
         int visibleCount = 0;
 
         for (int index = 0; index < adapter.getCount(); index++) {
             DriverRequestItem item = adapter.getItem(index);
-            String status = item.getRequest().getStatus();
+            String status = TripListState.passengerStatus(item.getRequest(), item.getTrip(), System.currentTimeMillis());
             boolean isPending = "PENDING".equals(status);
 
             if ((selectedTab == TAB_PENDING && isPending)
-                    || (selectedTab == TAB_RESPONDED && !isPending)) {
+                    || selectedTab == TAB_RESPONDED) {
                 requestList.addView(adapter.getView(index, null, requestList));
                 visibleCount++;
             }
@@ -278,12 +310,30 @@ public class DriverRequestsActivity extends AppCompatActivity
             TextView emptyText = new TextView(this);
             emptyText.setText(selectedTab == TAB_PENDING
                     ? "Chưa có yêu cầu nào đang chờ duyệt."
-                    : "Chưa có yêu cầu nào đã được phản hồi.");
+                    : "Chưa có yêu cầu đi nhờ.");
             emptyText.setTextColor(getColor(R.color.muted));
             emptyText.setTextSize(14);
             emptyText.setPadding(12, 28, 12, 28);
             requestList.addView(emptyText);
         }
+    }
+
+    /** Đổi tab không được biến lỗi tải thành kết luận chưa có yêu cầu. */
+    private void showRequestLoadError() {
+        requestList.removeAllViews();
+        TextView message = new TextView(this);
+        message.setText("Chưa tải được yêu cầu. Kiểm tra kết nối rồi thử lại.");
+        message.setTextColor(getColor(R.color.muted));
+        requestList.addView(message);
+        AppCompatButton retry = new AppCompatButton(this);
+        retry.setText("Thử tải lại");
+        retry.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View clickedView) {
+                loadRequests();
+            }
+        });
+        requestList.addView(retry);
     }
 
     /** Mở chi tiết bằng ID Firestore, không truyền nguyên đối tượng qua Intent. */
@@ -307,7 +357,7 @@ public class DriverRequestsActivity extends AppCompatActivity
         if (place == null || place.getName() == null || place.getName().trim().isEmpty()) {
             return fallback;
         }
-        return place.getName().trim();
+        return PlaceNameFormatter.format(place.getName());
     }
 
     /** Tạo tóm tắt chuyến bằng thời gian và số chỗ hiện tại. */

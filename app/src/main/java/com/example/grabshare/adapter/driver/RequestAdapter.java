@@ -10,6 +10,10 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.PlaceNameFormatter;
+import com.example.grabshare.presentation.TripListState;
+import com.example.grabshare.contract.RequestRouteResolver;
+import com.example.grabshare.activity.passenger.PassengerContributionText;
 import com.example.grabshare.model.DriverRequestItem;
 import com.example.grabshare.model.Place;
 
@@ -89,9 +93,7 @@ public class RequestAdapter extends BaseAdapter {
         }
 
         nameText.setText(passengerName);
-        metaText.setText(passengerVehicle.isEmpty()
-                ? "Người gửi yêu cầu đi nhờ"
-                : passengerVehicle);
+        metaText.setVisibility(View.GONE);
         badgeText.setVisibility(View.GONE);
         avatarImage.setVisibility(View.GONE);
 
@@ -100,7 +102,21 @@ public class RequestAdapter extends BaseAdapter {
                 || pickup.getName().trim().isEmpty()
                 ? "Chưa có điểm đón"
                 : pickup.getName().trim();
-        pickupText.setText("Điểm đón: " + pickupName);
+        pickupText.setText("Đón: " + PlaceNameFormatter.format(pickupName));
+        pickupText.setMaxLines(1);
+        pickupText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        TextView dropoffText = row.findViewById(R.id.request_dropoff);
+        try {
+            Place dropoff = RequestRouteResolver.resolveDropoff(item.getRequest(), item.getTrip());
+            dropoffText.setText("Trả: " + PlaceNameFormatter.format(dropoff.getName()));
+        } catch (IllegalArgumentException error) {
+            dropoffText.setText("Điểm xuống chưa hợp lệ · Xem chi tiết");
+        }
+        ((TextView) row.findViewById(R.id.request_contribution))
+                .setText(PassengerContributionText.format(item.getRequest()));
+        String status = TripListState.passengerStatus(item.getRequest(), item.getTrip(), System.currentTimeMillis());
+        ((TextView) row.findViewById(R.id.request_card_status)).setText(
+                TripListState.label(status, item.getTrip(), System.currentTimeMillis()));
 
         String message = item.getRequest().getMessage();
         messageText.setText(message == null || message.trim().isEmpty()
@@ -113,6 +129,19 @@ public class RequestAdapter extends BaseAdapter {
         openButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (listener != null) {
+                    listener.onOpenRequest(item);
+                }
+            }
+        });
+        row.setContentDescription(passengerName + ", " + pickupText.getText() + ", "
+                + dropoffText.getText() + ". Xem yêu cầu");
+        row.setFocusable(true);
+        row.setBackgroundResource(R.drawable.bg_card);
+        row.setOnClickListener(new View.OnClickListener() {
+            /** Cả thẻ là một điểm chạm, không lặp thêm nút mở trên từng khách. */
+            @Override
+            public void onClick(View clickedView) {
                 if (listener != null) {
                     listener.onOpenRequest(item);
                 }

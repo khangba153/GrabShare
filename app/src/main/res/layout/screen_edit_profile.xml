@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -8,7 +7,7 @@
     android:background="@color/background">
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp">
         <ImageButton
             android:id="@+id/header_back"
@@ -23,13 +22,29 @@
             android:layout_marginHorizontal="52dp"
             android:gravity="center"
             android:text="Chỉnh sửa hồ sơ" />
+        <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="48dp" />
+        <ImageButton
+            android:id="@+id/header_action"
+            style="@style/IconButton"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="Thông báo"
+            android:layout_gravity="center_vertical|end" />
     </FrameLayout>
     <ScrollView
         android:id="@+id/profile_edit_scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -63,7 +78,9 @@
                 android:id="@+id/profile_edit_retry"
                 style="@style/ButtonSecondary"
                 android:text="@string/profile_retry"
-                android:visibility="gone" />
+                android:visibility="gone"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
             <LinearLayout
                 style="@style/Card">
                 <TextView
@@ -77,7 +94,9 @@
                     android:inputType="textPersonName"
                     android:importantForAutofill="no"
                     android:saveEnabled="false"
-                    android:imeOptions="actionNext" />
+                    android:imeOptions="actionNext"
+                    android:textColor="@color/ink"
+                    android:textSize="15sp" />
                 <TextView
                     style="@style/Caption"
                     android:layout_marginTop="16dp"
@@ -105,7 +124,9 @@
                     android:inputType="textCapWords"
                     android:importantForAutofill="no"
                     android:saveEnabled="false"
-                    android:imeOptions="actionNext" />
+                    android:imeOptions="actionNext"
+                    android:textColor="@color/ink"
+                    android:textSize="15sp" />
                 <TextView
                     style="@style/Caption"
                     android:layout_marginTop="16dp"
@@ -118,7 +139,9 @@
                     android:inputType="textCapCharacters"
                     android:importantForAutofill="no"
                     android:saveEnabled="false"
-                    android:imeOptions="actionDone" />
+                    android:imeOptions="actionNext"
+                    android:textColor="@color/ink"
+                    android:textSize="15sp" />
                 <TextView
                     style="@style/Hint"
                     android:layout_width="match_parent"
@@ -138,11 +161,15 @@
                     android:id="@+id/primary_action"
                     style="@style/ButtonPrimary"
                     android:enabled="false"
-                    android:text="@string/profile_save" />
+                    android:text="@string/profile_save"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp" />
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/secondary_action"
                     style="@style/ButtonSecondary"
-                    android:text="@string/profile_cancel" />
+                    android:text="@string/profile_cancel"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>

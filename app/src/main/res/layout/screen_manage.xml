@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/background">
-
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp">
-
         <ImageButton
             android:id="@+id/header_back"
             style="@style/IconButton"
@@ -18,7 +17,6 @@
             android:contentDescription="Quay lại"
             android:clickable="true"
             android:focusable="true" />
-
         <TextView
             style="@style/Subtitle"
             android:layout_width="match_parent"
@@ -26,8 +24,21 @@
             android:layout_marginHorizontal="52dp"
             android:gravity="center"
             android:text="Quản lý chuyến" />
+        <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="48dp" />
+        <ImageButton
+            android:id="@+id/header_action"
+            style="@style/IconButton"
+            android:src="@drawable/ic_bell"
+            android:contentDescription="Thông báo"
+            android:layout_gravity="center_vertical|end" />
     </FrameLayout>
-
     <ProgressBar
         android:id="@+id/manage_loading"
         style="?android:attr/progressBarStyleHorizontal"
@@ -35,14 +46,13 @@
         android:layout_height="3dp"
         android:indeterminate="true"
         android:visibility="gone" />
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true"
-        android:clipToPadding="false">
-
+        android:clipToPadding="false"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -50,14 +60,12 @@
             android:paddingHorizontal="20dp"
             android:paddingTop="8dp"
             android:paddingBottom="24dp">
-
             <TextView
                 android:id="@+id/manage_status"
                 style="@style/Badge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Đang tải..." />
-
             <TextView
                 android:id="@+id/manage_time"
                 style="@style/Hint"
@@ -65,7 +73,6 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Đang tải thời gian..." />
-
             <TextView
                 android:id="@+id/manage_message"
                 style="@style/Hint"
@@ -74,34 +81,38 @@
                 android:layout_marginTop="12dp"
                 android:text="Đang tải thông tin chuyến..."
                 android:visibility="visible" />
-
-            <include layout="@layout/view_map" />
-
+            <include
+                layout="@layout/view_ride_progress_guidance" />
+            <include
+                layout="@layout/view_map" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/manage_accepted_passenger"
+                style="@style/ButtonSecondary"
+                android:text="Khách đã nhận"
+                android:visibility="gone"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
             <LinearLayout
                 style="@style/Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
-
                 <TextView
                     style="@style/Subtitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Thông tin chuyến" />
-
                 <LinearLayout
                     style="@style/Row"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp">
-
                     <TextView
                         style="@style/Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="Chỗ còn lại" />
-
                     <TextView
                         android:id="@+id/remaining_seats"
                         style="@style/BodyBold"
@@ -109,20 +120,17 @@
                         android:layout_height="wrap_content"
                         android:text="Đang tải..." />
                 </LinearLayout>
-
                 <LinearLayout
                     style="@style/Row"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp">
-
                     <TextView
                         style="@style/Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="Đóng góp" />
-
                     <TextView
                         android:id="@+id/manage_cost"
                         style="@style/BodyBold"
@@ -130,19 +138,16 @@
                         android:layout_height="wrap_content"
                         android:text="Đang tải..." />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="12dp"
                     android:background="@color/border" />
-
                 <TextView
                     style="@style/Caption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Ghi chú" />
-
                 <TextView
                     android:id="@+id/manage_note"
                     style="@style/Body"
@@ -151,7 +156,6 @@
                     android:layout_marginTop="4dp"
                     android:text="Đang tải..." />
             </LinearLayout>
-
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/manage_edit"
                 style="@style/ButtonSecondary"
@@ -159,8 +163,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Chỉnh sửa chuyến"
-                android:enabled="false" />
-
+                android:enabled="false"
+                android:minHeight="48dp" />
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/manage_requests"
                 style="@style/ButtonSecondary"
@@ -168,34 +172,34 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="Yêu cầu đi nhờ"
-                android:enabled="false" />
+                android:enabled="false"
+                android:minHeight="48dp" />
+            <LinearLayout
+                android:id="@+id/action_area"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="0dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="12dp"
+                android:background="@color/background">
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/primary_action"
+                    style="@style/ButtonPrimary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Hoàn thành chuyến"
+                    android:visibility="gone"
+                    android:minHeight="48dp" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/secondary_action"
+                    style="@style/ButtonSecondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Hủy chuyến"
+                    android:visibility="gone"
+                    android:minHeight="48dp" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
-
-    <LinearLayout
-        android:id="@+id/action_area"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="12dp"
-        android:background="@color/background">
-
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/primary_action"
-            style="@style/ButtonPrimary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Hoàn thành chuyến"
-            android:visibility="gone" />
-
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/secondary_action"
-            style="@style/ButtonSecondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Hủy chuyến"
-            android:visibility="gone" />
-    </LinearLayout>
 </LinearLayout>

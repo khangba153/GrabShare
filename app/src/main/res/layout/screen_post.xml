@@ -1,17 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
     android:orientation="vertical">
-
-    <!-- Phần tiêu đề của màn hình -->
     <FrameLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp">
-
         <ImageButton
             android:id="@+id/header_back"
             style="@style/IconButton"
@@ -19,16 +17,25 @@
             android:contentDescription="Quay lại"
             android:src="@drawable/ic_back"
             android:visibility="visible" />
-
         <TextView
             android:id="@+id/header_title"
             style="@style/Subtitle"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginHorizontal="52dp"
+            android:layout_marginStart="52dp"
+            android:layout_marginEnd="104dp"
             android:gravity="center"
-            android:text="Đăng chuyến" />
-
+            android:text="Đăng chuyến"
+            android:maxLines="1"
+            android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="48dp" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
@@ -38,15 +45,13 @@
             android:focusable="false"
             android:src="@drawable/ic_bell" />
     </FrameLayout>
-
-    <!-- Nội dung biểu mẫu có thể cuộn -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:fillViewport="true">
-
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -54,161 +59,136 @@
             android:paddingHorizontal="20dp"
             android:paddingTop="8dp"
             android:paddingBottom="24dp">
-
             <TextView
                 style="@style/Subtitle"
                 android:text="Chia sẻ chuyến đi của bạn" />
-
             <TextView
                 style="@style/Hint"
                 android:text="Kết nối với người có cùng tuyến đường." />
-
-            <!-- Chọn điểm đi, điểm đến, ngày và giờ -->
-            <LinearLayout style="@style/Card">
-
+            <LinearLayout
+                style="@style/Card">
+                <TextView
+                    style="@style/BodyBold"
+                    android:text="1. Tuyến và giờ khởi hành"
+                    android:layout_marginBottom="12dp" />
                 <LinearLayout
                     android:id="@+id/post_start"
                     style="@style/Picker"
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
-
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:importantForAccessibility="no"
                         android:src="@drawable/ic_pin" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
                             style="@style/Caption"
                             android:text="Điểm đi" />
-
                         <TextView
                             android:id="@+id/post_start_value"
                             style="@style/BodyBold"
                             android:text="Chọn điểm đi" />
                     </LinearLayout>
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="12dp"
                     android:background="@color/border" />
-
                 <LinearLayout
                     android:id="@+id/post_end"
                     style="@style/Picker"
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
-
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:importantForAccessibility="no"
                         android:src="@drawable/ic_pin" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
                             style="@style/Caption"
                             android:text="Điểm đến" />
-
                         <TextView
                             android:id="@+id/post_end_value"
                             style="@style/BodyBold"
                             android:text="Chọn điểm đến" />
                     </LinearLayout>
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="12dp"
                     android:background="@color/border" />
-
-                <!-- Trường chọn ngày khởi hành -->
                 <LinearLayout
                     android:id="@+id/post_date"
                     style="@style/Picker"
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
-
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:importantForAccessibility="no"
                         android:src="@drawable/ic_calendar" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
                             style="@style/Caption"
                             android:text="Ngày khởi hành" />
-
                         <TextView
                             android:id="@+id/post_date_value"
                             style="@style/BodyBold"
                             android:text="Chọn ngày khởi hành" />
                     </LinearLayout>
-
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:importantForAccessibility="no"
                         android:src="@drawable/ic_chevron" />
                 </LinearLayout>
-
-                <!-- Trường chọn giờ khởi hành -->
                 <LinearLayout
                     android:id="@+id/post_time"
                     style="@style/Picker"
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
-
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:importantForAccessibility="no"
                         android:src="@drawable/ic_clock" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
                             style="@style/Caption"
                             android:text="Giờ khởi hành" />
-
                         <TextView
                             android:id="@+id/post_time_value"
                             style="@style/BodyBold"
                             android:text="Chọn giờ khởi hành" />
                     </LinearLayout>
-
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
@@ -216,25 +196,24 @@
                         android:src="@drawable/ic_chevron" />
                 </LinearLayout>
             </LinearLayout>
-
-            <!-- Chi phí và ghi chú của chuyến -->
-            <LinearLayout style="@style/Card">
-
+            <LinearLayout
+                style="@style/Card">
+                <TextView
+                    style="@style/BodyBold"
+                    android:text="2. Quãng đường và giới hạn đi thêm"
+                    android:layout_marginBottom="12dp" />
                 <TextView
                     style="@style/Caption"
                     android:text="Số chỗ đi nhờ" />
-
                 <TextView
                     style="@style/BodyBold"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
                     android:text="1 người (cố định)" />
-
                 <TextView
                     style="@style/Caption"
                     android:text="Quãng đường bộ gốc" />
-
                 <TextView
                     android:id="@+id/route_distance_value"
                     style="@style/BodyBold"
@@ -242,41 +221,19 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
                     android:text="Chọn điểm đi và điểm đến để tính quãng đường" />
-
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/retry_route_estimate"
                     style="@style/ButtonSecondary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Tính lại quãng đường"
-                    android:visibility="gone" />
-
-                <TextView
-                    style="@style/Caption"
-                    android:text="Tiền đóng góp tham khảo (3.000 đ/km)" />
-
-                <TextView
-                    android:id="@+id/suggested_cost_value"
-                    style="@style/BodyBold"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="4dp"
-                    android:text="Chưa có ước tính" />
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/use_suggested_cost"
-                    style="@style/ButtonSecondary"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:enabled="false"
-                    android:text="Dùng giá tham khảo" />
-
+                    android:visibility="gone"
+                    android:minHeight="48dp" />
                 <TextView
                     style="@style/Caption"
                     android:layout_marginTop="12dp"
                     android:labelFor="@id/max_detour_input"
                     android:text="@string/detour_limit_label" />
-
                 <EditText
                     android:id="@+id/max_detour_input"
                     style="@style/Input"
@@ -286,28 +243,46 @@
                     android:importantForAutofill="no"
                     android:inputType="textNoSuggestions"
                     android:saveEnabled="true"
-                    android:singleLine="true" />
-
+                    android:singleLine="true"
+                    android:textColor="@color/ink"
+                    android:textSize="15sp"
+                    android:imeOptions="actionNext" />
                 <TextView
                     style="@style/Hint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/detour_limit_help" />
-
+            </LinearLayout>
+            <LinearLayout
+                style="@style/Card">
                 <TextView
-                    style="@style/Hint"
-                    android:text="Tiền tham khảo không phải giá bắt buộc. Chủ xe tự quyết định số tiền cuối cùng." />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="12dp"
-                    android:background="@color/border" />
-
+                    style="@style/BodyBold"
+                    android:text="3. Khoản đóng góp toàn tuyến"
+                    android:layout_marginBottom="12dp" />
                 <TextView
                     style="@style/Caption"
-                    android:text="Đóng góp xăng xe (đ)" />
-
+                    android:text="Tiền đóng góp tham khảo (3.000 đ/km)" />
+                <TextView
+                    android:id="@+id/suggested_cost_value"
+                    style="@style/BodyBold"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:text="Chưa có ước tính" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/use_suggested_cost"
+                    style="@style/ButtonSecondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:enabled="false"
+                    android:text="Dùng giá tham khảo"
+                    android:minHeight="48dp" />
+                <TextView
+                    style="@style/Hint"
+                    android:text="Bạn có thể nhập mức khác giá gợi ý." />
+                <TextView
+                    style="@style/Caption"
+                    android:text="Mức toàn tuyến (đ)" />
                 <EditText
                     android:id="@+id/post_cost"
                     style="@style/Input"
@@ -317,25 +292,22 @@
                     android:importantForAutofill="no"
                     android:inputType="number"
                     android:singleLine="true"
-                    android:text="" />
-
+                    android:text=""
+                    android:textColor="@color/ink"
+                    android:textSize="15sp"
+                    android:imeOptions="actionNext" />
                 <CheckBox
                     android:id="@+id/post_free"
                     style="@style/Radio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Miễn phí" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="12dp"
-                    android:background="@color/border" />
-
+            </LinearLayout>
+            <LinearLayout
+                style="@style/Card">
                 <TextView
                     style="@style/Caption"
                     android:text="Ghi chú chuyến đi (không bắt buộc)" />
-
                 <EditText
                     android:id="@+id/post_note"
                     style="@style/Input"
@@ -346,9 +318,10 @@
                     android:importantForAutofill="no"
                     android:inputType="textCapSentences|textMultiLine"
                     android:minHeight="100dp"
-                    android:text="" />
+                    android:text=""
+                    android:textColor="@color/ink"
+                    android:textSize="15sp" />
             </LinearLayout>
-
             <TextView
                 style="@style/Caption"
                 android:layout_width="match_parent"
@@ -356,23 +329,22 @@
                 android:layout_marginHorizontal="4dp"
                 android:layout_marginTop="4dp"
                 android:text="Thông tin xe sẽ được lấy từ hồ sơ của chủ xe." />
+            <LinearLayout
+                android:id="@+id/action_area"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/background"
+                android:orientation="vertical"
+                android:paddingHorizontal="0dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="12dp">
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/primary_action"
+                    style="@style/ButtonPrimary"
+                    android:text="Đăng chuyến"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
-
-    <!-- Các nút thao tác phía dưới -->
-    <LinearLayout
-        android:id="@+id/action_area"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/background"
-        android:orientation="vertical"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="12dp">
-
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/primary_action"
-            style="@style/ButtonPrimary"
-            android:text="Đăng chuyến" />
-    </LinearLayout>
 </LinearLayout>

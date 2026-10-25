@@ -15,6 +15,9 @@ import androidx.core.view.WindowInsetsCompat;
 
 /** Chừa vùng hệ thống cho màn thật, giữ nguyên padding thiết kế và hỗ trợ bàn phím. */
 public final class ScreenLayoutCallbacks implements Application.ActivityLifecycleCallbacks {
+    private final java.util.Map<Activity, NotificationBellController> bells = new java.util.HashMap<Activity, NotificationBellController>();
+
+    private final java.util.Map<Activity, ChatEntryController> chats = new java.util.HashMap<Activity, ChatEntryController>();
 
     /** Mỗi root được gắn một lần sau khi Activity đã dựng xong giao diện. */
     @Override
@@ -24,6 +27,7 @@ public final class ScreenLayoutCallbacks implements Application.ActivityLifecycl
             return;
         }
         final View screen = content.getChildAt(0);
+        ScreenSections.bind(screen, savedInstanceState);
         final int initialLeft = screen.getPaddingLeft();
         final int initialTop = screen.getPaddingTop();
         final int initialRight = screen.getPaddingRight();
@@ -63,11 +67,33 @@ public final class ScreenLayoutCallbacks implements Application.ActivityLifecycl
     }
 
     @Override
+    public void onActivityPostResumed(@NonNull Activity activity) {
+        ChatEntryController chat = ChatEntryController.create(activity);
+        if (chat != null) {
+            chats.put(activity, chat);
+            chat.start();
+        }
+        NotificationBellController controller = NotificationBellController.create(activity);
+        if (controller != null) {
+            bells.put(activity, controller);
+            controller.start();
+        }
+    }
+
+    @Override
     public void onActivityResumed(@NonNull Activity activity) {
     }
 
     @Override
     public void onActivityPaused(@NonNull Activity activity) {
+        ChatEntryController chat = chats.remove(activity);
+        if (chat != null) {
+            chat.stop();
+        }
+        NotificationBellController controller = bells.remove(activity);
+        if (controller != null) {
+            controller.stop();
+        }
     }
 
     @Override
@@ -76,9 +102,18 @@ public final class ScreenLayoutCallbacks implements Application.ActivityLifecycl
 
     @Override
     public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle state) {
+        ScreenSections.save(activity.findViewById(android.R.id.content), state);
     }
 
     @Override
     public void onActivityDestroyed(@NonNull Activity activity) {
+        ChatEntryController chat = chats.remove(activity);
+        if (chat != null) {
+            chat.stop();
+        }
+        NotificationBellController controller = bells.remove(activity);
+        if (controller != null) {
+            controller.stop();
+        }
     }
 }

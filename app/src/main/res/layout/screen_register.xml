@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -9,7 +8,7 @@
     <FrameLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp"
         android:visibility="visible">
         <ImageButton
@@ -27,7 +26,9 @@
             android:layout_marginHorizontal="52dp"
             android:layout_marginBottom="0dp"
             android:gravity="center"
-            android:text="Đăng ký" />
+            android:text="Đăng ký"
+            android:maxLines="1"
+            android:ellipsize="end" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
@@ -41,7 +42,8 @@
         android:layout_height="0dp"
         android:fillViewport="true"
         android:clipToPadding="false"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -78,7 +80,9 @@
                         android:inputType="textPersonName"
                         android:hint="Tên hiển thị của bạn"
                         android:importantForAutofill="no"
-                        android:imeOptions="actionNext" />
+                        android:imeOptions="actionNext"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp" />
                 </LinearLayout>
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -96,7 +100,9 @@
                         android:inputType="textEmailAddress"
                         android:hint="Email"
                         android:importantForAutofill="no"
-                        android:imeOptions="actionNext" />
+                        android:imeOptions="actionNext"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp" />
                 </LinearLayout>
                 <TextView
                     style="@style/AccountSectionTitle"
@@ -117,7 +123,9 @@
                         android:maxLength="80"
                         android:hint="Ví dụ: Honda Wave"
                         android:importantForAutofill="no"
-                        android:imeOptions="actionNext" />
+                        android:imeOptions="actionNext"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp" />
                     <TextView
                         style="@style/Caption"
                         android:layout_marginTop="12dp"
@@ -130,7 +138,9 @@
                         android:maxLength="20"
                         android:hint="Biển số xe"
                         android:importantForAutofill="no"
-                        android:imeOptions="actionNext" />
+                        android:imeOptions="actionNext"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp" />
                     <TextView
                         style="@style/Hint"
                         android:text="Nếu chỉ đi nhờ, bạn có thể để trống cả hai ô." />
@@ -155,11 +165,21 @@
                         android:inputType="textPassword"
                         android:hint="@string/leader_password_hint"
                         android:importantForAutofill="no"
-                        android:imeOptions="actionDone" />
+                        android:imeOptions="actionNext"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp" />
                     <androidx.appcompat.widget.AppCompatButton
                         style="@style/ButtonSecondary"
                         android:id="@+id/register_toggle_password"
-                        android:text="@string/leader_password_show" />
+                        android:text="@string/leader_password_show"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:layout_width="wrap_content"
+                        android:layout_gravity="end"
+                        android:background="?attr/selectableItemBackground"
+                        android:textColor="@color/primary"
+                        android:paddingVertical="4dp"
+                        android:layout_marginTop="0dp" />
                 </LinearLayout>
                 <CheckBox
                     android:id="@+id/register_terms"
@@ -169,7 +189,9 @@
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/open_terms"
                     style="@style/ButtonSecondary"
-                    android:text="Xem điều khoản sử dụng" />
+                    android:text="Xem điều khoản sử dụng"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp" />
             </LinearLayout>
             <TextView
                 android:id="@+id/register_status"
@@ -181,7 +203,9 @@
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/register_submit"
                 style="@style/ButtonPrimary"
-                android:text="Đăng ký" />
+                android:text="Đăng ký"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
             <ProgressBar
                 android:id="@+id/register_progress"
                 android:layout_width="wrap_content"
@@ -192,7 +216,9 @@
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/go_login"
                 style="@style/ButtonSecondary"
-                android:text="Đã có tài khoản? Đăng nhập" />
+                android:text="Đã có tài khoản? Đăng nhập"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
         </LinearLayout>
     </ScrollView>
     <LinearLayout
@@ -208,11 +234,15 @@
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/primary_action"
             style="@style/ButtonPrimary"
-            android:text="Tiếp tục" />
+            android:text="Tiếp tục"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/secondary_action"
             style="@style/ButtonSecondary"
-            android:text="Quay lại" />
+            android:text="Quay lại"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/bottom_nav"
@@ -225,7 +255,7 @@
         <LinearLayout
             android:id="@+id/nav_home"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -248,7 +278,7 @@
         <LinearLayout
             android:id="@+id/nav_trips"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -271,7 +301,7 @@
         <LinearLayout
             android:id="@+id/nav_account"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"

@@ -11,15 +11,21 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.example.grabshare.R;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.contract.ContributionCalculator;
+import com.example.grabshare.contract.ContributionSnapshot;
+import com.example.grabshare.contract.RequestRouteResolver;
+import com.example.grabshare.repository.search.SearchTripPolicy;
 import com.example.grabshare.model.DriverRequestItem;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.model.TripRequest;
-import com.example.grabshare.repository.driver.DriverRequestDecisionRepository;
 import com.example.grabshare.repository.driver.DriverRequestRepository;
 import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
@@ -44,6 +50,11 @@ public class RequestDetailActivity extends AppCompatActivity {
     private TextView routeEndText;
     private TextView timeText;
     private TextView pickupText;
+    private TextView dropoffText;
+    private TextView routeNoticeText;
+    private TextView contributionDetailsText;
+    private TextView fullTripCostText;
+    private TextView decisionNoticeText;
     private TextView messageText;
     private TextView costText;
     private TextView statusText;
@@ -51,12 +62,13 @@ public class RequestDetailActivity extends AppCompatActivity {
     private AppCompatButton rejectButton;
 
     private DriverRequestRepository requestRepository;
-    private DriverRequestDecisionRepository decisionRepository;
+    private DriverRequestDecisionViewModel decisionViewModel;
     private String requestId;
     private String tripId;
     private DriverRequestItem currentItem;
     private boolean isLoading;
     private boolean isResponding;
+    private boolean requestDetailsValid;
 
     /** Khởi tạo giao diện và khôi phục ID yêu cầu sau khi xoay màn hình. */
     @Override
@@ -69,7 +81,7 @@ public class RequestDetailActivity extends AppCompatActivity {
         FirebaseFirestore firestore = FirebaseFirestore.getInstance();
         FirebaseAuth firebaseAuth = FirebaseAuth.getInstance();
         requestRepository = new DriverRequestRepository(firestore, firebaseAuth);
-        decisionRepository = new DriverRequestDecisionRepository(firestore, firebaseAuth);
+        decisionViewModel = new ViewModelProvider(this).get(DriverRequestDecisionViewModel.class);
 
         if (savedInstanceState != null) {
             requestId = savedInstanceState.getString(
@@ -96,12 +108,21 @@ public class RequestDetailActivity extends AppCompatActivity {
             return;
         }
         requestId = requestId.trim();
+        decisionViewModel.getState().observe(this,
+                new Observer<DriverRequestDecisionViewModel.State>() {
+                    /** Observer mới tiếp nhận cùng tác vụ sau xoay, không gửi lại quyết định. */
+                    @Override
+                    public void onChanged(DriverRequestDecisionViewModel.State state) {
+                        renderDecisionState(state);
+                    }
+                });
     }
 
     /** Đọc lại yêu cầu từ máy chủ mỗi khi màn hình xuất hiện. */
     @Override
     protected void onResume() {
         super.onResume();
+        renderDecisionState(decisionViewModel.getState().getValue());
         loadRequest();
     }
 
@@ -124,6 +145,11 @@ public class RequestDetailActivity extends AppCompatActivity {
         routeEndText = findViewById(R.id.route_end);
         timeText = findViewById(R.id.request_time);
         pickupText = findViewById(R.id.request_pickup_value);
+        dropoffText = findViewById(R.id.request_dropoff_value);
+        routeNoticeText = findViewById(R.id.request_route_notice);
+        contributionDetailsText = findViewById(R.id.request_contribution_details);
+        fullTripCostText = findViewById(R.id.request_full_trip_cost);
+        decisionNoticeText = findViewById(R.id.request_decision_notice);
         messageText = findViewById(R.id.request_message);
         costText = findViewById(R.id.request_cost);
         statusText = findViewById(R.id.request_status);
@@ -162,6 +188,8 @@ public class RequestDetailActivity extends AppCompatActivity {
         }
 
         isLoading = true;
+        requestDetailsValid = false;
+        statusText.setText("Đang tải yêu cầu…");
         hideActionButtons();
         requestRepository.loadRequestForCurrentDriver(
                 requestId,
@@ -228,16 +256,19 @@ public class RequestDetailActivity extends AppCompatActivity {
         if (trip != null) {
             routeStartText.setText(getPlaceName(trip.getOrigin(), "Chưa có điểm đi"));
             routeEndText.setText(getPlaceName(trip.getDestination(), "Chưa có điểm đến"));
-            timeText.setText(formatDepartureTime(trip.getDepartureAt()));
-            costText.setText(formatCost(trip.getCostVnd()));
+            timeText.setText("Bạn khởi hành: " + formatDepartureTime(trip.getDepartureAt()));
+            fullTripCostText.setText("Mức tham khảo toàn tuyến hiện tại: "
+                    + formatCost(trip.getCostVnd()));
         } else {
             routeStartText.setText("Không còn dữ liệu chuyến");
             routeEndText.setText("");
             timeText.setText("Không có dữ liệu giờ khởi hành");
-            costText.setText("Không có dữ liệu chi phí");
+            fullTripCostText.setText("Không còn dữ liệu mức tham khảo toàn tuyến hiện tại.");
         }
 
         pickupText.setText(getPlaceName(request.getPickup(), "Chưa có điểm đón"));
+        renderPassengerJourney(request, trip);
+        renderConfirmedContribution(request);
         String message = request.getMessage();
         messageText.setText(message == null || message.trim().isEmpty()
                 ? "Không có lời nhắn."
@@ -268,13 +299,70 @@ public class RequestDetailActivity extends AppCompatActivity {
         boolean tripIsOpen = isTripOpen(trip);
         boolean tripCanBeRejected = tripIsOpen || isTripFull(trip);
 
-        boolean canAccept = isPending && departureIsFuture && tripIsOpen;
+        boolean canAccept = isPending && departureIsFuture && tripIsOpen && requestDetailsValid;
         boolean canReject = isPending && departureIsFuture && tripCanBeRejected;
 
-        acceptButton.setVisibility(canAccept ? View.VISIBLE : View.GONE);
-        rejectButton.setVisibility(canReject ? View.VISIBLE : View.GONE);
+        acceptButton.setVisibility(View.GONE);
+        if (isPending && departureIsFuture && tripIsOpen) {
+            acceptButton.setVisibility(View.VISIBLE);
+        }
+        rejectButton.setVisibility(View.GONE);
+        if (canReject) {
+            rejectButton.setVisibility(View.VISIBLE);
+        }
         acceptButton.setEnabled(canAccept && !isResponding && !isLoading);
         rejectButton.setEnabled(canReject && !isResponding && !isLoading);
+    }
+
+    /** Chỉ yêu cầu thiếu hẳn C mới dùng D của đúng chuyến theo hợp đồng dữ liệu cũ. */
+    private void renderPassengerJourney(TripRequest request, Trip trip) {
+        requestDetailsValid = false;
+        try {
+            if (!SearchTripPolicy.validPlace(request.getPickup())) {
+                throw new IllegalArgumentException("Điểm đón không hợp lệ.");
+            }
+            Place dropoff = RequestRouteResolver.resolveDropoff(request, trip);
+            dropoffText.setText(getPlaceName(dropoff, "Chưa có điểm xuống"));
+            routeNoticeText.setText("");
+            routeNoticeText.setVisibility(View.GONE);
+            if (!request.hasDropoffField()) {
+                routeNoticeText.setText("Yêu cầu cũ chưa lưu điểm xuống riêng; đang dùng điểm đến"
+                        + " của chuyến theo quy ước dữ liệu cũ.");
+                routeNoticeText.setVisibility(View.VISIBLE);
+            }
+            requestDetailsValid = true;
+        } catch (IllegalArgumentException error) {
+            dropoffText.setText("Chưa xác nhận được điểm xuống");
+            routeNoticeText.setText("Dữ liệu đón/trả không hợp lệ. Chưa thể chấp nhận yêu cầu này.");
+            routeNoticeText.setVisibility(View.VISIBLE);
+        }
+    }
+
+    /** Hiển thị snapshot của đúng yêu cầu; không lấy giá chuyến hiện tại bù tiền của khách. */
+    private void renderConfirmedContribution(TripRequest request) {
+        try {
+            ContributionSnapshot contribution = ContributionCalculator.readConfirmed(request);
+            if (contribution == null) {
+                costText.setText("Chưa xác nhận đóng góp");
+                contributionDetailsText.setText("Yêu cầu cũ chưa lưu khoản đóng góp đã xác nhận."
+                        + " Không suy ra tiền khách từ mức tham khảo toàn tuyến.");
+                return;
+            }
+            costText.setText(formatCost(contribution.getAmountVnd()));
+            NumberFormat distanceFormatter = NumberFormat.getNumberInstance(
+                    Locale.forLanguageTag("vi-VN"));
+            distanceFormatter.setMaximumFractionDigits(2);
+            contributionDetailsText.setText("Chặng khách đi P → C: "
+                    + distanceFormatter.format(contribution.getPassengerDistanceMeters() / 1000.0)
+                    + " km\nMức toàn tuyến lúc khách xác nhận: "
+                    + formatCost(contribution.getFullTripCostVnd())
+                    + "\nKhoản khách đã xác nhận khi gửi; chưa phải xác nhận đã thanh toán.");
+        } catch (IllegalArgumentException error) {
+            requestDetailsValid = false;
+            costText.setText("Khoản đóng góp không hợp lệ");
+            contributionDetailsText.setText("Không đọc được khoản khách đã xác nhận."
+                    + " Chưa thể chấp nhận yêu cầu này.");
+        }
     }
 
     /** Xác nhận trước khi ghi trạng thái mới lên Firestore. */
@@ -291,11 +379,20 @@ public class RequestDetailActivity extends AppCompatActivity {
         }
 
         boolean isAccepting = "ACCEPTED".equals(targetStatus);
-        String title = isAccepting ? "Chấp nhận yêu cầu?" : "Từ chối yêu cầu?";
-        String message = isAccepting
-                ? "Chấp nhận hành khách này sẽ chuyển chuyến sang FULL và khóa việc nhận yêu cầu khác."
-                : "Yêu cầu này sẽ được chuyển sang trạng thái Đã từ chối.";
-        String confirmText = isAccepting ? "Chấp nhận" : "Từ chối";
+        if (isAccepting && !requestDetailsValid) {
+            return;
+        }
+        String title = "Từ chối yêu cầu?";
+        String message = "Yêu cầu này sẽ được chuyển sang trạng thái Đã từ chối.";
+        String confirmText = "Từ chối";
+        if (isAccepting) {
+            title = "Chấp nhận yêu cầu?";
+            confirmText = "Chấp nhận";
+            message = "Đón: " + pickupText.getText() + "\nTrả: " + dropoffText.getText()
+                    + "\nKhách đóng góp: " + costText.getText()
+                    + "\n\nChấp nhận sẽ giữ chỗ cho khách này và dừng nhận thêm khách."
+                    + " Hai bên tự thanh toán; thao tác này không thu tiền.";
+        }
 
         new AlertDialog.Builder(this)
                 .setTitle(title)
@@ -321,48 +418,32 @@ public class RequestDetailActivity extends AppCompatActivity {
             return;
         }
 
-        isResponding = true;
-        setActionButtonsEnabled(false);
-        statusText.setText("Đang gửi phản hồi...");
-        RepositoryCallback<Void> callback = new RepositoryCallback<Void>() {
-            @Override
-            public void onSuccess(Void ignored) {
-                if (isFinishing() || isDestroyed()) {
-                    return;
-                }
+        decisionViewModel.submit(requestId, "ACCEPTED".equals(targetStatus));
+    }
 
-                isResponding = false;
-                String message = "ACCEPTED".equals(targetStatus)
-                        ? "Đã chấp nhận yêu cầu."
-                        : "Đã từ chối yêu cầu.";
-                Toast.makeText(
-                        RequestDetailActivity.this,
-                        message,
-                        Toast.LENGTH_LONG
-                ).show();
-                loadRequest();
-            }
-
-            @Override
-            public void onError(Exception error) {
-                if (isFinishing() || isDestroyed()) {
-                    return;
-                }
-
-                isResponding = false;
-                Toast.makeText(
-                        RequestDetailActivity.this,
-                        readableError(error),
-                        Toast.LENGTH_LONG
-                ).show();
-                loadRequest();
-            }
-        };
-
-        if ("ACCEPTED".equals(targetStatus)) {
-            decisionRepository.acceptRequest(requestId, callback);
-        } else {
-            decisionRepository.rejectRequest(requestId, callback);
+    /** Hiện tiến trình, chỉ báo kết quả khi người dùng đang ở màn này. */
+    private void renderDecisionState(DriverRequestDecisionViewModel.State state) {
+        if (state == null) {
+            return;
+        }
+        isResponding = state.busy;
+        decisionNoticeText.setVisibility(View.GONE);
+        if (state.busy) {
+            setActionButtonsEnabled(false);
+            acceptButton.setText("Đang xử lý…");
+            statusText.setText(state.message);
+            return;
+        }
+        acceptButton.setText("Chấp nhận");
+        if (!state.message.isEmpty()) {
+            decisionNoticeText.setText(state.message);
+            decisionNoticeText.setVisibility(View.VISIBLE);
+        }
+        if (state.completed && getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) {
+            String message = state.message;
+            decisionViewModel.acknowledgeResult();
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+            loadRequest();
         }
     }
 

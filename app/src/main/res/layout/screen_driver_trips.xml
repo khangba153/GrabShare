@@ -9,7 +9,7 @@
     <FrameLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp">
         <ImageButton
             android:id="@+id/header_back"
@@ -25,9 +25,20 @@
             style="@style/Subtitle"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginHorizontal="52dp"
+            android:layout_marginStart="52dp"
+            android:layout_marginEnd="104dp"
             android:gravity="center"
-            android:text="Chuyến của tôi" />
+            android:text="Chuyến của tôi"
+            android:maxLines="1"
+            android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="48dp" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
@@ -49,7 +60,7 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:minHeight="52dp"
+            android:minHeight="48dp"
             android:layout_marginHorizontal="3dp"
             android:text="Đi nhờ"
             android:clickable="false"
@@ -61,7 +72,7 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:minHeight="52dp"
+            android:minHeight="48dp"
             android:layout_marginHorizontal="3dp"
             android:text="Chủ xe"
             android:clickable="false"
@@ -82,7 +93,7 @@
             android:layout_height="wrap_content"
             android:minHeight="48dp"
             android:layout_marginHorizontal="3dp"
-            android:text="Đang theo dõi"
+            android:text="Đang quản lý"
             android:layout_marginTop="0dp" />
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/tab_history"
@@ -94,15 +105,17 @@
             android:layout_marginHorizontal="3dp"
             android:text="Lịch sử"
             android:layout_marginTop="0dp" />
-    <androidx.appcompat.widget.AppCompatButton
-        style="@style/ButtonSecondary"
-        android:id="@+id/trip_list_filter"
-        android:text="Bộ lọc"
-        android:layout_width="0dp"
-        android:layout_weight="1"
-        android:layout_marginHorizontal="3dp"
-        android:layout_marginTop="0dp"
-        android:layout_marginBottom="0dp" />
+        <androidx.appcompat.widget.AppCompatButton
+            style="@style/ButtonSecondary"
+            android:id="@+id/trip_list_filter"
+            android:text="Bộ lọc"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="3dp"
+            android:layout_marginTop="0dp"
+            android:layout_marginBottom="0dp"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
     </LinearLayout>
     <FrameLayout
         android:layout_width="match_parent"
@@ -150,7 +163,9 @@
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/primary_action"
             style="@style/ButtonPrimary"
-            android:text="＋ Đăng chuyến" />
+            android:text="＋ Đăng chuyến"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/bottom_nav"
@@ -162,7 +177,7 @@
         <LinearLayout
             android:id="@+id/nav_home"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -183,7 +198,7 @@
         <LinearLayout
             android:id="@+id/nav_trips"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -204,7 +219,7 @@
         <LinearLayout
             android:id="@+id/nav_account"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"

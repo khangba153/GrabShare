@@ -9,6 +9,10 @@
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowBackground">@color/background</item>
         <item name="android:colorAccent">@color/primary</item>
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@color/ink</item>
+        <item name="colorOutline">@color/border</item>
+        <item name="colorError">@color/feedback_error_text</item>
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>

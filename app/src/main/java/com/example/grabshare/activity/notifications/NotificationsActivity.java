@@ -9,6 +9,9 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.AdapterView;
+import android.content.res.ColorStateList;
+import java.util.ArrayList;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -53,6 +56,9 @@ public class NotificationsActivity extends AppCompatActivity {
     private boolean isActive;
     private boolean routeInProgress;
     private int actionToken;
+    private boolean unreadOnly;
+    private boolean inboxLoaded;
+    private final List<AppNotification> loadedNotifications = new ArrayList<AppNotification>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +79,9 @@ public class NotificationsActivity extends AppCompatActivity {
             finish();
             return;
         }
+        if (savedInstanceState != null) {
+            unreadOnly = savedInstanceState.getBoolean("inbox_unread_only", false);
+        }
 
         repository = new NotificationRepository(FirebaseFirestore.getInstance(), auth);
         initializeViews();
@@ -89,6 +98,7 @@ public class NotificationsActivity extends AppCompatActivity {
             return;
         }
         startListening();
+
     }
 
     @Override
@@ -106,6 +116,7 @@ public class NotificationsActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         outState.putString(STATE_EXPECTED_UID, expectedUid);
+        outState.putBoolean("inbox_unread_only", unreadOnly);
         super.onSaveInstanceState(outState);
     }
 
@@ -120,16 +131,44 @@ public class NotificationsActivity extends AppCompatActivity {
     private void initializeList() {
         adapter = new NotificationAdapter(this);
         notificationList.setAdapter(adapter);
-        notificationList.setOnItemClickListener((parent, view, position, id) -> {
-            if (position >= 0 && position < adapter.getCount()) {
-                openNotification(adapter.getItem(position));
+        notificationList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long identifier) {
+                if (position >= 0 && position < adapter.getCount()) {
+                    openNotification(adapter.getItem(position));
+                }
             }
         });
     }
 
     private void connectActions() {
-        backButton.setOnClickListener(view -> finish());
-        retryButton.setOnClickListener(view -> startListening());
+        backButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View clickedView) {
+                finish();
+            }
+        });
+        retryButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View clickedView) {
+                startListening();
+            }
+        });
+        findViewById(R.id.inbox_all).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View clickedView) {
+                unreadOnly = false;
+                renderInbox();
+            }
+        });
+        findViewById(R.id.inbox_unread).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View clickedView) {
+                unreadOnly = true;
+                renderInbox();
+            }
+        });
+        renderInbox();
     }
 
     /** Chỉ có một listener đang hoạt động cho mỗi Activity. */
@@ -148,17 +187,13 @@ public class NotificationsActivity extends AppCompatActivity {
                 }
                 loadingIndicator.setVisibility(View.GONE);
                 retryButton.setVisibility(View.GONE);
-                if (notifications == null || notifications.isEmpty()) {
-                    notificationList.setVisibility(View.GONE);
-                    statusText.setVisibility(View.VISIBLE);
-                    statusText.setText("Bạn chưa có thông báo.");
-                    return;
+                loadedNotifications.clear();
+                if (notifications != null) {
+                    loadedNotifications.addAll(notifications);
                 }
-
-                statusText.setVisibility(View.GONE);
-                notificationList.setVisibility(View.VISIBLE);
+                inboxLoaded = true;
                 notificationList.setEnabled(true);
-                adapter.replaceItems(notifications);
+                renderInbox();
             }
 
             @Override
@@ -167,6 +202,7 @@ public class NotificationsActivity extends AppCompatActivity {
                     return;
                 }
                 loadingIndicator.setVisibility(View.GONE);
+                inboxLoaded = false;
                 statusText.setVisibility(View.VISIBLE);
                 statusText.setText(adapter.getCount() > 0
                         ? "Không thể cập nhật danh sách thông báo."
@@ -178,12 +214,58 @@ public class NotificationsActivity extends AppCompatActivity {
     }
 
     private void showLoading() {
+        inboxLoaded = false;
         loadingIndicator.setVisibility(View.VISIBLE);
         statusText.setVisibility(View.GONE);
         retryButton.setVisibility(View.GONE);
         if (adapter.getCount() == 0) {
             notificationList.setVisibility(View.GONE);
         }
+    }
+
+    /** Lọc bản đã tải, không tự đánh dấu đã đọc khi chuyển tab hoặc vào Inbox. */
+    private void renderInbox() {
+        styleInboxTab(R.id.inbox_all, !unreadOnly);
+        styleInboxTab(R.id.inbox_unread, unreadOnly);
+        if (!inboxLoaded) {
+            return;
+        }
+        List<AppNotification> visible = new ArrayList<AppNotification>();
+        int unreadCount = 0;
+        for (AppNotification notification : loadedNotifications) {
+            boolean unread = !Boolean.TRUE.equals(notification.getIsRead());
+            if (unread) {
+                unreadCount = unreadCount + 1;
+            }
+            if (!unreadOnly || unread) {
+                visible.add(notification);
+            }
+        }
+        ((TextView) findViewById(R.id.inbox_unread)).setText("Chưa đọc (" + unreadCount + ")");
+        adapter.replaceItems(visible);
+        statusText.setVisibility(View.GONE);
+        notificationList.setVisibility(View.VISIBLE);
+        if (visible.isEmpty()) {
+            notificationList.setVisibility(View.GONE);
+            statusText.setVisibility(View.VISIBLE);
+            statusText.setText("Bạn chưa có thông báo.");
+            if (unreadOnly) {
+                statusText.setText("Bạn đã đọc hết thông báo.");
+            }
+        }
+    }
+
+    private void styleInboxTab(int identifier, boolean selected) {
+        Button button = findViewById(identifier);
+        int background = R.color.white;
+        int text = R.color.ink;
+        if (selected) {
+            background = R.color.primary;
+            text = R.color.white;
+        }
+        button.setSelected(selected);
+        button.setBackgroundTintList(ColorStateList.valueOf(getColor(background)));
+        button.setTextColor(getColor(text));
     }
 
     private void removeInboxListener() {

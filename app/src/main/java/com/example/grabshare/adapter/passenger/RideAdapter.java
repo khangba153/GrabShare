@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
 import com.example.grabshare.presentation.TripCardText;
+import com.example.grabshare.presentation.TripListState;
 import com.example.grabshare.contract.RequestRouteResolver;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.activity.passenger.PassengerRouteText;
@@ -110,7 +111,14 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
                 if (tvPrice != null) tvPrice.setText(PassengerContributionText.format(request));
                 if (tvStatus != null) tvStatus.setText("Không khả dụng");
                 itemView.setAlpha(0.5f);
-                itemView.setOnClickListener(null);
+                itemView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View clickedView) {
+                        if (listener != null) {
+                            listener.onRideClick(item);
+                        }
+                    }
+                });
                 return;
             }
 
@@ -152,14 +160,10 @@ public class RideAdapter extends RecyclerView.Adapter<RideAdapter.RideViewHolder
 
             if (tvPrice != null) tvPrice.setText(PassengerContributionText.format(request));
 
-            String effectiveStatus = resolveEffectiveStatus(request, trip);
+            long now = System.currentTimeMillis();
+            String effectiveStatus = TripListState.passengerStatus(request, trip, now);
             if (tvStatus != null) {
-                if (("ACCEPTED".equals(effectiveStatus) || "PENDING".equals(effectiveStatus))
-                        && TripCardText.pastDeparture(trip)) {
-                    tvStatus.setText("Đã qua giờ");
-                } else {
-                    tvStatus.setText(getVietnameseStatusText(effectiveStatus));
-                }
+                tvStatus.setText(TripListState.label(effectiveStatus, trip, now));
             }
 
             itemView.setOnClickListener(new View.OnClickListener() {

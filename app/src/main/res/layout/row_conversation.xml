@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Card">
+    <TextView
+        android:id="@+id/conversation_name"
+        style="@style/BodyBold"
+        android:layout_width="match_parent"
+        android:maxLines="1"
+        android:ellipsize="end" />
+    <TextView
+        android:id="@+id/conversation_route"
+        style="@style/Caption"
+        android:layout_width="match_parent"
+        android:layout_marginTop="6dp"
+        android:maxLines="3"
+        android:ellipsize="end" />
+    <TextView
+        android:id="@+id/conversation_preview"
+        style="@style/Body"
+        android:layout_width="match_parent"
+        android:layout_marginTop="6dp"
+        android:maxLines="2"
+        android:ellipsize="end" />
+    <TextView
+        android:id="@+id/conversation_time"
+        style="@style/Caption"
+        android:layout_marginTop="8dp" />
+</LinearLayout>

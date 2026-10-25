@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -9,7 +8,7 @@
     <FrameLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp"
         android:visibility="visible">
         <ImageButton
@@ -26,10 +25,21 @@
             style="@style/Subtitle"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginHorizontal="52dp"
+            android:layout_marginStart="52dp"
+            android:layout_marginEnd="104dp"
             android:layout_marginBottom="0dp"
             android:gravity="center"
-            android:text="Tài khoản" />
+            android:text="Tài khoản"
+            android:maxLines="1"
+            android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="48dp" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
@@ -54,7 +64,8 @@
         android:layout_height="0dp"
         android:fillViewport="true"
         android:clipToPadding="false"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -110,12 +121,16 @@
                         android:id="@+id/account_profile_retry"
                         style="@style/ButtonSecondary"
                         android:text="@string/profile_retry"
-                        android:visibility="gone" />
+                        android:visibility="gone"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp" />
                     <androidx.appcompat.widget.AppCompatButton
                         android:id="@+id/edit_profile"
                         style="@style/ButtonSecondary"
                         android:text="@string/profile_edit_action"
-                        android:enabled="false" />
+                        android:enabled="false"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp" />
                 </LinearLayout>
             </LinearLayout>
             <LinearLayout
@@ -336,13 +351,17 @@
             style="@style/ButtonPrimary"
             android:text="Tiếp tục"
             android:clickable="false"
-            android:focusable="false" />
+            android:focusable="false"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/secondary_action"
             style="@style/ButtonSecondary"
             android:text="Quay lại"
             android:clickable="false"
-            android:focusable="false" />
+            android:focusable="false"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/bottom_nav"
@@ -355,7 +374,7 @@
         <LinearLayout
             android:id="@+id/nav_home"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -380,7 +399,7 @@
         <LinearLayout
             android:id="@+id/nav_trips"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -405,7 +424,7 @@
         <LinearLayout
             android:id="@+id/nav_account"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bố cục cuộn được; vùng thanh hệ thống do ScreenLayoutCallbacks quản lý. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -9,7 +8,7 @@
     <FrameLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp"
         android:visibility="gone">
         <ImageButton
@@ -29,7 +28,9 @@
             android:layout_marginHorizontal="52dp"
             android:layout_marginBottom="0dp"
             android:gravity="center"
-            android:text="Đăng nhập" />
+            android:text="Đăng nhập"
+            android:maxLines="1"
+            android:ellipsize="end" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
@@ -45,7 +46,8 @@
         android:layout_height="0dp"
         android:fillViewport="true"
         android:clipToPadding="false"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:overScrollMode="ifContentScrolls">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -110,7 +112,9 @@
                         android:hint="Nhập email của bạn"
                         android:importantForAutofill="no"
                         android:imeOptions="actionNext"
-                        android:maxLength="254" />
+                        android:maxLength="254"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp" />
                 </LinearLayout>
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -128,18 +132,36 @@
                         android:hint="Nhập mật khẩu"
                         android:importantForAutofill="no"
                         android:saveEnabled="false"
-                        android:imeOptions="actionDone" />
+                        android:imeOptions="actionNext"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp" />
                     <androidx.appcompat.widget.AppCompatButton
                         style="@style/ButtonSecondary"
                         android:id="@+id/login_toggle_password"
-                        android:text="@string/leader_password_show" />
+                        android:text="@string/leader_password_show"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:layout_width="wrap_content"
+                        android:layout_gravity="end"
+                        android:background="?attr/selectableItemBackground"
+                        android:textColor="@color/primary"
+                        android:paddingVertical="4dp"
+                        android:layout_marginTop="0dp" />
                 </LinearLayout>
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/forgot_password"
                     style="@style/ButtonSecondary"
                     android:text="Quên mật khẩu?"
                     android:clickable="false"
-                    android:focusable="false" />
+                    android:focusable="false"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:layout_width="wrap_content"
+                    android:layout_gravity="end"
+                    android:background="?attr/selectableItemBackground"
+                    android:textColor="@color/primary"
+                    android:paddingVertical="4dp"
+                    android:layout_marginTop="0dp" />
             </LinearLayout>
             <TextView
                 android:id="@+id/login_status"
@@ -159,7 +181,9 @@
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/login_submit"
                 style="@style/ButtonPrimary"
-                android:text="Đăng nhập" />
+                android:text="Đăng nhập"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
             <TextView
                 style="@style/Caption"
                 android:text="@string/leader_or"
@@ -170,16 +194,22 @@
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/login_google"
                 style="@style/ButtonSecondary"
-                android:text="Đăng nhập với Google" />
+                android:text="Đăng nhập với Google"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/go_register"
                 style="@style/ButtonSecondary"
-                android:text="Chưa có tài khoản? Đăng ký" />
+                android:text="Chưa có tài khoản? Đăng ký"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
             <androidx.appcompat.widget.AppCompatButton
                 style="@style/ButtonSecondary"
                 android:id="@+id/login_logout"
                 android:text="@string/leader_logout_action"
-                android:visibility="gone" />
+                android:visibility="gone"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
         </LinearLayout>
     </ScrollView>
     <LinearLayout
@@ -197,13 +227,17 @@
             style="@style/ButtonPrimary"
             android:text="Tiếp tục"
             android:clickable="false"
-            android:focusable="false" />
+            android:focusable="false"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/secondary_action"
             style="@style/ButtonSecondary"
             android:text="Quay lại"
             android:clickable="false"
-            android:focusable="false" />
+            android:focusable="false"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/bottom_nav"
@@ -216,7 +250,7 @@
         <LinearLayout
             android:id="@+id/nav_home"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -241,7 +275,7 @@
         <LinearLayout
             android:id="@+id/nav_trips"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
@@ -266,7 +300,7 @@
         <LinearLayout
             android:id="@+id/nav_account"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/bottom_navigation_height"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"

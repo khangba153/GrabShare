@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/background">
-
     <FrameLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="@dimen/screen_header_height"
         android:paddingHorizontal="12dp">
-
         <ImageButton
             android:id="@+id/header_back"
             style="@style/IconButton"
@@ -19,16 +18,25 @@
             android:contentDescription="Quay lại"
             android:clickable="true"
             android:focusable="true" />
-
         <TextView
             android:id="@+id/header_title"
             style="@style/Subtitle"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginHorizontal="52dp"
+            android:layout_marginStart="52dp"
+            android:layout_marginEnd="104dp"
             android:gravity="center"
-            android:text="Thông báo" />
-
+            android:text="Thông báo"
+            android:maxLines="1"
+            android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/header_chat"
+            style="@style/IconButton"
+            android:src="@drawable/ic_chat"
+            android:contentDescription="Tin nhắn"
+            android:visibility="gone"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="48dp" />
         <ImageButton
             android:id="@+id/header_action"
             style="@style/IconButton"
@@ -39,7 +47,27 @@
             android:clickable="false"
             android:focusable="false" />
     </FrameLayout>
-
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="8dp">
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/inbox_all"
+            style="@style/ButtonPrimary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="4dp"
+            android:text="Tất cả" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/inbox_unread"
+            style="@style/ButtonSecondary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="4dp"
+            android:text="Chưa đọc" />
+    </LinearLayout>
     <ProgressBar
         android:id="@+id/notification_loading"
         android:layout_width="32dp"
@@ -47,7 +75,6 @@
         android:layout_gravity="center_horizontal"
         android:layout_marginTop="24dp"
         android:visibility="gone" />
-
     <TextView
         android:id="@+id/notification_status"
         style="@style/Body"
@@ -58,7 +85,6 @@
         android:paddingVertical="20dp"
         android:text="Đang tải thông báo..."
         android:visibility="gone" />
-
     <ListView
         android:id="@+id/notification_list"
         android:layout_width="match_parent"
@@ -71,7 +97,6 @@
         android:paddingTop="8dp"
         android:paddingBottom="16dp"
         android:visibility="gone" />
-
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/notification_retry"
         style="@style/ButtonSecondary"
@@ -80,5 +105,6 @@
         android:layout_marginHorizontal="20dp"
         android:layout_marginBottom="20dp"
         android:text="Thử lại"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:minHeight="48dp" />
 </LinearLayout>

@@ -19,6 +19,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.RideProgressGuidance;
+import com.example.grabshare.presentation.TripListState;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.model.Place;
@@ -243,14 +245,17 @@ public class ManageTripActivity extends AppCompatActivity {
 
     /** Hiển thị các field chuyến thật và tính các thao tác có thể thực hiện. */
     private void renderTrip(Trip trip) {
-        statusText.setText(formatTripStatus(trip.getStatus()));
+        RideProgressGuidance.bindDriver(findViewById(R.id.ride_progress_guidance), trip);
+        configureAcceptedPassenger(trip);
+        statusText.setText(TripListState.label(
+                TripListState.driverStatus(trip, System.currentTimeMillis()), trip, System.currentTimeMillis()));
         timeText.setText(formatDepartureTime(trip.getDepartureAt()));
         originText.setText(getPlaceName(trip.getOrigin(), "Chưa có điểm đi"));
         destinationText.setText(
                 getPlaceName(trip.getDestination(), "Chưa có điểm đến")
         );
         seatsText.setText(formatAvailableSeats(trip));
-        costText.setText(formatCost(trip.getCostVnd()));
+        costText.setText("Toàn tuyến: " + formatCost(trip.getCostVnd()));
 
         String note = trip.getNote();
         if (note == null || note.trim().isEmpty()) {
@@ -261,6 +266,32 @@ public class ManageTripActivity extends AppCompatActivity {
 
         requestsButton.setEnabled(true);
         updateActionAvailability(trip);
+    }
+
+    /** Mở đúng request được chuyến trỏ tới, không tự ghép ID từ hành khách. */
+    private void configureAcceptedPassenger(final Trip trip) {
+        AppCompatButton acceptedPassengerButton = findViewById(R.id.manage_accepted_passenger);
+        acceptedPassengerButton.setVisibility(View.GONE);
+        acceptedPassengerButton.setOnClickListener(null);
+        if (trip == null || trip.getAcceptedRequestId() == null
+                || trip.getAcceptedRequestId().trim().isEmpty()
+                || !("FULL".equals(trip.getStatus()) || "COMPLETED".equals(trip.getStatus()))) {
+            return;
+        }
+        acceptedPassengerButton.setVisibility(View.VISIBLE);
+        acceptedPassengerButton.setOnClickListener(new View.OnClickListener() {
+            /** Chi tiết yêu cầu tiếp tục đọc lại server và xác minh quyền chủ xe. */
+            @Override
+            public void onClick(View view) {
+                if (isLoading || isTransitioning || currentTrip != trip) {
+                    return;
+                }
+                Intent requestIntent = new Intent(ManageTripActivity.this, RequestDetailActivity.class);
+                requestIntent.putExtra(NavigationKeys.REQUEST_ID, trip.getAcceptedRequestId());
+                requestIntent.putExtra(NavigationKeys.TRIP_ID, tripId);
+                startActivity(requestIntent);
+            }
+        });
     }
 
     /** Tính trạng thái các nút từ dữ liệu chuyến và thời điểm hiện tại. */
@@ -277,25 +308,31 @@ public class ManageTripActivity extends AppCompatActivity {
                 > System.currentTimeMillis();
 
         editButton.setEnabled(isOpen && departureIsFuture);
+        editButton.setVisibility(View.GONE);
+        if (isOpen && departureIsFuture) {
+            editButton.setVisibility(View.VISIBLE);
+        }
         editButton.setText("Chỉnh sửa chuyến");
 
         if (isOpen && !departureIsFuture) {
             messageText.setVisibility(View.VISIBLE);
             messageText.setText(
-                    "Đã qua giờ khởi hành nhưng chuyến vẫn ở trạng thái OPEN. "
-                            + "Theo quy tắc dự án, chuyến OPEN không tự chuyển thành COMPLETED."
+                    "Chuyến đã hết giờ nhận khách. Thông tin được giữ trong Lịch sử."
             );
+        } else if (isFull && departureIsFuture) {
+            messageText.setVisibility(View.VISIBLE);
+            messageText.setText("Có thể xác nhận hoàn thành từ "
+                    + formatDepartureTime(trip.getDepartureAt()) + ".");
         } else {
             messageText.setVisibility(View.GONE);
         }
 
-        completeButton.setVisibility(isFull ? View.VISIBLE : View.GONE);
-        if (isFull && departureIsFuture) {
-            completeButton.setText("Chỉ hoàn thành sau giờ khởi hành");
-            completeButton.setEnabled(false);
-        } else {
-            completeButton.setText("Hoàn thành chuyến");
-            completeButton.setEnabled(isFull);
+        completeButton.setVisibility(View.GONE);
+        completeButton.setText("Hoàn thành chuyến");
+        completeButton.setEnabled(false);
+        if (canCompleteTrip(trip)) {
+            completeButton.setVisibility(View.VISIBLE);
+            completeButton.setEnabled(true);
         }
 
         boolean canCancel = (isOpen || isFull) && departureIsFuture;
@@ -401,8 +438,9 @@ public class ManageTripActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle("Hoàn thành chuyến?")
                 .setMessage(
-                        "Xác nhận chuyến đã kết thúc. Hành khách được nhận "
-                                + "sẽ nhận thông báo hoàn thành."
+                        "Chỉ xác nhận khi bạn và khách đã thực sự kết thúc chuyến đi. "
+                                + "Hành khách được nhận sẽ nhận thông báo hoàn thành và có thể đánh giá. "
+                                + "Thao tác này không thu tiền và không xác nhận đã thanh toán."
                 )
                 .setPositiveButton("Xác nhận hoàn thành", new DialogInterface.OnClickListener() {
                     @Override
