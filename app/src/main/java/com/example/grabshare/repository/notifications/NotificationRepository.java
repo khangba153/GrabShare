@@ -355,6 +355,7 @@ public class NotificationRepository {
 
     private boolean isKnownType(String type) {
         return "REQUEST_SENT".equals(type)
+                || "REQUEST_RELEASED".equals(type)
                 || "REQUEST_CANCELLED".equals(type)
                 || "REQUEST_ACCEPTED".equals(type)
                 || "REQUEST_REJECTED".equals(type)

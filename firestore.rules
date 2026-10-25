@@ -202,12 +202,15 @@ service cloud.firestore {
       let before = get(reqPath(rid)).data;
       let after = getAfter(reqPath(rid)).data;
       return fullTrip(old) && openTrip(data) && old.departureAt > request.time
-        && owner(before.passengerId)
         && rid == tid + '_' + before.passengerId
         && before.tripId == tid && before.driverId == old.driverId
         && before.status == 'ACCEPTED' && after.status == 'CANCELLED'
-        && requestNotice(rid, 'REQUEST_CANCELLED', before,
-          before.passengerId, old.driverId);
+        && ((owner(before.passengerId)
+            && requestNotice(rid, 'REQUEST_CANCELLED', before,
+              before.passengerId, old.driverId))
+          || (owner(old.driverId) && before.passengerId != old.driverId
+            && requestNotice(rid, 'REQUEST_RELEASED', before,
+              old.driverId, before.passengerId)));
     }
     function cancelTrip(tid, old, data) {
       return owner(old.driverId) && old.departureAt > request.time
@@ -335,7 +338,14 @@ service cloud.firestore {
         && data.diff(old).affectedKeys().hasOnly(['status', 'updatedAt'])
         && (acceptRequest(rid, old, data, t, next)
           || rejectRequest(rid, old, data, t, next)
-          || cancelRequest(rid, old, data, t, next));
+          || cancelRequest(rid, old, data, t, next)
+          || releasePassenger(rid, old, data, t, next));
+    }
+    function releasePassenger(rid, old, data, t, next) {
+      return owner(old.driverId) && old.passengerId != old.driverId
+        && old.status == 'ACCEPTED' && data.status == 'CANCELLED'
+        && fullTrip(t) && t.acceptedRequestId == rid && openTrip(next)
+        && requestNotice(rid, 'REQUEST_RELEASED', old, old.driverId, old.passengerId);
     }
     match /requests/{rid} {
       // Cho passenger kiem tra ID cua minh chua ton tai truoc khi tao.
@@ -424,7 +434,10 @@ service cloud.firestore {
             && n.actorId == old.driverId && n.recipientId == old.passengerId)
           || (n.type == 'REQUEST_CANCELLED'
             && old.status in ['PENDING', 'ACCEPTED'] && next.status == 'CANCELLED'
-            && n.actorId == old.passengerId && n.recipientId == old.driverId));
+            && n.actorId == old.passengerId && n.recipientId == old.driverId)
+          || (n.type == 'REQUEST_RELEASED' && old.status == 'ACCEPTED'
+            && next.status == 'CANCELLED'
+            && n.actorId == old.driverId && n.recipientId == old.passengerId));
     }
     function requestEvent(nid, n) {
       let next = getAfter(reqPath(n.requestId)).data;
@@ -435,7 +448,7 @@ service cloud.firestore {
         && ((n.type == 'REQUEST_SENT' && !exists(reqPath(n.requestId))
             && next.status == 'PENDING' && next.createdAt == request.time
             && n.actorId == next.passengerId && n.recipientId == t.driverId)
-          || (n.type in ['REQUEST_ACCEPTED', 'REQUEST_REJECTED', 'REQUEST_CANCELLED']
+          || (n.type in ['REQUEST_ACCEPTED', 'REQUEST_REJECTED', 'REQUEST_CANCELLED', 'REQUEST_RELEASED']
             && changedRequestEvent(n)));
     }
     function tripEvent(nid, n) {
@@ -471,7 +484,7 @@ service cloud.firestore {
       allow read: if signedIn() && resource.data.recipientId == request.auth.uid;
       allow create: if signedIn() && notificationData(request.resource.data)
         && ((request.resource.data.type in ['REQUEST_SENT', 'REQUEST_ACCEPTED',
-              'REQUEST_REJECTED', 'REQUEST_CANCELLED']
+              'REQUEST_REJECTED', 'REQUEST_CANCELLED', 'REQUEST_RELEASED']
             && requestEvent(nid, request.resource.data))
           || (request.resource.data.type in ['TRIP_CANCELLED', 'TRIP_COMPLETED']
             && tripEvent(nid, request.resource.data)));

@@ -245,7 +245,7 @@ public class AcceptedActivity extends AppCompatActivity {
                     }
                     return;
                 } else if ("CANCELLED".equalsIgnoreCase(effectiveStatus)) {
-                    if (statusTitle != null) statusTitle.setText("Chuyến đi đã bị hủy");
+                    if (statusTitle != null) statusTitle.setText("Lượt đi nhờ đã hủy");
                     if (statusDescription != null) statusDescription.setText("Chuyến đi hoặc yêu cầu này đã bị hủy.");
                     if (primaryAction != null) {
                         primaryAction.setText("Quay về Chuyến của tôi");

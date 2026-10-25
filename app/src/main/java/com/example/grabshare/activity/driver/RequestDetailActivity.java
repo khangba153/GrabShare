@@ -60,6 +60,10 @@ public class RequestDetailActivity extends AppCompatActivity {
     private TextView statusText;
     private AppCompatButton acceptButton;
     private AppCompatButton rejectButton;
+    private AppCompatButton releaseButton;
+    private AppCompatButton otherRequestsButton;
+    private final com.example.grabshare.presentation.TripListTimeRefresh actionTimeRefresh =
+            new com.example.grabshare.presentation.TripListTimeRefresh();
 
     private DriverRequestRepository requestRepository;
     private DriverRequestDecisionViewModel decisionViewModel;
@@ -155,10 +159,33 @@ public class RequestDetailActivity extends AppCompatActivity {
         statusText = findViewById(R.id.request_status);
         acceptButton = findViewById(R.id.primary_action);
         rejectButton = findViewById(R.id.secondary_action);
+        releaseButton = findViewById(R.id.release_passenger);
+        otherRequestsButton = findViewById(R.id.view_other_requests);
     }
 
     /** Kết nối quay lại và các thao tác chấp nhận/từ chối. */
     private void connectEvents() {
+        otherRequestsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (!isLoading && !isResponding && currentItem != null
+                        && isTripOpen(currentItem.getTrip()) && isDepartureInFuture(currentItem.getTrip())) {
+                    android.content.Intent intent = new android.content.Intent(RequestDetailActivity.this,
+                            DriverRequestsActivity.class);
+                    intent.putExtra(NavigationKeys.TRIP_ID, tripId);
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(intent);
+                    finish();
+                }
+            }
+        });
+        releaseButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                confirmReleasePassenger();
+            }
+        });
         backButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -312,6 +339,79 @@ public class RequestDetailActivity extends AppCompatActivity {
         }
         acceptButton.setEnabled(canAccept && !isResponding && !isLoading);
         rejectButton.setEnabled(canReject && !isResponding && !isLoading);
+        releaseButton.setVisibility(View.GONE);
+        if (canReleasePassenger(item)) {
+            releaseButton.setVisibility(View.VISIBLE);
+        }
+        releaseButton.setEnabled(canReleasePassenger(item) && !isResponding && !isLoading);
+        otherRequestsButton.setVisibility(View.GONE);
+        if (request != null && "CANCELLED".equals(request.getStatus())
+                && tripIsOpen && departureIsFuture) {
+            otherRequestsButton.setVisibility(View.VISIBLE);
+        }
+        otherRequestsButton.setEnabled(!isResponding && !isLoading);
+        actionTimeRefresh.stop();
+        if (departureIsFuture && trip != null && trip.getDepartureAt() != null) {
+            actionTimeRefresh.schedule(trip.getDepartureAt().toDate().getTime(), new Runnable() {
+                /** Tới giờ khởi hành tự ẩn nút, không cần người dùng tải lại màn. */
+                @Override
+                public void run() {
+                    if (currentItem != null && !isFinishing() && !isDestroyed()) {
+                        configureActionButtons(currentItem);
+                    }
+                }
+            });
+        }
+    }
+
+    private boolean canReleasePassenger(DriverRequestItem item) {
+        if (item == null || item.getRequest() == null || item.getTrip() == null
+                || FirebaseAuth.getInstance().getCurrentUser() == null) {
+            return false;
+        }
+        TripRequest request = item.getRequest();
+        Trip trip = item.getTrip();
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        return userId.equals(request.getDriverId()) && userId.equals(trip.getDriverId())
+                && "ACCEPTED".equals(request.getStatus()) && isTripFull(trip)
+                && requestId.equals(trip.getAcceptedRequestId()) && isDepartureInFuture(trip);
+    }
+
+    /** Hủy người đang được nhận, giữ chuyến và các yêu cầu còn chờ để chọn người khác. */
+    private void confirmReleasePassenger() {
+        if (isLoading || isResponding || !canReleasePassenger(currentItem)) {
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Hủy nhận khách này?")
+                .setMessage("Khách sẽ nhận thông báo hủy nhận. Chuyến của bạn vẫn giữ nguyên và mở lại một chỗ để chọn khách khác."
+                        + "\n\nYêu cầu và lịch sử chat của khách cũ được giữ lại, nhưng không thể gửi thêm tin."
+                        + " Bạn chỉ được hủy nhận trước giờ khởi hành.")
+                .setNegativeButton("Giữ khách", null)
+                .setPositiveButton("Hủy nhận khách", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (!isLoading && !isResponding && canReleasePassenger(currentItem)) {
+                            decisionViewModel.releaseAcceptedPassenger(requestId);
+                        } else {
+                            Toast.makeText(RequestDetailActivity.this,
+                                    "Chuyến đã thay đổi hoặc đến giờ khởi hành. Hãy tải lại.", Toast.LENGTH_LONG).show();
+                            loadRequest();
+                        }
+                    }
+                }).show();
+    }
+
+    @Override
+    protected void onPause() {
+        actionTimeRefresh.stop();
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        actionTimeRefresh.close();
+        super.onDestroy();
     }
 
     /** Chỉ yêu cầu thiếu hẳn C mới dùng D của đúng chuyến theo hợp đồng dữ liệu cũ. */
@@ -352,7 +452,7 @@ public class RequestDetailActivity extends AppCompatActivity {
             NumberFormat distanceFormatter = NumberFormat.getNumberInstance(
                     Locale.forLanguageTag("vi-VN"));
             distanceFormatter.setMaximumFractionDigits(2);
-            contributionDetailsText.setText("Chặng khách đi P → C: "
+            contributionDetailsText.setText("Chặng khách đi: "
                     + distanceFormatter.format(contribution.getPassengerDistanceMeters() / 1000.0)
                     + " km\nMức toàn tuyến lúc khách xác nhận: "
                     + formatCost(contribution.getFullTripCostVnd())
@@ -451,6 +551,8 @@ public class RequestDetailActivity extends AppCompatActivity {
     private void setActionButtonsEnabled(boolean enabled) {
         acceptButton.setEnabled(enabled);
         rejectButton.setEnabled(enabled);
+        releaseButton.setEnabled(enabled);
+        otherRequestsButton.setEnabled(enabled);
     }
 
     /** Ẩn hai nút cho đến khi dữ liệu mới được xác thực. */
@@ -459,6 +561,10 @@ public class RequestDetailActivity extends AppCompatActivity {
         rejectButton.setEnabled(false);
         acceptButton.setVisibility(View.GONE);
         rejectButton.setVisibility(View.GONE);
+        releaseButton.setEnabled(false);
+        releaseButton.setVisibility(View.GONE);
+        otherRequestsButton.setEnabled(false);
+        otherRequestsButton.setVisibility(View.GONE);
     }
 
     /** Kiểm tra sơ bộ thời gian; repository vẫn kiểm tra lại khi ghi. */

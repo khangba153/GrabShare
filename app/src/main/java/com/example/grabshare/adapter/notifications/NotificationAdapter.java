@@ -91,6 +91,9 @@ public class NotificationAdapter extends BaseAdapter {
     }
 
     private String titleFor(String type) {
+        if ("REQUEST_RELEASED".equals(type)) {
+            return "Chủ xe đã hủy nhận bạn";
+        }
         if ("REQUEST_SENT".equals(type)) return "Có yêu cầu đi nhờ mới";
         if ("REQUEST_CANCELLED".equals(type)) return "Yêu cầu đi nhờ đã bị hủy";
         if ("REQUEST_ACCEPTED".equals(type)) return "Yêu cầu đã được chấp nhận";
@@ -104,6 +107,10 @@ public class NotificationAdapter extends BaseAdapter {
         String actor = safeText(item.getActorDisplayName(), "Người liên quan");
         String trip = safeText(item.getTripSummary(), "Chuyến không còn tồn tại");
         String type = item.getType();
+
+        if ("REQUEST_RELEASED".equals(type)) {
+            return "Chỗ của bạn không còn được giữ. Bạn có thể tìm chuyến khác · " + trip;
+        }
 
         if ("REQUEST_SENT".equals(type)) {
             return "Muốn đi nhờ · " + trip;
@@ -127,6 +134,9 @@ public class NotificationAdapter extends BaseAdapter {
     }
 
     private int iconFor(String type) {
+        if ("REQUEST_RELEASED".equals(type)) {
+            return R.drawable.ic_close;
+        }
         if ("REQUEST_ACCEPTED".equals(type) || "TRIP_COMPLETED".equals(type)) {
             return R.drawable.ic_check;
         }

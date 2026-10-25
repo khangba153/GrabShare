@@ -98,7 +98,7 @@
                     android:text="Hành trình khách đi nhờ" />
                 <TextView
                     style="@style/Caption"
-                    android:text="Điểm đón P" />
+                    android:text="Điểm đón" />
                 <TextView
                     android:id="@+id/request_pickup_value"
                     style="@style/BodyBold"
@@ -107,7 +107,7 @@
                 <TextView
                     style="@style/Caption"
                     android:layout_marginTop="12dp"
-                    android:text="Điểm xuống C" />
+                    android:text="Điểm xuống" />
                 <TextView
                     android:id="@+id/request_dropoff_value"
                     style="@style/BodyBold"
@@ -154,7 +154,7 @@
                     android:minHeight="48dp"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="12dp"
-                    android:text="Tuyến chủ xe A → D"
+                    android:text="Tuyến chủ xe"
                     android:textColor="@color/primary"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
@@ -162,18 +162,15 @@
                 <LinearLayout
                     style="@style/Card">
                     <TextView
-                        style="@style/BodyBold"
-                        android:text="Chuyến bạn đăng A → D" />
-                    <TextView
                         style="@style/Caption"
-                        android:text="Điểm xuất phát A" />
+                        android:text="Điểm xuất phát" />
                     <TextView
                         android:id="@+id/route_start"
                         style="@style/Body"
                         android:textIsSelectable="true" />
                     <TextView
                         style="@style/Caption"
-                        android:text="Điểm đến D" />
+                        android:text="Điểm đến" />
                     <TextView
                         android:id="@+id/route_end"
                         style="@style/Body"
@@ -192,6 +189,16 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/release_passenger"
+                    style="@style/ButtonSecondary"
+                    android:text="Hủy nhận khách"
+                    android:visibility="gone" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/view_other_requests"
+                    style="@style/ButtonPrimary"
+                    android:text="Xem yêu cầu khác"
+                    android:visibility="gone" />
                 <TextView
                     android:id="@+id/request_decision_notice"
                     style="@style/Body"

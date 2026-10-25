@@ -409,10 +409,15 @@ public class UpcomingActivity extends AppCompatActivity {
         // Kiểm tra trạng thái chuyến đi đã bị hủy bởi chủ xe hoặc hành khách
         if ("CANCELLED".equals(tripStatus) || "CANCELLED".equals(requestStatus)) {
             if (headerTitle != null) {
-                headerTitle.setText("Chuyến đã hủy");
+                headerTitle.setText("Lượt đi nhờ đã hủy");
             }
             if (upcomingStatus != null) upcomingStatus.setText("Đã hủy");
-            if (upcomingDescription != null) upcomingDescription.setText("Chuyến đi đã bị hủy.");
+            if (upcomingDescription != null) {
+                upcomingDescription.setText("Bạn không còn giữ chỗ trong chuyến này. Có thể quay lại tìm chuyến khác.");
+                if ("CANCELLED".equals(tripStatus)) {
+                    upcomingDescription.setText("Chủ xe đã hủy chuyến đi.");
+                }
+            }
 
             if (secondaryAction != null) {
                 secondaryAction.setVisibility(View.GONE);

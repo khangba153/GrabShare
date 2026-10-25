@@ -322,7 +322,10 @@ public class NotificationsActivity extends AppCompatActivity {
         Intent intent;
         String type = item.getType();
 
-        if ("REQUEST_SENT".equals(type)) {
+        if ("REQUEST_RELEASED".equals(type)) {
+            intent = new Intent(this, com.example.grabshare.activity.passenger.CancelledRideActivity.class);
+            intent.putExtra(NavigationKeys.REQUEST_ID, item.getRequestId());
+        } else if ("REQUEST_SENT".equals(type)) {
             intent = new Intent(this, RequestDetailActivity.class);
             intent.putExtra(NavigationKeys.REQUEST_ID, item.getRequestId());
             intent.putExtra(NavigationKeys.TRIP_ID, item.getTripId());
