@@ -14,6 +14,7 @@ import com.example.grabshare.contract.DetourCheckResult;
 import com.example.grabshare.contract.DetourChecker;
 import com.example.grabshare.contract.DetourLimit;
 import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.contract.RequestAttemptContract;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.Trip;
 import com.example.grabshare.model.TripRequest;
@@ -36,7 +37,14 @@ import java.util.Map;
 public class RequestCreationRepository {
 
     // Leader chỉ bật cùng mốc Publish Rules tiền đã nghiệm thu; không tự bật từ UI.
-    public static final boolean CONTRIBUTION_SUBMISSION_ENABLED = false;
+    public static final boolean CONTRIBUTION_SUBMISSION_ENABLED = true;
+
+    // Chỉ bật sau khi leader nghiệm thu client hai phía và Rules guard cùng phiên bản.
+    public static final boolean REQUEST_ATTEMPTS_ENABLED = false;
+
+    // Dùng chung thông báo khi hệ thống chưa mở ghi theo hợp đồng tiền mới.
+    public static final String SUBMISSION_UNAVAILABLE_MESSAGE =
+            "Hệ thống chưa mở gửi yêu cầu theo khoản đóng góp mới. Vui lòng thử lại sau.";
 
     private final Context context;
 
@@ -63,23 +71,22 @@ public class RequestCreationRepository {
 
         public final ContributionSnapshot contribution;
 
-        /** Giữ tuyến đã lưu trên server, không lấy Bundle làm nguồn của request hiện có. */
-        private Result(String requestId, String status, boolean existing, RequestJourney journey) {
-            this(requestId, status, existing, journey, null);
-        }
+        public final Long attemptNumber;
 
-        /** Khoản lịch sử chỉ lấy từ Request server; null là yêu cầu cũ thiếu snapshot. */
+        /** Số lần null chỉ dành cho document legacy không có field attemptNumber. */
         private Result(
                 String requestId,
                 String status,
                 boolean existing,
                 RequestJourney journey,
-                ContributionSnapshot contribution) {
+                ContributionSnapshot contribution,
+                Long attemptNumber) {
             this.requestId = requestId;
             this.status = status;
             this.existing = existing;
             this.journey = journey;
             this.contribution = contribution;
+            this.attemptNumber = attemptNumber;
         }
 
         /** Trả bản sao P của request đã được server xác nhận. */
@@ -122,7 +129,7 @@ public class RequestCreationRepository {
         return current != null && userIdentifier.equals(current.getUid());
     }
 
-    /** Chuyển dữ liệu request đã tồn tại thành kết quả, không cho gửi lại. */
+    /** Đọc tuyến/tiền/số lần từ server; không suy trạng thái hoặc tính lại tiền lịch sử. */
     private Result existingResult(
             DocumentSnapshot snapshot, Trip trip, String tripId, String userIdentifier) {
         TripRequest request = snapshot.toObject(TripRequest.class);
@@ -132,8 +139,29 @@ public class RequestCreationRepository {
                 || !("PENDING".equals(request.getStatus())
                         || "ACCEPTED".equals(request.getStatus())
                         || "REJECTED".equals(request.getStatus())
-                        || "CANCELLED".equals(request.getStatus()))) {
+                        || "CANCELLED".equals(request.getStatus())
+                        || "COMPLETED".equals(request.getStatus()))
+                || trip == null
+                || !tripId.equals(trip.getId())
+                || !java.util.Objects.equals(trip.getDriverId(), request.getDriverId())) {
             throw new IllegalStateException("Dữ liệu yêu cầu đã có không hợp lệ.");
+        }
+        if (request.hasAttemptNumberField()) {
+            Object number = snapshot.get("attemptNumber");
+            if (!(number instanceof Long)
+                    || request.getAttemptNumber() == null
+                    || request.getAttemptNumber() < 1
+                    || !snapshot.getId()
+                            .matches(
+                                    "[0-9a-f]{32}_"
+                                            + java.util.regex.Pattern.quote(userIdentifier))) {
+                throw new IllegalStateException("Số lần yêu cầu đã lưu không hợp lệ.");
+            }
+        } else {
+            if (!RequestAttemptContract.legacyRequestId(tripId, userIdentifier)
+                    .equals(snapshot.getId())) {
+                throw new IllegalStateException("Yêu cầu mới thiếu số lần đã lưu.");
+            }
         }
         request.setId(snapshot.getId());
         RequestJourney journey = RequestJourney.fromExistingRequest(request, trip);
@@ -142,7 +170,8 @@ public class RequestCreationRepository {
                 request.getStatus(),
                 true,
                 journey,
-                ContributionCalculator.readConfirmed(request));
+                ContributionCalculator.readConfirmed(request),
+                request.getAttemptNumber());
     }
 
     /** Đọc đúng chuyến từ server để kiểm tra liên kết request và áp dụng fallback legacy. */
@@ -196,10 +225,163 @@ public class RequestCreationRepository {
                         });
     }
 
+    /** Toàn bộ dữ liệu server cần đối chiếu; không chứa tác vụ ghi hoặc API định tuyến. */
+    private static final class AttemptState {
+        final Trip trip;
+        final Result latest;
+        final Result intended;
+
+        /** Giữ riêng lần gần nhất và ID đang đối soát để callback muộn không gửi lần mới. */
+        AttemptState(Trip trip, Result latest, Result intended) {
+            this.trip = trip;
+            this.latest = latest;
+            this.intended = intended;
+        }
+
+        /** Ưu tiên document của chính ý định đã gửi, kể cả nó đã bị hủy sau commit. */
+        Result resolved() {
+            if (intended != null) {
+                return intended;
+            }
+            return latest;
+        }
+    }
+
+    /** Đọc theo path đã chốt; không query hoặc list collection guard. */
+    private DocumentReference guardReference(String tripId, String userIdentifier) {
+        return firestore.document(RequestAttemptContract.guardPath(tripId, userIdentifier));
+    }
+
+    /** Đọc đủ Trip/guard/lần trước/ID ý định trước mọi thao tác ghi trong transaction. */
+    private AttemptState readAttemptState(
+            Transaction transaction,
+            String tripId,
+            String userIdentifier,
+            RequestSubmissionIntent intent)
+            throws FirebaseFirestoreException {
+        DocumentSnapshot tripSnapshot =
+                transaction.get(firestore.collection("trips").document(tripId));
+        DocumentSnapshot guardSnapshot = transaction.get(guardReference(tripId, userIdentifier));
+        Trip trip = tripSnapshot.toObject(Trip.class);
+        if (trip == null || !tripSnapshot.exists()) {
+            throw failure("Chuyến không còn tồn tại.");
+        }
+        trip.setId(tripSnapshot.getId());
+        String latestIdentifier = RequestAttemptContract.legacyRequestId(tripId, userIdentifier);
+        Long guardNumber = null;
+        if (guardSnapshot.exists()) {
+            Map<String, Object> fields = guardSnapshot.getData();
+            if (fields == null
+                    || fields.size() != 3
+                    || !(fields.get("requestId") instanceof String)
+                    || !(fields.get("attemptNumber") instanceof Long)
+                    || !(fields.get("updatedAt") instanceof com.google.firebase.Timestamp)) {
+                throw failure("Con trỏ yêu cầu không hợp lệ. Vui lòng báo nhóm hỗ trợ.");
+            }
+            latestIdentifier = (String) fields.get("requestId");
+            guardNumber = (Long) fields.get("attemptNumber");
+            if (guardNumber < 1
+                    || !latestIdentifier.matches(
+                            "[0-9a-f]{32}_" + java.util.regex.Pattern.quote(userIdentifier))) {
+                throw failure("Con trỏ yêu cầu sai ID hoặc số lần.");
+            }
+        }
+        DocumentSnapshot latestSnapshot =
+                transaction.get(firestore.collection("requests").document(latestIdentifier));
+        Result latest = null;
+        if (latestSnapshot.exists()) {
+            latest = existingResult(latestSnapshot, trip, tripId, userIdentifier);
+        }
+        if (guardSnapshot.exists()) {
+            if (latest == null || !guardNumber.equals(latest.attemptNumber)) {
+                throw failure("Con trỏ không khớp yêu cầu đã lưu.");
+            }
+        } else {
+            if (latest != null && latest.attemptNumber != null) {
+                throw failure("Yêu cầu legacy có số lần không hợp lệ.");
+            }
+        }
+        Result intended = null;
+        if (intent != null) {
+            DocumentSnapshot intendedSnapshot = latestSnapshot;
+            if (!intent.requestIdentifier.equals(latestIdentifier)) {
+                intendedSnapshot =
+                        transaction.get(
+                                firestore
+                                        .collection("requests")
+                                        .document(intent.requestIdentifier));
+            }
+            if (intendedSnapshot.exists()) {
+                intended = existingResult(intendedSnapshot, trip, tripId, userIdentifier);
+                if (guardNumber == null
+                        || intended.attemptNumber == null
+                        || intended.attemptNumber > guardNumber
+                        || (!intent.requestIdentifier.equals(latestIdentifier)
+                                && (!"CANCELLED".equals(intended.status)
+                                        || intended.attemptNumber.equals(guardNumber)))) {
+                    throw failure("Lần yêu cầu không khớp con trỏ lịch sử.");
+                }
+            }
+        }
+        return new AttemptState(trip, latest, intended);
+    }
+
+    /** Đối soát trên server bằng transaction chỉ đọc, không tự submit từ restore. */
+    private void readLatestAttempt(
+            final String tripId,
+            final String userIdentifier,
+            final RequestSubmissionIntent intent,
+            final RepositoryCallback<AttemptState> callback) {
+        firestore
+                .runTransaction(
+                        new Transaction.Function<AttemptState>() {
+                            /**
+                             * Firestore có thể đọc lại khi guard đổi; không phát sinh ID hoặc HTTP.
+                             */
+                            @Override
+                            public AttemptState apply(@NonNull Transaction transaction)
+                                    throws FirebaseFirestoreException {
+                                if (closed || !sameUser(userIdentifier) || !online()) {
+                                    throw failure(
+                                            "Phiên đã đổi hoặc mất mạng khi kiểm tra yêu cầu.");
+                                }
+                                return readAttemptState(
+                                        transaction, tripId, userIdentifier, intent);
+                            }
+                        })
+                .addOnSuccessListener(
+                        new OnSuccessListener<AttemptState>() {
+                            /** Chỉ giao dữ liệu server cho phiên vẫn đang mở màn. */
+                            @Override
+                            public void onSuccess(AttemptState value) {
+                                if (!closed) {
+                                    if (sameUser(userIdentifier)) {
+                                        callback.onSuccess(value);
+                                    } else {
+                                        callback.onError(
+                                                new IllegalStateException(
+                                                        "Phiên đăng nhập đã đổi."));
+                                    }
+                                }
+                            }
+                        })
+                .addOnFailureListener(
+                        new OnFailureListener() {
+                            /** Quyền/mạng/dữ liệu sai không được biến thành chưa có yêu cầu. */
+                            @Override
+                            public void onFailure(@NonNull Exception error) {
+                                if (!closed) {
+                                    callback.onError(error);
+                                }
+                            }
+                        });
+    }
+
     /** Đọc request đúng UID trên server để khôi phục sau process death hoặc lỗi mạng. */
     public void findExisting(
             final String tripId,
             final String userIdentifier,
+            final RequestSubmissionIntent intent,
             final RepositoryCallback<Result> callback) {
         if (closed
                 || !SearchTripPolicy.validId(tripId)
@@ -209,9 +391,36 @@ public class RequestCreationRepository {
                     new IllegalStateException("Thiếu mã chuyến hoặc phiên đăng nhập đã đổi."));
             return;
         }
+        if (intent != null
+                && (!tripId.equals(intent.tripIdentifier)
+                        || !userIdentifier.equals(intent.passengerIdentifier))) {
+            callback.onError(
+                    new IllegalArgumentException("Ý định gửi thuộc chuyến hoặc phiên khác."));
+            return;
+        }
+        if (isRequestAttemptsEnabled()) {
+            readLatestAttempt(
+                    tripId,
+                    userIdentifier,
+                    intent,
+                    new RepositoryCallback<AttemptState>() {
+                        /** Trả đúng ID server, không ghép tripId_uid để mở màn trạng thái. */
+                        @Override
+                        public void onSuccess(AttemptState value) {
+                            callback.onSuccess(value.resolved());
+                        }
+
+                        /** Giữ lỗi đọc guard, không fallback legacy khi server từ chối quyền. */
+                        @Override
+                        public void onError(Exception error) {
+                            callback.onError(error);
+                        }
+                    });
+            return;
+        }
         firestore
                 .collection("requests")
-                .document(tripId + "_" + userIdentifier)
+                .document(RequestAttemptContract.legacyRequestId(tripId, userIdentifier))
                 .get(Source.SERVER)
                 .addOnSuccessListener(
                         new OnSuccessListener<DocumentSnapshot>() {
@@ -258,6 +467,7 @@ public class RequestCreationRepository {
             Place dropoff,
             String inputMessage,
             final RequestQuote confirmedQuote,
+            final RequestSubmissionIntent intent,
             final RepositoryCallback<Result> callback) {
         if (closed
                 || !SearchTripPolicy.validId(tripId)
@@ -282,6 +492,13 @@ public class RequestCreationRepository {
                             "Vui lòng xác nhận khoản đóng góp trước khi gửi."));
             return;
         }
+        if (intent == null
+                || !tripId.equals(intent.tripIdentifier)
+                || !userIdentifier.equals(intent.passengerIdentifier)) {
+            callback.onError(
+                    new IllegalArgumentException("Thiếu ý định gửi đúng chuyến và tài khoản."));
+            return;
+        }
         final String message;
         if (inputMessage == null) {
             message = "";
@@ -295,6 +512,7 @@ public class RequestCreationRepository {
         findExisting(
                 tripId,
                 userIdentifier,
+                intent,
                 new RepositoryCallback<Result>() {
 
                     /**
@@ -305,19 +523,33 @@ public class RequestCreationRepository {
                         if (closed) {
                             return;
                         }
-                        if (existing != null) {
+                        if (existing != null
+                                && (!isRequestAttemptsEnabled()
+                                        || intent.requestIdentifier.equals(existing.requestId)
+                                        || !"CANCELLED".equals(existing.status))) {
                             callback.onSuccess(existing);
+                            return;
+                        }
+                        if (isRequestAttemptsEnabled() && !intent.follows(existing)) {
+                            callback.onError(
+                                    new IllegalStateException(
+                                            "Lịch sử yêu cầu đã đổi. Hãy kiểm tra lại trước khi"
+                                                    + " gửi."));
                             return;
                         }
                         if (!isContributionSubmissionEnabled()) {
                             callback.onError(
-                                    new IllegalStateException(
-                                            "Chưa thể gửi với khoản đóng góp mới. Vui lòng thử lại"
-                                                    + " sau."));
+                                    new IllegalStateException(SUBMISSION_UNAVAILABLE_MESSAGE));
                             return;
                         }
                         verifyLatestRoute(
-                                tripId, userIdentifier, journey, message, confirmedQuote, callback);
+                                tripId,
+                                userIdentifier,
+                                journey,
+                                message,
+                                confirmedQuote,
+                                intent,
+                                callback);
                     }
 
                     /** Không coi lỗi đối soát là chưa có request rồi tiếp tục ghi. */
@@ -337,6 +569,7 @@ public class RequestCreationRepository {
             final RequestJourney journey,
             final String message,
             final RequestQuote confirmedQuote,
+            final RequestSubmissionIntent intent,
             final RepositoryCallback<Result> callback) {
         firestore
                 .collection("trips")
@@ -426,6 +659,7 @@ public class RequestCreationRepository {
                                                         message,
                                                         journey,
                                                         confirmedQuote,
+                                                        intent,
                                                         callback);
                                             }
 
@@ -462,6 +696,7 @@ public class RequestCreationRepository {
             final String message,
             final RequestJourney journey,
             final RequestQuote confirmedQuote,
+            final RequestSubmissionIntent intent,
             final RepositoryCallback<Result> callback) {
         if (!SearchTripPolicy.validId(tripId)
                 || !SearchTripPolicy.validId(userIdentifier)
@@ -474,11 +709,19 @@ public class RequestCreationRepository {
             callback.onError(new IllegalStateException("Cần kết nối Internet để gửi yêu cầu."));
             return;
         }
-        final String requestId = tripId + "_" + userIdentifier;
+        final boolean attemptsEnabled = isRequestAttemptsEnabled();
+        final String requestId;
+        if (attemptsEnabled) {
+            requestId = intent.requestIdentifier;
+        } else {
+            requestId = RequestAttemptContract.legacyRequestId(tripId, userIdentifier);
+        }
         final DocumentReference tripRef = firestore.collection("trips").document(tripId);
         final DocumentReference requestRef = firestore.collection("requests").document(requestId);
         final DocumentReference eventRef =
-                firestore.collection("notifications").document(requestId + "_REQUEST_SENT");
+                firestore
+                        .collection("notifications")
+                        .document(RequestAttemptContract.requestEventId(requestId, "REQUEST_SENT"));
         firestore
                 .runTransaction(
                         new Transaction.Function<Result>() {
@@ -495,23 +738,48 @@ public class RequestCreationRepository {
                                             "Phiên đã đổi hoặc mất mạng. Yêu cầu chưa được xác"
                                                     + " nhận.");
                                 }
-                                DocumentSnapshot tripSnapshot = transaction.get(tripRef);
-                                DocumentSnapshot requestSnapshot = transaction.get(requestRef);
-                                Trip trip = tripSnapshot.toObject(Trip.class);
-                                if (trip != null) {
-                                    trip.setId(tripSnapshot.getId());
-                                }
-                                if (requestSnapshot.exists()) {
-                                    try {
+                                Trip trip;
+                                Long attemptNumber = null;
+                                if (attemptsEnabled) {
+                                    AttemptState attempt =
+                                            readAttemptState(
+                                                    transaction, tripId, userIdentifier, intent);
+                                    if (attempt.intended != null) {
+                                        return attempt.intended;
+                                    }
+                                    if (attempt.latest != null
+                                            && !"CANCELLED".equals(attempt.latest.status)) {
+                                        return attempt.latest;
+                                    }
+                                    if (!intent.follows(attempt.latest)) {
+                                        throw failure(
+                                                "Lịch sử yêu cầu đã đổi. Cần thao tác gửi mới sau"
+                                                        + " khi kiểm tra lại.");
+                                    }
+                                    String previousStatus = null;
+                                    Long previousNumber = null;
+                                    if (attempt.latest != null) {
+                                        previousStatus = attempt.latest.status;
+                                        previousNumber = attempt.latest.attemptNumber;
+                                    }
+                                    attemptNumber =
+                                            RequestAttemptContract.nextAttemptNumber(
+                                                    previousNumber, previousStatus);
+                                    trip = attempt.trip;
+                                } else {
+                                    DocumentSnapshot tripSnapshot = transaction.get(tripRef);
+                                    DocumentSnapshot requestSnapshot = transaction.get(requestRef);
+                                    trip = tripSnapshot.toObject(Trip.class);
+                                    if (trip != null) {
+                                        trip.setId(tripSnapshot.getId());
+                                    }
+                                    if (requestSnapshot.exists()) {
                                         return existingResult(
                                                 requestSnapshot, trip, tripId, userIdentifier);
-                                    } catch (RuntimeException error) {
-                                        throw failure(
-                                                "Yêu cầu đã tồn tại nhưng dữ liệu không hợp lệ.");
                                     }
-                                }
-                                if (!tripSnapshot.exists()) {
-                                    throw failure("Chuyến không còn tồn tại.");
+                                    if (!tripSnapshot.exists()) {
+                                        throw failure("Chuyến không còn tồn tại.");
+                                    }
                                 }
                                 String reason =
                                         SearchTripPolicy.blockedReason(trip, userIdentifier);
@@ -538,6 +806,9 @@ public class RequestCreationRepository {
                                 request.put("status", "PENDING");
                                 request.put("createdAt", FieldValue.serverTimestamp());
                                 request.put("updatedAt", FieldValue.serverTimestamp());
+                                if (attemptsEnabled) {
+                                    request.put("attemptNumber", attemptNumber);
+                                }
                                 Map<String, Object> event = new HashMap<String, Object>();
                                 event.put("recipientId", trip.getDriverId());
                                 event.put("actorId", userIdentifier);
@@ -547,13 +818,20 @@ public class RequestCreationRepository {
                                 event.put("isRead", false);
                                 event.put("createdAt", FieldValue.serverTimestamp());
                                 transaction.set(requestRef, request);
+                                if (attemptsEnabled) {
+                                    transaction.set(
+                                            guardReference(tripId, userIdentifier),
+                                            RequestAttemptContract.guardFields(
+                                                    requestId, attemptNumber));
+                                }
                                 transaction.set(eventRef, event);
                                 return new Result(
                                         requestId,
                                         "PENDING",
                                         false,
                                         journey,
-                                        confirmedQuote.getContribution());
+                                        confirmedQuote.getContribution(),
+                                        attemptNumber);
                             }
                         })
                 .addOnSuccessListener(
@@ -591,13 +869,18 @@ public class RequestCreationRepository {
                                 findExisting(
                                         tripId,
                                         userIdentifier,
+                                        intent,
                                         new RepositoryCallback<Result>() {
                                             /**
                                              * Chỉ công nhận dữ liệu server; không tự thử ghi lại.
                                              */
                                             @Override
                                             public void onSuccess(Result existing) {
-                                                if (existing != null) {
+                                                if (existing != null
+                                                        && (!attemptsEnabled
+                                                                || intent.requestIdentifier.equals(
+                                                                        existing.requestId)
+                                                                || !intent.follows(existing))) {
                                                     callback.onSuccess(existing);
                                                 } else {
                                                     callback.onError(error);
@@ -625,6 +908,11 @@ public class RequestCreationRepository {
     /** Cổng rollout dùng chung với UI; kiểm thử local có thể thay mà không đổi Rules thật. */
     protected boolean isContributionSubmissionEnabled() {
         return CONTRIBUTION_SUBMISSION_ENABLED;
+    }
+
+    /** Đọc/ghi guard chỉ ở stage attempt; stage tiền cũ không đòi quyền guard chưa Publish. */
+    protected boolean isRequestAttemptsEnabled() {
+        return REQUEST_ATTEMPTS_ENABLED;
     }
 
     /** ViewModel đóng checker khi Back khỏi Review, không giữ tác vụ định tuyến mồ côi. */

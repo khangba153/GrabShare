@@ -11,51 +11,34 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.grabshare.contract.CachedTrip;
-import com.example.grabshare.contract.FavoriteStore;
-import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.contract.TripCacheStore;
 import com.example.grabshare.local.TripCacheRepository;
 import com.example.grabshare.model.Trip;
-import com.example.grabshare.repository.passenger.FavoriteRepository;
 import com.example.grabshare.repository.search.SearchTripPolicy;
 import com.google.android.gms.tasks.TaskExecutors;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Nối Favorite/SQLite Thuận bàn giao; dữ liệu lưu chỉ được dùng đọc, không cấp quyền gửi. */
+/** Nối SQLite Thuận bàn giao; dữ liệu lưu chỉ được dùng đọc, không cấp quyền gửi. */
 public final class TripDetailSupportViewModel extends AndroidViewModel {
     /** Snapshot giao diện không giữ Activity hoặc callback từ màn đã đóng. */
     public static final class State {
         public final CachedTrip cachedTrip;
-        public final Boolean favorite;
-        public final boolean favoriteBusy;
-        public final String favoriteMessage;
         public final String cacheMessage;
         public final boolean onlineReady;
 
         /** Sao chép trạng thái bất biến cho mỗi lần render. */
-        private State(
-                CachedTrip cachedTrip,
-                Boolean favorite,
-                boolean favoriteBusy,
-                String favoriteMessage,
-                String cacheMessage,
-                boolean onlineReady) {
+        private State(CachedTrip cachedTrip, String cacheMessage, boolean onlineReady) {
             this.cachedTrip = cachedTrip;
-            this.favorite = favorite;
-            this.favoriteBusy = favoriteBusy;
-            this.favoriteMessage = favoriteMessage;
             this.cacheMessage = cacheMessage;
             this.onlineReady = onlineReady;
         }
     }
 
     private final MutableLiveData<State> state = new MutableLiveData<State>();
-    private final FavoriteStore favorites;
     private final TripCacheStore cache;
     private final ExecutorService cacheExecutor = Executors.newSingleThreadExecutor();
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
@@ -67,17 +50,12 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
     private String tripIdentifier;
     private Trip onlineTrip;
     private CachedTrip cachedTrip;
-    private Boolean favorite;
-    private boolean favoriteBusy;
-    private boolean favoriteReadAttempted;
-    private String favoriteMessage = "";
     private String cacheMessage = "";
     private boolean cacheReadPending;
 
     /** Dùng đúng implementation đã bàn giao, không tạo kho dữ liệu hoặc schema khác. */
     public TripDetailSupportViewModel(Application application) {
         super(application);
-        favorites = new FavoriteRepository(FirebaseFirestore.getInstance());
         cache = new TripCacheRepository(application);
         publish();
     }
@@ -87,7 +65,7 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
         return state;
     }
 
-    /** Mở phiên theo đúng cặp UID/trip_id, mỗi lần quay lại phải xác nhận Favorite mới. */
+    /** Mở phiên cache theo đúng cặp UID/trip_id và kiểm tra lại kết nối khi quay lại. */
     public void start(String tripIdentifier, String userIdentifier) {
         stop();
         this.tripIdentifier = tripIdentifier;
@@ -95,10 +73,6 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
         active = true;
         onlineTrip = null;
         cachedTrip = null;
-        favorite = null;
-        favoriteBusy = false;
-        favoriteReadAttempted = false;
-        favoriteMessage = "";
         cacheMessage = "";
         cacheReadPending = false;
         final int expectedGeneration = generation;
@@ -111,8 +85,6 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
                             stop();
                             onlineTrip = null;
                             cachedTrip = null;
-                            favorite = null;
-                            favoriteBusy = false;
                             publish();
                         }
                     }
@@ -156,9 +128,6 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
             onlineTrip = tripState.trip;
             cachedTrip = null;
             cacheMessage = "";
-            if (!favoriteReadAttempted) {
-                refreshFavorite();
-            }
             cacheExecutor.execute(
                     new Runnable() {
                         /** Kiểm tra phiên và vòng đời ngay trước khi gọi API cache đồng bộ. */
@@ -192,89 +161,6 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
             }
         }
         publish();
-    }
-
-    /** Nút tim chỉ ghi khi có chuyến online và mạng; lỗi chưa xác nhận phải đọc lại. */
-    public void toggleFavorite() {
-        final int expectedGeneration = generation;
-        if (!current(expectedGeneration) || onlineTrip == null || !hasInternet() || favoriteBusy) {
-            return;
-        }
-        if (favorite == null) {
-            refreshFavorite();
-            return;
-        }
-        final boolean desiredFavorite = !favorite;
-        favoriteBusy = true;
-        favoriteMessage = "Đang cập nhật yêu thích…";
-        publish();
-        RepositoryCallback<Void> callback =
-                new RepositoryCallback<Void>() {
-                    /** Chỉ đổi trạng thái tim sau xác nhận server của phiên hiện tại. */
-                    @Override
-                    public void onSuccess(Void unused) {
-                        if (!current(expectedGeneration)) {
-                            return;
-                        }
-                        favorite = desiredFavorite;
-                        favoriteBusy = false;
-                        favoriteMessage = "";
-                        publish();
-                    }
-
-                    /** Không giả thành công khi lỗi mạng/quyền hoặc chưa rõ kết quả ghi. */
-                    @Override
-                    public void onError(Exception error) {
-                        if (!current(expectedGeneration)) {
-                            return;
-                        }
-                        favorite = null;
-                        favoriteBusy = false;
-                        favoriteMessage = "Chưa xác nhận được yêu thích. Bấm nút để tải lại.";
-                        publish();
-                    }
-                };
-        if (desiredFavorite) {
-            favorites.addFavorite(userIdentifier, tripIdentifier, callback);
-        } else {
-            favorites.removeFavorite(userIdentifier, tripIdentifier, callback);
-        }
-    }
-
-    /** Chỉ đọc server một lần mỗi lượt mở màn, lỗi không tạo vòng lặp tự gửi query. */
-    private void refreshFavorite() {
-        final int expectedGeneration = generation;
-        favoriteReadAttempted = true;
-        favoriteBusy = true;
-        favoriteMessage = "Đang tải trạng thái yêu thích…";
-        favorites.isFavorite(
-                userIdentifier,
-                tripIdentifier,
-                new RepositoryCallback<Boolean>() {
-                    /** Giao trạng thái đúng UID/trip_id, bỏ callback sau Back hoặc xoay. */
-                    @Override
-                    public void onSuccess(Boolean value) {
-                        if (!current(expectedGeneration)) {
-                            return;
-                        }
-                        favorite = value;
-                        favoriteBusy = false;
-                        favoriteMessage = "";
-                        publish();
-                    }
-
-                    /** Lỗi đọc khác với chưa yêu thích; cho phép người dùng thử tải lại. */
-                    @Override
-                    public void onError(Exception error) {
-                        if (!current(expectedGeneration)) {
-                            return;
-                        }
-                        favorite = null;
-                        favoriteBusy = false;
-                        favoriteMessage = "Không tải được yêu thích. Bấm nút để thử lại.";
-                        publish();
-                    }
-                });
     }
 
     /** Cache không chứa đủ trường nghiệp vụ mới nên chỉ kiểm tra dữ liệu phục vụ đọc. */
@@ -383,7 +269,6 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
                         }
                         if (!hasInternet()) {
                             onlineTrip = null;
-                            favoriteReadAttempted = false;
                             loadCachedTrip(expectedGeneration);
                         } else {
                             if (onlineTrip == null) {
@@ -410,9 +295,6 @@ public final class TripDetailSupportViewModel extends AndroidViewModel {
         state.setValue(
                 new State(
                         cachedTrip,
-                        favorite,
-                        favoriteBusy,
-                        favoriteMessage,
                         cacheMessage,
                         onlineTrip != null && hasInternet() && current(generation)));
     }

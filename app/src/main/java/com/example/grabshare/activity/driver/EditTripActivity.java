@@ -27,6 +27,7 @@ import com.example.grabshare.activity.search.LocationActivity;
 import com.example.grabshare.activity.search.RouteDistanceFormatter;
 import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
 import com.example.grabshare.contract.DetourLimit;
@@ -646,14 +647,26 @@ public class EditTripActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    /** Rút gọn chữ hiển thị, giữ nguyên địa điểm gốc để sửa và lưu chuyến. */
     private void updateOriginDisplay() {
-        originValue.setText(selectedOrigin == null ? "Chọn điểm đi" : selectedOrigin.getName());
+        if (selectedOrigin == null) {
+            originValue.setText("Chọn điểm đi");
+            originValue.setContentDescription(null);
+            return;
+        }
+        originValue.setText(PlaceNameFormatter.formatMultiline(selectedOrigin.getName()));
+        originValue.setContentDescription(selectedOrigin.getName());
     }
 
+    /** Dùng cùng quy tắc tên điểm đến với đăng chuyến và tìm chuyến. */
     private void updateDestinationDisplay() {
-        destinationValue.setText(
-                selectedDestination == null ? "Chọn điểm đến" : selectedDestination.getName()
-        );
+        if (selectedDestination == null) {
+            destinationValue.setText("Chọn điểm đến");
+            destinationValue.setContentDescription(null);
+            return;
+        }
+        destinationValue.setText(PlaceNameFormatter.formatMultiline(selectedDestination.getName()));
+        destinationValue.setContentDescription(selectedDestination.getName());
     }
 
     private void updateDepartureDateDisplay() {

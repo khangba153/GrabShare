@@ -54,7 +54,9 @@ public final class EnRouteSearch {
         public Criteria(Place pickup, Place dropoff, long requestedAt, String userId) {
             if (!SearchTripPolicy.validPlace(pickup)
                     || !SearchTripPolicy.validPlace(dropoff)
-                    || distance(pickup, dropoff) < 1
+                    || (pickup.getLatitude().doubleValue() == dropoff.getLatitude().doubleValue()
+                            && pickup.getLongitude().doubleValue()
+                                    == dropoff.getLongitude().doubleValue())
                     || !SearchTripPolicy.validId(userId)
                     || requestedAt <= 0) {
                 throw new IllegalArgumentException("Thiếu hoặc sai điều kiện tìm chuyến.");

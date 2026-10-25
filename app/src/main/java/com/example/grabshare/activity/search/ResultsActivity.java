@@ -18,6 +18,7 @@ import com.example.grabshare.R;
 import com.example.grabshare.adapter.search.TripAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.model.Place;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.repository.search.EnRouteSearch;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -152,8 +153,12 @@ public class ResultsActivity extends AppCompatActivity {
                         });
         try {
             criteria = readCriteria(savedInstanceState);
-            ((TextView) findViewById(R.id.route_start)).setText(criteria.pickup.getName());
-            ((TextView) findViewById(R.id.route_end)).setText(criteria.dropoff.getName());
+            ((TextView) findViewById(R.id.route_start))
+                    .setText(PlaceNameFormatter.formatMultiline(criteria.pickup.getName()));
+            ((TextView) findViewById(R.id.route_end))
+                    .setText(PlaceNameFormatter.formatMultiline(criteria.dropoff.getName()));
+            findViewById(R.id.route_start).setContentDescription(criteria.pickup.getName());
+            findViewById(R.id.route_end).setContentDescription(criteria.dropoff.getName());
             SimpleDateFormat format =
                     new SimpleDateFormat("dd/MM/yyyy · HH:mm", new Locale("vi", "VN"));
             format.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));

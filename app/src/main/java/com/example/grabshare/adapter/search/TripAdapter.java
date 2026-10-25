@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
 import com.example.grabshare.activity.search.RouteDistanceFormatter;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.repository.search.EnRouteSearch.Match;
 
 import java.text.SimpleDateFormat;
@@ -108,6 +109,11 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
         }
         tripViewHolder.driverRouteTextView.setText(
                 "Tuyến tài xế: "
+                        + PlaceNameFormatter.format(matchedTrip.trip.getOrigin().getName())
+                        + " → "
+                        + PlaceNameFormatter.format(matchedTrip.trip.getDestination().getName()));
+        tripViewHolder.driverRouteTextView.setContentDescription(
+                "Tuyến tài xế: "
                         + matchedTrip.trip.getOrigin().getName()
                         + " → "
                         + matchedTrip.trip.getDestination().getName());
@@ -121,10 +127,10 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
         if (matchedTrip.baselineAdjusted) {
             tripViewHolder.informationTextView.setText(
                     "Còn 1 chỗ · Giờ trên là giờ đi của tài xế, chưa phải giờ đón bạn."
-                            + (" Khoảng cách được cập nhật theo đường đi hiện tại."));
+                            + " Khoảng cách được cập nhật theo đường đi hiện tại.");
         } else {
             tripViewHolder.informationTextView.setText(
-                    "Còn 1 chỗ · Giờ trên là giờ đi của tài xế, chưa phải giờ đón bạn." + (""));
+                    "Còn 1 chỗ · Giờ trên là giờ đi của tài xế, chưa phải giờ đón bạn.");
         }
         tripViewHolder.itemView.setOnClickListener(
                 new View.OnClickListener() {

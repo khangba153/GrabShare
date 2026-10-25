@@ -474,7 +474,7 @@ public class VietnamRoutingClient {
                             + URLEncoder.encode(waypoints.toString(), "UTF-8")
                             + "&mode=motorcycle&type=balanced&units=metric&details=admin_areas"
                             + "&intermediate_waypoint_mode=stopover"
-                            + ("&avoid=country_codes%3Ala%2Ckh%2Ccn")
+                            + "&avoid=country_codes%3Ala%2Ckh%2Ccn"
                             + "&apiKey="
                             + URLEncoder.encode(apiKey, "UTF-8");
         } else {
@@ -483,7 +483,6 @@ public class VietnamRoutingClient {
                             + URLEncoder.encode(waypoints.toString(), "UTF-8")
                             + "&mode=motorcycle&type=balanced&units=metric&details=admin_areas"
                             + "&intermediate_waypoint_mode=stopover"
-                            + ("")
                             + "&apiKey="
                             + URLEncoder.encode(apiKey, "UTF-8");
         }

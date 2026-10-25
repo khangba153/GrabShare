@@ -10,6 +10,7 @@ import android.widget.TextView;
 import com.example.grabshare.R;
 import com.example.grabshare.model.Place;
 import com.example.grabshare.model.Trip;
+import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.google.firebase.Timestamp;
 
 import java.text.NumberFormat;
@@ -161,7 +162,7 @@ public class DriverTripAdapter extends BaseAdapter {
             return "Chưa có thông tin địa điểm";
         }
 
-        return place.getName();
+        return PlaceNameFormatter.formatMultiline(place.getName());
     }
 
     /**

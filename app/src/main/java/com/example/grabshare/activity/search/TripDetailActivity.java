@@ -39,7 +39,7 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
-/** Một màn xem chuyến, yêu thích, xác nhận P/C và gửi yêu cầu; offline chỉ xem bản lưu. */
+/** Một màn xem chuyến, xác nhận P/C và gửi yêu cầu; offline chỉ xem bản lưu. */
 public class TripDetailActivity extends AppCompatActivity {
 
     private String tripId;
@@ -248,21 +248,12 @@ public class TripDetailActivity extends AppCompatActivity {
                                 primaryAction();
                             }
                         });
-        findViewById(R.id.detail_favorite)
-                .setOnClickListener(
-                        new View.OnClickListener() {
-                            /** Chỉ đổi trạng thái yêu thích sau xác nhận server. */
-                            @Override
-                            public void onClick(View view) {
-                                supportViewModel.toggleFavorite();
-                            }
-                        });
         supportViewModel
                 .getState()
                 .observe(
                         this,
                         new Observer<TripDetailSupportViewModel.State>() {
-                            /** Trạng thái mạng/cache/tim thay đổi phải khóa quyền gửi tương ứng. */
+                            /** Trạng thái mạng và cache thay đổi phải khóa quyền gửi tương ứng. */
                             @Override
                             public void onChanged(TripDetailSupportViewModel.State state) {
                                 render();
@@ -465,7 +456,7 @@ public class TripDetailActivity extends AppCompatActivity {
             ((TextView) findViewById(R.id.search_trip_cost_label))
                     .setText("Mức tham khảo toàn tuyến hiện tại");
         }
-        renderFavorite(ready, supportState);
+        renderCacheNotice(supportState);
         if (!sameAccount) {
             ((TextView) findViewById(R.id.search_status))
                     .setText("Phiên đăng nhập đã đổi. Quay lại để mở bằng tài khoản hiện tại.");
@@ -524,7 +515,11 @@ public class TripDetailActivity extends AppCompatActivity {
         } else {
             if (existing) {
                 if ("CANCELLED".equals(request.result.status)) {
-                    button.setText("Tìm chuyến khác");
+                    if (RequestCreationRepository.REQUEST_ATTEMPTS_ENABLED && reason.isEmpty()) {
+                        button.setText("Gửi lại yêu cầu");
+                    } else {
+                        button.setText("Tìm chuyến khác");
+                    }
                 } else {
                     button.setText("Xem trạng thái yêu cầu");
                 }
@@ -552,12 +547,18 @@ public class TripDetailActivity extends AppCompatActivity {
             } else {
                 button.setText("Gửi yêu cầu");
             }
+            if (!RequestCreationRepository.CONTRIBUTION_SUBMISSION_ENABLED) {
+                button.setText("Tạm dừng gửi yêu cầu");
+            }
             if (reason.isEmpty()
                     && contributionState != null
                     && contributionState.contribution != null) {
-                String hint = "Vui lòng xác nhận khoản đóng góp trước khi gửi.";
+                String hint = "";
+                if (contributionViewModel.getConfirmedQuote() == null) {
+                    hint = "Vui lòng xác nhận khoản đóng góp trước khi gửi.";
+                }
                 if (!RequestCreationRepository.CONTRIBUTION_SUBMISSION_ENABLED) {
-                    hint = "Chưa thể gửi với khoản đóng góp mới. Vui lòng thử lại sau.";
+                    hint = RequestCreationRepository.SUBMISSION_UNAVAILABLE_MESSAGE;
                 }
                 ((TextView) findViewById(R.id.search_action_hint)).setText(hint);
             }
@@ -644,23 +645,12 @@ public class TripDetailActivity extends AppCompatActivity {
         }
     }
 
-    /** Giữ chức năng yêu thích của Detail và thông báo cache trên cùng màn gửi yêu cầu. */
-    private void renderFavorite(boolean ready, TripDetailSupportViewModel.State supportState) {
-        Button favoriteButton = findViewById(R.id.detail_favorite);
-        favoriteButton.setEnabled(ready && supportState != null && !supportState.favoriteBusy);
-        if (supportState == null || supportState.favorite == null) {
-            favoriteButton.setText("Tải trạng thái yêu thích");
-        } else {
-            if (supportState.favorite) {
-                favoriteButton.setText("♥ Bỏ yêu thích");
-            } else {
-                favoriteButton.setText("♡ Thêm yêu thích");
-            }
-        }
-        TextView status = findViewById(R.id.detail_favorite_status);
+    /** Chỉ hiển thị thông báo bản lưu offline, không nối Favorite vào màn gửi yêu cầu. */
+    private void renderCacheNotice(TripDetailSupportViewModel.State supportState) {
+        TextView status = findViewById(R.id.detail_cache_status);
         String message = "";
         if (supportState != null) {
-            message = (supportState.favoriteMessage + " " + supportState.cacheMessage).trim();
+            message = supportState.cacheMessage;
         }
         status.setText(message);
         if (message.isEmpty()) {
@@ -681,6 +671,24 @@ public class TripDetailActivity extends AppCompatActivity {
         }
         if (request.result != null) {
             if ("CANCELLED".equals(request.result.status)) {
+                OnlineTripViewModel.State currentTrip = tripViewModel.getState().getValue();
+                TripDetailSupportViewModel.State currentSupport =
+                        supportViewModel.getState().getValue();
+                if (RequestCreationRepository.REQUEST_ATTEMPTS_ENABLED
+                        && currentTrip != null
+                        && currentTrip.online
+                        && currentSupport != null
+                        && currentSupport.onlineReady
+                        && SearchTripPolicy.blockedReason(currentTrip.trip, userIdentifier)
+                                .isEmpty()) {
+                    contributionViewModel.retry();
+                    if (passengerSearchRoute != null) {
+                        requestViewModel.pickup = passengerSearchRoute.getPickup();
+                        requestViewModel.dropoff = passengerSearchRoute.getDropoff();
+                    }
+                    requestViewModel.prepareResend();
+                    return;
+                }
                 Intent homeIntent = new Intent(this, HomeActivity.class);
                 homeIntent.addFlags(
                         Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -718,7 +726,7 @@ public class TripDetailActivity extends AppCompatActivity {
             return;
         }
         if (!RequestCreationRepository.CONTRIBUTION_SUBMISSION_ENABLED) {
-            showError("Chưa thể gửi với khoản đóng góp mới. Vui lòng thử lại sau.");
+            showError(RequestCreationRepository.SUBMISSION_UNAVAILABLE_MESSAGE);
             return;
         }
         requestViewModel.submit(confirmedQuote);

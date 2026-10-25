@@ -14,10 +14,7 @@
                 <TextView style="@style/Subtitle" android:text="Chuyến của chủ xe" />
                 <include layout="@layout/view_search_trip" />
             </LinearLayout>
-            <androidx.appcompat.widget.AppCompatButton android:id="@+id/detail_favorite"
-                style="@style/ButtonSecondary" android:text="Tải trạng thái yêu thích"
-                android:enabled="false" />
-            <TextView android:id="@+id/detail_favorite_status" style="@style/Caption"
+            <TextView android:id="@+id/detail_cache_status" style="@style/Caption"
                 android:layout_width="match_parent" android:accessibilityLiveRegion="polite" />
             <include layout="@layout/view_passenger_search_route" />
             <LinearLayout android:id="@+id/detail_contribution_card" style="@style/Card">
