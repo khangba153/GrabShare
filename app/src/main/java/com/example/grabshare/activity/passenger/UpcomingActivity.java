@@ -28,7 +28,6 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
-import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -357,6 +356,9 @@ public class UpcomingActivity extends AppCompatActivity {
 
         // Kiểm tra trạng thái chuyến đi đã bị hủy bởi chủ xe hoặc hành khách
         if ("CANCELLED".equals(tripStatus) || "CANCELLED".equals(requestStatus)) {
+            if (headerTitle != null) {
+                headerTitle.setText("Chuyến đã hủy");
+            }
             if (upcomingStatus != null) upcomingStatus.setText("Đã hủy");
             if (upcomingDescription != null) upcomingDescription.setText("Chuyến đi đã bị hủy.");
 
@@ -372,6 +374,9 @@ public class UpcomingActivity extends AppCompatActivity {
 
         // Trường hợp chuyến đi đã COMPLETED
         if ("COMPLETED".equals(tripStatus)) {
+            if (headerTitle != null) {
+                headerTitle.setText("Chuyến đã hoàn thành");
+            }
             if (upcomingStatus != null) upcomingStatus.setText("Đã hoàn thành");
             if (upcomingDescription != null) upcomingDescription.setText("Chuyến đi đã hoàn thành. Hãy đánh giá chủ xe!");
 
@@ -416,6 +421,9 @@ public class UpcomingActivity extends AppCompatActivity {
         }
 
         if (isAfterDeparture) {
+            if (headerTitle != null) {
+                headerTitle.setText("Chuyến chưa kết thúc");
+            }
             if (upcomingStatus != null) upcomingStatus.setText("Chờ hoàn thành");
             if (upcomingDescription != null) {
                 String timeStr = (trip.getDepartureAt() != null) ? formatTimeOnly(trip.getDepartureAt()) : "giờ hẹn";
@@ -430,9 +438,13 @@ public class UpcomingActivity extends AppCompatActivity {
                 primaryAction.setEnabled(false); // Passenger không tự complete
             }
         } else {
+            if (headerTitle != null) {
+                headerTitle.setText("Chuyến đã được nhận");
+            }
             if (upcomingStatus != null) upcomingStatus.setText("Sắp khởi hành");
             if (upcomingDescription != null && trip.getDepartureAt() != null) {
-                upcomingDescription.setText("Hẹn bạn tại điểm đón lúc " + formatTimeOnly(trip.getDepartureAt()) + ".");
+                upcomingDescription.setText("Chủ xe khởi hành lúc " + formatTimeOnly(trip.getDepartureAt())
+                        + ". Đây chưa phải giờ đón bạn; hai bên cần thống nhất trước khi đi.");
             }
 
             if (secondaryAction != null) {
@@ -490,21 +502,9 @@ public class UpcomingActivity extends AppCompatActivity {
             if (mapEndLabel != null && trip.getDestination() != null) {
                 mapEndLabel.setText(trip.getDestination().getName() != null ? trip.getDestination().getName() : "Điểm đến");
             }
-
-            if (tripCost != null) {
-                if (trip.getCostVnd() != null) {
-                    if (trip.getCostVnd() == 0) {
-                        tripCost.setText("Miễn phí");
-                    } else {
-                        DecimalFormat decimalFormat = new DecimalFormat("#,###");
-                        tripCost.setText(decimalFormat.format(trip.getCostVnd()) + "đ");
-                    }
-                } else {
-                    tripCost.setText("Chưa có chi phí");
-                }
-            }
         }
 
+        if (tripCost != null) tripCost.setText(PassengerContributionText.format(request));
         if (request != null && request.getPickup() != null) {
             Place pickupPlace = request.getPickup();
             if (tripPickup != null) {

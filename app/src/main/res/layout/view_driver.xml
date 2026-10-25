@@ -5,5 +5,5 @@
         <TextView android:id="@+id/driver_name" style="@style/BodyBold" android:text="Thanh Minh" />
         <TextView android:id="@+id/driver_meta" style="@style/Caption" android:text="★ 4.9 · Honda Wave" />
     </LinearLayout>
-    <TextView android:id="@+id/verified_badge" style="@style/Badge" android:text="Đã xác minh" />
+    <TextView android:id="@+id/verified_badge" style="@style/Badge" android:text="" android:visibility="gone" />
 </LinearLayout>

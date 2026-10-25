@@ -13,9 +13,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.MainNavigation;
+import com.example.grabshare.presentation.TripListFilter;
 import com.example.grabshare.activity.account.LoginActivity;
-import com.example.grabshare.activity.driver.DriverTripsActivity;
-import com.example.grabshare.activity.search.HomeActivity;
 import com.example.grabshare.adapter.passenger.RideAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -29,8 +29,9 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.List;
-
-import com.example.grabshare.activity.account.AccountActivity;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 /**
  * Activity hiển thị danh sách tất cả chuyến đi nhờ của Hành khách (Tab MyTrips).
@@ -50,6 +51,10 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     private String currentUserId;
     private PassengerSessionGuard sessionGuard;
     private int loadGeneration;
+    private final List<PassengerRideItem> loadedTrips = new ArrayList<>();
+    private final TripListFilter listFilter = new TripListFilter(
+            new String[]{"Tất cả", "Chờ xác nhận", "Đã được nhận", "Hoàn thành", "Đã hủy", "Bị từ chối"},
+            new String[]{"", "PENDING", "ACCEPTED", "COMPLETED", "CANCELLED", "REJECTED"});
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,6 +85,8 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         sessionGuard = new PassengerSessionGuard(this);
 
         setupListeners();
+        listFilter.restore(savedInstanceState);
+        updateFilterLabel();
     }
 
     private void initViews() {
@@ -112,55 +119,20 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             });
         }
 
-        View roleDriver = findViewById(R.id.role_driver);
-        if (roleDriver != null) {
-            roleDriver.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    Intent intent = new Intent(MyTripsActivity.this, DriverTripsActivity.class);
-                    startActivity(intent);
-                    finish();
-                }
-            });
-        }
-
-        View navHome = findViewById(R.id.nav_home);
-        if (navHome != null) {
-            navHome.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    // Quay về Home đang có để giữ form và tránh tạo màn trùng.
-                    Intent intent = new Intent(
-                            MyTripsActivity.this,
-                            HomeActivity.class);
-
-                    intent.addFlags(
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-                    startActivity(intent);
-                    finish();
-                }
-            });
-        }
-
-        View navAccount = findViewById(R.id.nav_account);
-        if (navAccount != null) {
-            navAccount.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    Intent intent = new Intent(
-                            MyTripsActivity.this,
-                            AccountActivity.class);
-
-                    intent.addFlags(
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
-                    startActivity(intent);
-                }
-            });
-        }
+        MainNavigation.bind(this);
+        MainNavigation.bindNotifications(this, R.id.header_action);
+        findViewById(R.id.trip_list_filter).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                listFilter.show(MyTripsActivity.this, new Runnable() {
+                    @Override
+                    public void run() {
+                        updateFilterLabel();
+                        applyListFilter();
+                    }
+                });
+            }
+        });
     }
 
     @Override
@@ -186,6 +158,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     @Override
     protected void onSaveInstanceState(Bundle state) {
         state.putString(EXPECTED_UID, currentUserId);
+        listFilter.save(state);
         super.onSaveInstanceState(state);
     }
 
@@ -204,11 +177,12 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
             @Override
             public void onSuccess(List<PassengerRideItem> result) {
                 if (!sessionGuard.current(sessionToken) || generation != loadGeneration) return;
-                if (result == null || result.isEmpty()) {
-                    showEmptyState();
-                } else {
-                    showDataState(result);
+                findViewById(R.id.trip_list_filter).setEnabled(true);
+                loadedTrips.clear();
+                if (result != null) {
+                    loadedTrips.addAll(result);
                 }
+                applyListFilter();
             }
 
             @Override
@@ -247,8 +221,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
         } else if ("COMPLETED".equalsIgnoreCase(effectiveStatus)) {
             intent = new Intent(this, CompleteActivity.class);
         } else if ("CANCELLED".equalsIgnoreCase(effectiveStatus)) {
-            Toast.makeText(this, "Chuyến đi này đã bị hủy.", Toast.LENGTH_SHORT).show();
-            return;
+            intent = new Intent(this, CancelledRideActivity.class);
         }
 
         if (intent != null) {
@@ -261,10 +234,51 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     }
 
     private void showLoadingState() {
+        findViewById(R.id.trip_list_filter).setEnabled(false);
         if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
         if (recyclerView != null) recyclerView.setVisibility(View.GONE);
         if (tvEmptyState != null) tvEmptyState.setVisibility(View.GONE);
         if (layoutError != null) layoutError.setVisibility(View.GONE);
+    }
+
+    /** Lọc bản đã tải, giữ từng request_id và không thay đổi trạng thái trên server. */
+    private void applyListFilter() {
+        List<PassengerRideItem> visibleTrips = new ArrayList<>();
+        for (PassengerRideItem item : loadedTrips) {
+            Trip trip = item.getTrip();
+            com.google.firebase.Timestamp departure = null;
+            if (trip != null) {
+                departure = trip.getDepartureAt();
+            }
+            String status = RideAdapter.RideViewHolder.resolveEffectiveStatus(item.getRequest(), trip);
+            if (listFilter.matches(status, departure)) {
+                visibleTrips.add(item);
+            }
+        }
+        Collections.sort(visibleTrips, new Comparator<PassengerRideItem>() {
+            @Override
+            public int compare(PassengerRideItem first, PassengerRideItem second) {
+                com.google.firebase.Timestamp firstTime = null;
+                com.google.firebase.Timestamp secondTime = null;
+                if (first.getTrip() != null) {
+                    firstTime = first.getTrip().getDepartureAt();
+                }
+                if (second.getTrip() != null) {
+                    secondTime = second.getTrip().getDepartureAt();
+                }
+                return listFilter.compare(firstTime, secondTime);
+            }
+        });
+        if (visibleTrips.isEmpty()) {
+            tvEmptyState.setText("Không có chuyến phù hợp bộ lọc. Chọn Bộ lọc → Đặt lại để xem tất cả.");
+            showEmptyState();
+        } else {
+            showDataState(visibleTrips);
+        }
+    }
+
+    private void updateFilterLabel() {
+        ((TextView) findViewById(R.id.trip_list_filter)).setText(listFilter.summary());
     }
 
     private void showDataState(List<PassengerRideItem> items) {
@@ -285,6 +299,7 @@ public class MyTripsActivity extends AppCompatActivity implements RideAdapter.On
     }
 
     private void showErrorState() {
+        findViewById(R.id.trip_list_filter).setEnabled(false);
         if (progressBar != null) progressBar.setVisibility(View.GONE);
         if (recyclerView != null) recyclerView.setVisibility(View.GONE);
         if (tvEmptyState != null) tvEmptyState.setVisibility(View.GONE);

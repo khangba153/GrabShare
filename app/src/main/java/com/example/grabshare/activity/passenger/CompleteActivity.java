@@ -12,6 +12,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.example.grabshare.R;
 import com.example.grabshare.contract.NavigationKeys;
@@ -28,7 +30,6 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
-import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
@@ -47,6 +48,7 @@ public class CompleteActivity extends AppCompatActivity {
     private TextView commentCounter;
     private Button primaryAction;
     private Button retryAction;
+    private CompletedFavoriteViewModel favoriteViewModel;
     private PassengerTripsRepository tripsRepository;
     private RatingRepository ratingRepository;
     private PassengerSessionGuard sessionGuard;
@@ -87,6 +89,21 @@ public class CompleteActivity extends AppCompatActivity {
         ratingRepository = new RatingRepository(firestore);
         sessionGuard = new PassengerSessionGuard(this);
         bindViews();
+        favoriteViewModel = new ViewModelProvider(this).get(CompletedFavoriteViewModel.class);
+        favoriteViewModel.getState().observe(this, new Observer<CompletedFavoriteViewModel.State>() {
+            @Override
+            public void onChanged(CompletedFavoriteViewModel.State state) {
+                renderFavorite(state);
+            }
+        });
+        findViewById(R.id.completed_favorite).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (eligible(currentDetails) && sessionGuard.current(sessionGuard.token())) {
+                    favoriteViewModel.toggle();
+                }
+            }
+        });
         if (savedInstanceState != null) {
             ratingComment.setText(savedInstanceState.getString(DRAFT_COMMENT, ""));
             ratingBar.setRating(savedInstanceState.getFloat(DRAFT_SCORE, 5.0f));
@@ -186,6 +203,8 @@ public class CompleteActivity extends AppCompatActivity {
         ratingReadGeneration = ratingReadGeneration + 1;
         checkedTripId = null;
         currentDetails = null;
+        findViewById(R.id.completed_favorite).setVisibility(View.GONE);
+        findViewById(R.id.completed_favorite_status).setVisibility(View.GONE);
         showState(RatingState.LOADING, "Đang tải chuyến đi và xác nhận đánh giá…");
         requestListener = tripsRepository.listenSingleRequest(requestId,
                 new RepositoryCallback<SingleRequestDetails>() {
@@ -197,6 +216,7 @@ public class CompleteActivity extends AppCompatActivity {
                         }
                         currentDetails = details;
                         if (!eligible(details)) {
+                            findViewById(R.id.completed_favorite).setVisibility(View.GONE);
                             ratingReadGeneration = ratingReadGeneration + 1;
                             checkedTripId = null;
                             showState(RatingState.UNAVAILABLE,
@@ -204,6 +224,8 @@ public class CompleteActivity extends AppCompatActivity {
                             return;
                         }
                         bindTrip(details);
+                        favoriteViewModel.start(expectedUserId, details.getTrip().getId());
+                        renderFavorite(favoriteViewModel.getState().getValue());
                         if (!details.getTrip().getId().equals(checkedTripId) && !submitting) {
                             checkExistingRating();
                         }
@@ -217,6 +239,7 @@ public class CompleteActivity extends AppCompatActivity {
                         }
                         ratingReadGeneration = ratingReadGeneration + 1;
                         currentDetails = null;
+                        renderFavorite(favoriteViewModel.getState().getValue());
                         showState(RatingState.ERROR, "Không tải được chuyến đi. Hãy thử lại.");
                     }
                 });
@@ -235,6 +258,34 @@ public class CompleteActivity extends AppCompatActivity {
                 && trip.getId() != null && trip.getId().equals(request.getTripId())
                 && trip.getDriverId() != null && trip.getDriverId().equals(request.getDriverId())
                 && trip.getAvailableSeats() != null && trip.getAvailableSeats() == 0L;
+    }
+
+    /** Yêu thích là thao tác sau trải nghiệm, độc lập với việc đã gửi đánh giá hay chưa. */
+    private void renderFavorite(CompletedFavoriteViewModel.State state) {
+        Button button = findViewById(R.id.completed_favorite);
+        if (!eligible(currentDetails) || state == null) {
+            button.setVisibility(View.GONE);
+            findViewById(R.id.completed_favorite_status).setVisibility(View.GONE);
+            return;
+        }
+        button.setVisibility(View.VISIBLE);
+        button.setEnabled(!state.busy);
+        if (state.busy) {
+            button.setText("Đang xử lý yêu thích…");
+        } else if (state.favorite == null) {
+            button.setText("Thử lại yêu thích");
+        } else if (state.favorite) {
+            button.setText("Bỏ yêu thích chuyến này");
+        } else {
+            button.setText("Yêu thích chuyến đã đi");
+        }
+        TextView status = findViewById(R.id.completed_favorite_status);
+        status.setText(state.message);
+        if (state.message.isEmpty()) {
+            status.setVisibility(View.GONE);
+        } else {
+            status.setVisibility(View.VISIBLE);
+        }
     }
 
     /** Dùng số thế hệ riêng để lần đọc cũ không ghi đè kết quả thử lại mới hơn. */
@@ -403,10 +454,7 @@ public class CompleteActivity extends AppCompatActivity {
         if (request.getPickup() != null) {
             setText(R.id.trip_pickup, "Điểm đón: " + textOr(request.getPickup().getName(), "Chưa có điểm đón"));
         }
-        setText(R.id.trip_cost, "Chưa có chi phí");
-        if (trip.getCostVnd() != null) {
-            setText(R.id.trip_cost, new DecimalFormat("#,###").format(trip.getCostVnd()) + "đ");
-        }
+        setText(R.id.trip_cost, PassengerContributionText.format(request));
     }
 
     /** Gán nội dung vào TextView của phần tóm tắt chuyến thuộc màn này. */

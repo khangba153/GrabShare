@@ -1,6 +1,7 @@
 package com.example.grabshare.activity.passenger;
 
 import android.content.Intent;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -10,6 +11,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -21,6 +23,8 @@ import com.example.grabshare.activity.search.TripDetailActivity;
 import com.example.grabshare.adapter.passenger.FavoriteAdapter;
 import com.example.grabshare.adapter.passenger.FavoriteAdapter.FavoriteItem;
 import com.example.grabshare.contract.NavigationKeys;
+import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.repository.passenger.FavoriteRepository;
 import com.example.grabshare.model.Favorite;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
@@ -58,6 +62,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
     private int loadGeneration;
     private boolean visible;
 
+    /** Kiểm tra đăng nhập trước khi tạo danh sách gắn với UID hiện tại. */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -81,6 +86,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         setupListeners();
     }
 
+    /** Gắn các view của màn yêu thích sau khi layout đã được nạp. */
     private void initViews() {
         headerBack = findViewById(R.id.header_back);
         headerTitle = findViewById(R.id.header_title);
@@ -101,6 +107,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         }
     }
 
+    /** Hiển thị danh sách theo thứ tự đã trả về từ truy vấn favorites. */
     private void setupRecyclerView() {
         adapter = new FavoriteAdapter(this, this);
         if (recyclerView != null) {
@@ -109,9 +116,11 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         }
     }
 
+    /** Nối Retry, điều hướng và nút quay lại với màn hiện tại. */
     private void setupListeners() {
         if (headerBack != null) {
             headerBack.setOnClickListener(new View.OnClickListener() {
+                /** Quay về màn trước mà không thay đổi favorite. */
                 @Override
                 public void onClick(View view) {
                     finish();
@@ -121,6 +130,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
 
         if (btnRetry != null) {
             btnRetry.setOnClickListener(new View.OnClickListener() {
+                /** Bắt đầu lượt đọc server mới sau lỗi. */
                 @Override
                 public void onClick(View view) {
                     loadFavorites();
@@ -131,6 +141,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         View navHome = findViewById(R.id.nav_home);
         if (navHome != null) {
             navHome.setOnClickListener(new View.OnClickListener() {
+                /** Chuyển về trang chủ theo điều hướng hiện có. */
                 @Override
                 public void onClick(View view) {
                     Intent intent = new Intent(FavoritesActivity.this, HomeActivity.class);
@@ -144,6 +155,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         View navTrips = findViewById(R.id.nav_trips);
         if (navTrips != null) {
             navTrips.setOnClickListener(new View.OnClickListener() {
+                /** Mở danh sách chuyến của hành khách. */
                 @Override
                 public void onClick(View view) {
                     Intent intent = new Intent(FavoritesActivity.this, MyTripsActivity.class);
@@ -157,6 +169,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         View navAccount = findViewById(R.id.nav_account);
         if (navAccount != null) {
             navAccount.setOnClickListener(new View.OnClickListener() {
+                /** Mở tài khoản, để lifecycle vô hiệu các callback tải cũ. */
                 @Override
                 public void onClick(View view) {
                     Intent intent = new Intent(FavoritesActivity.this, AccountActivity.class);
@@ -167,6 +180,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         }
     }
 
+    /** Mỗi lần màn hiện lại đều đọc dữ liệu server cho đúng UID. */
     @Override
     protected void onStart() {
         super.onStart();
@@ -193,6 +207,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                 && user.getUid().equals(currentUserId);
     }
 
+    /** Tạo thế hệ mới để các callback của lượt tải cũ không ghi đè UI. */
     private void loadFavorites() {
         if (currentUserId == null || currentUserId.trim().isEmpty() || sessionGuard == null
                 || !sessionGuard.current(sessionGuard.token())) {
@@ -209,6 +224,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get(Source.SERVER)
                 .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
+                    /** Chỉ xử lý kết quả server của đúng thế hệ tải. */
                     @Override
                     public void onSuccess(QuerySnapshot querySnapshot) {
                         if (!currentLoad(generation)) return;
@@ -242,6 +258,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
+                    /** Lỗi truy vấn favorites có trạng thái Retry riêng. */
                     @Override
                     public void onFailure(Exception error) {
                         if (currentLoad(generation)) showErrorState();
@@ -249,6 +266,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                 });
     }
 
+    /** Giữ vị trí mỗi favorite khi các chuyến và hồ sơ trả về không cùng thứ tự. */
     private void fetchTripsForFavorites(final List<Favorite> favorites, final int generation) {
         if (favorites.isEmpty()) {
             showEmptyState();
@@ -272,6 +290,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
 
             firestore.collection("trips").document(tripId).get(Source.SERVER)
                     .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
+                        /** Chuyến vắng vẫn giữ hàng favorite ở vị trí ban đầu. */
                         @Override
                         public void onSuccess(DocumentSnapshot tripDoc) {
                             if (!currentLoad(generation)) return;
@@ -300,6 +319,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                                 if (driverId != null && !driverId.trim().isEmpty()) {
                                     firestore.collection("publicProfiles").document(driverId).get(Source.SERVER)
                                             .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
+                                                /** Hồ sơ công khai là dữ liệu phụ của chuyến. */
                                                 @Override
                                                 public void onSuccess(DocumentSnapshot profileDoc) {
                                                     if (!currentLoad(generation)) return;
@@ -319,6 +339,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                                                 }
                                             })
                                             .addOnFailureListener(new OnFailureListener() {
+                                                /** Lỗi hồ sơ vẫn hiển thị chuyến đã đọc thành công. */
                                                 @Override
                                                 public void onFailure(Exception e) {
                                                     if (!currentLoad(generation)) return;
@@ -337,6 +358,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
                         }
                     })
                     .addOnFailureListener(new OnFailureListener() {
+                        /** Lỗi đọc chuyến yêu cầu Retry thay vì giả chuyến đã xóa. */
                         @Override
                         public void onFailure(Exception e) {
                             if (!currentLoad(generation)) return;
@@ -364,22 +386,68 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         showDataState(ordered);
     }
 
+    /** Chỉ mở Detail của chuyến còn tồn tại và thuộc lượt tải hiện hành. */
     @Override
-    public void onFavoriteClick(FavoriteItem favoriteItem) {
+    public void onFavoriteClick(final FavoriteItem favoriteItem) {
         if (!currentLoad(loadGeneration)) return;
         if (favoriteItem == null || favoriteItem.getTrip() == null) {
             Toast.makeText(this, "Chuyến đi không khả dụng.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String tripId = favoriteItem.getTrip().getId();
+        final String tripId = favoriteItem.getTrip().getId();
         if (tripId != null && !tripId.trim().isEmpty()) {
-            Intent intent = new Intent(this, TripDetailActivity.class);
-            intent.putExtra(NavigationKeys.TRIP_ID, tripId);
-            startActivity(intent);
+            new AlertDialog.Builder(this).setTitle("Chuyến yêu thích")
+                    .setItems(new String[]{"Xem chi tiết", "Bỏ yêu thích"}, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            if (!currentLoad(loadGeneration)) {
+                                return;
+                            }
+                            if (which == 0) {
+                                Intent intent;
+                                Trip trip = favoriteItem.getTrip();
+                                if ("COMPLETED".equals(trip.getStatus())
+                                        && trip.getAcceptedRequestId() != null
+                                        && !trip.getAcceptedRequestId().isEmpty()) {
+                                    intent = new Intent(FavoritesActivity.this, CompleteActivity.class);
+                                    intent.putExtra(NavigationKeys.REQUEST_ID, trip.getAcceptedRequestId());
+                                } else {
+                                    // Yêu thích cũ vẫn đọc được; không tự xóa hay nhận là chuyến đã đi.
+                                    intent = new Intent(FavoritesActivity.this, TripDetailActivity.class);
+                                    intent.putExtra(NavigationKeys.TRIP_ID, tripId);
+                                }
+                                startActivity(intent);
+                            } else {
+                                final int expectedGeneration = loadGeneration;
+                                recyclerView.setEnabled(false);
+                                new FavoriteRepository(firestore).removeFavorite(currentUserId, tripId,
+                                        new RepositoryCallback<Void>() {
+                                            @Override
+                                            public void onSuccess(Void ignored) {
+                                                if (currentLoad(expectedGeneration)) {
+                                                    recyclerView.setEnabled(true);
+                                                    loadFavorites();
+                                                }
+                                            }
+
+                                            @Override
+                                            public void onError(Exception error) {
+                                                if (currentLoad(expectedGeneration)) {
+                                                    recyclerView.setEnabled(true);
+                                                    Toast.makeText(FavoritesActivity.this,
+                                                            "Chưa xác nhận bỏ yêu thích. Hãy tải lại danh sách.",
+                                                            Toast.LENGTH_LONG).show();
+                                                }
+                                            }
+                                        });
+                            }
+                        }
+                    }).show();
         }
     }
 
+    /** Ẩn dữ liệu cũ trong khi chờ server xác nhận danh sách. */
     private void showLoadingState() {
         if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
         if (recyclerView != null) recyclerView.setVisibility(View.GONE);
@@ -387,6 +455,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         if (layoutError != null) layoutError.setVisibility(View.GONE);
     }
 
+    /** Chỉ hiện danh sách khi toàn bộ lượt tải đã thành công. */
     private void showDataState(List<FavoriteItem> items) {
         if (progressBar != null) progressBar.setVisibility(View.GONE);
         if (layoutError != null) layoutError.setVisibility(View.GONE);
@@ -402,6 +471,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         }
     }
 
+    /** Không dùng trạng thái rỗng cho lỗi mạng hay lỗi dữ liệu. */
     private void showEmptyState() {
         if (progressBar != null) progressBar.setVisibility(View.GONE);
         if (recyclerView != null) recyclerView.setVisibility(View.GONE);
@@ -409,6 +479,7 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
         if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
     }
 
+    /** Cho người dùng thử lại sau lỗi đọc dữ liệu. */
     private void showErrorState() {
         if (progressBar != null) progressBar.setVisibility(View.GONE);
         if (recyclerView != null) recyclerView.setVisibility(View.GONE);

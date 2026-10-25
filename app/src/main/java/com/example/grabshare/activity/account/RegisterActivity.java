@@ -12,6 +12,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.ScreenFeedback;
+import com.example.grabshare.presentation.PasswordVisibility;
 import com.example.grabshare.repository.account.AuthRepository;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -59,6 +61,8 @@ public class RegisterActivity extends AppCompatActivity {
         authRepository = new AuthRepository();
 
         bindViews();
+        PasswordVisibility.bind(passwordInput,
+                (TextView) findViewById(R.id.register_toggle_password));
         configureFormMode();
 
         registerViewModel = new ViewModelProvider(this)
@@ -168,20 +172,33 @@ public class RegisterActivity extends AppCompatActivity {
 
         TextView headerTitle = findViewById(R.id.header_title);
 
-        headerTitle.setText(
-                hasSession ? "Hoàn thiện hồ sơ" : "Đăng ký");
-
-        submitButton.setText(
-                hasSession ? "Lưu hồ sơ" : "Đăng ký");
-
-        loginButton.setText(
-                hasSession ? "Quay lại" : "Đã có tài khoản? Đăng nhập");
+        TextView formTitle = findViewById(R.id.register_form_title);
+        TextView formIntro = findViewById(R.id.register_form_intro);
+        TextView securityTitle = findViewById(R.id.register_security_title);
+        if (hasSession) {
+            headerTitle.setText(R.string.leader_complete_title);
+            formTitle.setText(R.string.leader_complete_title);
+            formIntro.setText(R.string.leader_complete_intro);
+            securityTitle.setText(R.string.account_terms_title);
+            submitButton.setText("Lưu hồ sơ");
+            loginButton.setText(R.string.leader_back);
+        } else {
+            headerTitle.setText("Đăng ký");
+            formTitle.setText("Tạo tài khoản");
+            formIntro.setText(R.string.leader_register_intro);
+            securityTitle.setText(R.string.leader_auth_security);
+            submitButton.setText("Đăng ký");
+            loginButton.setText("Đã có tài khoản? Đăng nhập");
+        }
 
         emailInput.setEnabled(!hasSession);
 
         View passwordGroup = (View) passwordInput.getParent();
-        passwordGroup.setVisibility(
-                hasSession ? View.GONE : View.VISIBLE);
+        if (hasSession) {
+            passwordGroup.setVisibility(View.GONE);
+        } else {
+            passwordGroup.setVisibility(View.VISIBLE);
+        }
 
         if (hasSession) {
             emailInput.setText(user.getEmail());
@@ -191,13 +208,17 @@ public class RegisterActivity extends AppCompatActivity {
 
     /** Hiển thị thông báo để người dùng biết kết quả thao tác. */
     private void showStatus(String message) {
-        statusText.setText(message);
-        statusText.setVisibility(View.VISIBLE);
+        ScreenFeedback.show(statusText, message, ScreenFeedback.Kind.INFORMATION);
+    }
+
+    /** Lỗi dữ liệu và kết nối dùng cùng cách trình bày với các màn tài khoản. */
+    private void showError(String message) {
+        ScreenFeedback.show(statusText, message, ScreenFeedback.Kind.ERROR);
     }
 
     /** Hiện lỗi tại ô cần sửa và thông báo ngắn để tránh bị khuất dưới form. */
     private boolean showValidationError(View target, String message) {
-        showStatus(message);
+        showError(message);
         target.requestFocus();
 
         if (target instanceof EditText) {
@@ -323,19 +344,27 @@ public class RegisterActivity extends AppCompatActivity {
         vehicleNameInput.setEnabled(!value);
         vehiclePlateInput.setEnabled(!value);
         termsCheck.setEnabled(!value);
+        findViewById(R.id.register_toggle_password).setEnabled(!value);
         submitButton.setEnabled(!value);
         loginButton.setEnabled(!value);
 
         findViewById(R.id.header_back).setEnabled(!value);
         findViewById(R.id.open_terms).setEnabled(!value);
 
-        progress.setVisibility(value ? View.VISIBLE : View.GONE);
+        if (value) {
+            progress.setVisibility(View.VISIBLE);
+        } else {
+            progress.setVisibility(View.GONE);
+        }
 
         if (value) {
             submitButton.setText("Đang xử lý...");
         } else {
-            submitButton.setText(
-                    hasSession ? "Lưu hồ sơ" : "Đăng ký");
+            if (hasSession) {
+                submitButton.setText("Lưu hồ sơ");
+            } else {
+                submitButton.setText("Đăng ký");
+            }
         }
     }
 
@@ -350,7 +379,7 @@ public class RegisterActivity extends AppCompatActivity {
         }
 
         if (!hasInternetConnection()) {
-            showStatus(
+            showError(
                     "Bạn đang offline hoặc chưa truy cập được Internet. "
                             + "Hãy kết nối mạng rồi thử lại.");
             return;
@@ -367,21 +396,21 @@ public class RegisterActivity extends AppCompatActivity {
     /** Báo lỗi dễ hiểu và giữ phiên để bổ sung lại hồ sơ khi cần. */
     private void showRegistrationError(Exception error) {
         if (error instanceof FirebaseAuthWeakPasswordException) {
-            showStatus(
+            showError(
                     "Mật khẩu chưa đáp ứng yêu cầu bảo mật. "
                             + "Hãy chọn mật khẩu mạnh hơn.");
         } else if (error instanceof FirebaseAuthUserCollisionException) {
-            showStatus(
+            showError(
                     "Không thể tạo tài khoản bằng email này. "
                             + "Nếu đã đăng ký, hãy quay lại đăng nhập.");
         } else if (error instanceof FirebaseNetworkException) {
-            showStatus("Kết nối bị gián đoạn. Hãy kiểm tra mạng rồi thử lại.");
+            showError("Kết nối bị gián đoạn. Hãy kiểm tra mạng rồi thử lại.");
         } else if (authRepository.getCurrentUser() != null) {
-            showStatus(
+            showError(
                     "Bạn đã có phiên đăng nhập nhưng chưa hoàn tất hồ sơ. "
                             + "Hãy kiểm tra dữ liệu và mạng rồi bấm Lưu hồ sơ.");
         } else {
-            showStatus(
+            showError(
                     "Chưa hoàn tất đăng ký. "
                             + "Hãy kiểm tra thông tin và thử lại.");
         }
@@ -398,7 +427,7 @@ public class RegisterActivity extends AppCompatActivity {
         if (user == null
                 || expectedUid == null
                 || !expectedUid.equals(user.getUid())) {
-            showStatus("Phiên đăng nhập đã thay đổi. Hãy quay lại đăng nhập.");
+            showError("Phiên đăng nhập đã thay đổi. Hãy quay lại đăng nhập.");
             return;
         }
 

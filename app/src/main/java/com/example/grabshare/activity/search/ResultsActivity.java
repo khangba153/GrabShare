@@ -153,12 +153,16 @@ public class ResultsActivity extends AppCompatActivity {
                         });
         try {
             criteria = readCriteria(savedInstanceState);
-            ((TextView) findViewById(R.id.route_start))
-                    .setText(PlaceNameFormatter.formatMultiline(criteria.pickup.getName()));
-            ((TextView) findViewById(R.id.route_end))
-                    .setText(PlaceNameFormatter.formatMultiline(criteria.dropoff.getName()));
-            findViewById(R.id.route_start).setContentDescription(criteria.pickup.getName());
-            findViewById(R.id.route_end).setContentDescription(criteria.dropoff.getName());
+            TextView pickupSummary = findViewById(R.id.route_start);
+            TextView dropoffSummary = findViewById(R.id.route_end);
+            pickupSummary.setText(PlaceNameFormatter.format(criteria.pickup.getName()));
+            dropoffSummary.setText(PlaceNameFormatter.format(criteria.dropoff.getName()));
+            pickupSummary.setContentDescription(criteria.pickup.getName());
+            dropoffSummary.setContentDescription(criteria.dropoff.getName());
+            pickupSummary.setMaxLines(1);
+            dropoffSummary.setMaxLines(1);
+            pickupSummary.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            dropoffSummary.setEllipsize(android.text.TextUtils.TruncateAt.END);
             SimpleDateFormat format =
                     new SimpleDateFormat("dd/MM/yyyy · HH:mm", new Locale("vi", "VN"));
             format.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));

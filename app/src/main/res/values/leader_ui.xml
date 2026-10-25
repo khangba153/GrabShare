@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="feedback_error_text">#9F1D2B</color>
+    <color name="feedback_error_background">#FFF1F2</color>
+    <color name="feedback_success_text">#166534</color>
+    <color name="feedback_success_background">#F0FDF4</color>
+    <dimen name="account_hero_height">112dp</dimen>
+    <style name="AccountFeedback" parent="Body">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_marginTop">12dp</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:accessibilityLiveRegion">polite</item>
+        <item name="android:visibility">gone</item>
+    </style>
+    <style name="AccountSectionTitle" parent="BodyBold">
+        <item name="android:layout_marginBottom">12dp</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+    <string name="leader_logout_title">Đăng xuất khỏi GrabShare?</string>
+    <string name="leader_logout_message">Dữ liệu chuyến đã lưu trên thiết bị sẽ được dọn. Chuyến đi và yêu cầu trên máy chủ vẫn được giữ. Bạn cần đăng nhập lại để tiếp tục.</string>
+    <string name="leader_logout_action">Đăng xuất</string>
+    <string name="leader_stay_signed_in">Ở lại</string>
+    <string name="leader_session_account">Tài khoản đang đăng nhập: %1$s</string>
+    <string name="leader_password_show">Hiện mật khẩu</string>
+    <string name="leader_password_hide">Ẩn mật khẩu</string>
+    <string name="leader_auth_identity">Thông tin tài khoản</string>
+    <string name="leader_auth_vehicle">Thông tin xe · tùy chọn</string>
+    <string name="leader_auth_security">Mật khẩu và điều khoản</string>
+    <string name="leader_register_intro">Điền thông tin tài khoản. Nếu chỉ đi nhờ, bạn có thể bổ sung xe sau.</string>
+    <string name="leader_complete_title">Hoàn thiện hồ sơ</string>
+    <string name="leader_complete_intro">Phiên đăng nhập đã có. Bổ sung hồ sơ để bắt đầu sử dụng GrabShare.</string>
+    <string name="leader_password_hint">Ít nhất 6 ký tự</string>
+    <string name="leader_or">Hoặc tiếp tục với</string>
+    <string name="leader_profile_intro">Thông tin cá nhân</string>
+    <string name="leader_profile_draft_hint">Thay đổi chỉ được ghi khi bạn bấm Lưu thay đổi và nhận thông báo thành công. Bấm Hủy để bỏ bản nháp.</string>
+    <string name="leader_account_menu">Chuyến đi và tiện ích</string>
+    <string name="leader_local_content">Nội dung này đọc được khi không có mạng.</string>
+    <string name="leader_back">Quay lại</string>
+    <string name="leader_terms_intro">Quy tắc chung khi tham gia cộng đồng GrabShare.</string>
+    <string name="leader_reset_check_mail">Kiểm tra hộp thư và thư rác. Sau khi đặt mật khẩu mới, quay lại màn đăng nhập.</string>
+</resources>

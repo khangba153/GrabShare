@@ -81,12 +81,12 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
             tripViewHolder.passengerDistanceTextView.setText("Chặng bạn đi: chưa tính được");
         } else {
             if (matchedTrip.contribution.getFullTripCostVnd() == 0) {
-                tripViewHolder.priceTextView.setText("Bạn dự kiến đóng góp: Miễn phí");
+                tripViewHolder.priceTextView.setText("Dự kiến: Miễn phí");
             } else {
                 tripViewHolder.priceTextView.setText(
                         String.format(
                                 new Locale("vi", "VN"),
-                                "Bạn dự kiến đóng góp: %,dđ",
+                                "Dự kiến: %,dđ",
                                 matchedTrip.contribution.getAmountVnd()));
             }
             tripViewHolder.passengerDistanceTextView.setText(
@@ -108,8 +108,7 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
                             fullTripCostVnd));
         }
         tripViewHolder.driverRouteTextView.setText(
-                "Tuyến tài xế: "
-                        + PlaceNameFormatter.format(matchedTrip.trip.getOrigin().getName())
+                PlaceNameFormatter.format(matchedTrip.trip.getOrigin().getName())
                         + " → "
                         + PlaceNameFormatter.format(matchedTrip.trip.getDestination().getName()));
         tripViewHolder.driverRouteTextView.setContentDescription(
@@ -124,14 +123,11 @@ public class TripAdapter extends RecyclerView.Adapter<TripAdapter.TripViewHolder
         tripViewHolder.detourTextView.setText(
                 "Tài xế đi thêm: +"
                         + RouteDistanceFormatter.formatKilometers(matchedTrip.detourMeters));
-        if (matchedTrip.baselineAdjusted) {
-            tripViewHolder.informationTextView.setText(
-                    "Còn 1 chỗ · Giờ trên là giờ đi của tài xế, chưa phải giờ đón bạn."
-                            + " Khoảng cách được cập nhật theo đường đi hiện tại.");
-        } else {
-            tripViewHolder.informationTextView.setText(
-                    "Còn 1 chỗ · Giờ trên là giờ đi của tài xế, chưa phải giờ đón bạn.");
-        }
+        // Chỉ giữ thông tin so sánh trên thẻ; chi tiết/giải thích đã có ở Detail.
+        tripViewHolder.fullTripCostTextView.setVisibility(View.GONE);
+        tripViewHolder.passengerDistanceTextView.setVisibility(View.GONE);
+        tripViewHolder.startGapTextView.setVisibility(View.GONE);
+        tripViewHolder.informationTextView.setVisibility(View.GONE);
         tripViewHolder.itemView.setOnClickListener(
                 new View.OnClickListener() {
 

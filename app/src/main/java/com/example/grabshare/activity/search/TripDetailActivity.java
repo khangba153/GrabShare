@@ -650,7 +650,7 @@ public class TripDetailActivity extends AppCompatActivity {
         TextView status = findViewById(R.id.detail_cache_status);
         String message = "";
         if (supportState != null) {
-            message = supportState.cacheMessage;
+            message = supportState.cacheMessage.trim();
         }
         status.setText(message);
         if (message.isEmpty()) {

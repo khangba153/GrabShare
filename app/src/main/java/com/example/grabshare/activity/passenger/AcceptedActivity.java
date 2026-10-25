@@ -26,7 +26,6 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
-import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -322,21 +321,9 @@ public class AcceptedActivity extends AppCompatActivity {
             if (mapEndLabel != null && trip.getDestination() != null) {
                 mapEndLabel.setText(trip.getDestination().getName() != null ? trip.getDestination().getName() : "Điểm đến");
             }
-
-            if (tripCost != null) {
-                if (trip.getCostVnd() != null) {
-                    if (trip.getCostVnd() == 0) {
-                        tripCost.setText("Miễn phí");
-                    } else {
-                        DecimalFormat decimalFormat = new DecimalFormat("#,###");
-                        tripCost.setText(decimalFormat.format(trip.getCostVnd()) + "đ");
-                    }
-                } else {
-                    tripCost.setText("Chưa có chi phí");
-                }
-            }
         }
 
+        if (tripCost != null) tripCost.setText(PassengerContributionText.format(request));
         if (request != null && request.getPickup() != null) {
             Place pickupPlace = request.getPickup();
             if (tripPickup != null) {
