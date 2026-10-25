@@ -352,7 +352,7 @@ public class RequestDetailActivity extends AppCompatActivity {
             NumberFormat distanceFormatter = NumberFormat.getNumberInstance(
                     Locale.forLanguageTag("vi-VN"));
             distanceFormatter.setMaximumFractionDigits(2);
-            contributionDetailsText.setText("Chặng khách đi P → C: "
+            contributionDetailsText.setText("Chặng khách đi: "
                     + distanceFormatter.format(contribution.getPassengerDistanceMeters() / 1000.0)
                     + " km\nMức toàn tuyến lúc khách xác nhận: "
                     + formatCost(contribution.getFullTripCostVnd())
