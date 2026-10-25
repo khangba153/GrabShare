@@ -248,15 +248,7 @@ public class TripDetailActivity extends AppCompatActivity {
                                 primaryAction();
                             }
                         });
-        findViewById(R.id.detail_favorite)
-                .setOnClickListener(
-                        new View.OnClickListener() {
-                            /** Chỉ đổi trạng thái yêu thích sau xác nhận server. */
-                            @Override
-                            public void onClick(View view) {
-                                supportViewModel.toggleFavorite();
-                            }
-                        });
+        findViewById(R.id.detail_favorite).setVisibility(View.GONE);
         supportViewModel
                 .getState()
                 .observe(
@@ -644,23 +636,13 @@ public class TripDetailActivity extends AppCompatActivity {
         }
     }
 
-    /** Giữ chức năng yêu thích của Detail và thông báo cache trên cùng màn gửi yêu cầu. */
+    /** Detail chỉ xem cache; yêu thích nằm ở chuyến đã tham gia và hoàn thành. */
     private void renderFavorite(boolean ready, TripDetailSupportViewModel.State supportState) {
-        Button favoriteButton = findViewById(R.id.detail_favorite);
-        favoriteButton.setEnabled(ready && supportState != null && !supportState.favoriteBusy);
-        if (supportState == null || supportState.favorite == null) {
-            favoriteButton.setText("Tải trạng thái yêu thích");
-        } else {
-            if (supportState.favorite) {
-                favoriteButton.setText("♥ Bỏ yêu thích");
-            } else {
-                favoriteButton.setText("♡ Thêm yêu thích");
-            }
-        }
+        findViewById(R.id.detail_favorite).setVisibility(View.GONE);
         TextView status = findViewById(R.id.detail_favorite_status);
         String message = "";
         if (supportState != null) {
-            message = (supportState.favoriteMessage + " " + supportState.cacheMessage).trim();
+            message = supportState.cacheMessage.trim();
         }
         status.setText(message);
         if (message.isEmpty()) {

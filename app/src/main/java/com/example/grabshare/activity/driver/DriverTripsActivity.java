@@ -17,6 +17,7 @@ import androidx.appcompat.widget.AppCompatButton;
 
 import com.example.grabshare.R;
 import com.example.grabshare.presentation.MainNavigation;
+import com.example.grabshare.presentation.TripListFilter;
 import com.example.grabshare.adapter.driver.DriverTripAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.contract.RepositoryCallback;
@@ -29,6 +30,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Collections;
+import java.util.Comparator;
 
 //endregion
 
@@ -78,6 +81,9 @@ public class DriverTripsActivity extends AppCompatActivity {
     //region 4. Screen state
 
     private int selectedFilter = FILTER_UPCOMING;
+    private final TripListFilter listFilter = new TripListFilter(
+            new String[]{"Tất cả", "Đang nhận yêu cầu", "Đã nhận khách", "Hoàn thành", "Đã hủy"},
+            new String[]{"", "OPEN", "FULL", "COMPLETED", "CANCELLED"});
 
     private boolean isLoading;
     private boolean hasLoadedSuccessfully;
@@ -99,6 +105,22 @@ public class DriverTripsActivity extends AppCompatActivity {
         initializeViews();
         initializeRepository();
         initializeAdapter();
+        listFilter.restore(savedInstanceState);
+        ((TextView) findViewById(R.id.trip_list_filter)).setText(listFilter.summary());
+        findViewById(R.id.trip_list_filter).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                listFilter.show(DriverTripsActivity.this, new Runnable() {
+                    @Override
+                    public void run() {
+                        ((TextView) findViewById(R.id.trip_list_filter)).setText(listFilter.summary());
+                        if (hasLoadedSuccessfully && !isLoading && !hasLoadError) {
+                            displayFilteredTrips();
+                        }
+                    }
+                });
+            }
+        });
 
         if (savedInstanceState != null) {
             selectedFilter = savedInstanceState.getInt(
@@ -143,6 +165,7 @@ public class DriverTripsActivity extends AppCompatActivity {
         );
 
         super.onSaveInstanceState(savedInstanceState);
+        listFilter.save(savedInstanceState);
     }
 
     //endregion
@@ -341,10 +364,24 @@ public class DriverTripsActivity extends AppCompatActivity {
     private void displayFilteredTrips() {
         List<Trip> filteredTrips = filterTripsForSelectedTab();
 
+        List<Trip> matchedTrips = new ArrayList<>();
+        for (Trip trip : filteredTrips) {
+            if (listFilter.matches(trip.getStatus(), trip.getDepartureAt())) {
+                matchedTrips.add(trip);
+            }
+        }
+        Collections.sort(matchedTrips, new Comparator<Trip>() {
+            @Override
+            public int compare(Trip first, Trip second) {
+                return listFilter.compare(first.getDepartureAt(), second.getDepartureAt());
+            }
+        });
+        filteredTrips = matchedTrips;
         tripAdapter.replaceTrips(filteredTrips);
 
         if (filteredTrips.isEmpty()) {
-            showEmptyTripsState();
+            showStatusMessage("Không có chuyến phù hợp mục và bộ lọc đang chọn. "
+                    + "Chọn Bộ lọc → Đặt lại để bỏ các điều kiện lọc.", false);
             return;
         }
 

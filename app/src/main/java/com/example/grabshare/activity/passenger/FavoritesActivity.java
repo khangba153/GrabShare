@@ -1,6 +1,7 @@
 package com.example.grabshare.activity.passenger;
 
 import android.content.Intent;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -10,6 +11,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -21,6 +23,8 @@ import com.example.grabshare.activity.search.TripDetailActivity;
 import com.example.grabshare.adapter.passenger.FavoriteAdapter;
 import com.example.grabshare.adapter.passenger.FavoriteAdapter.FavoriteItem;
 import com.example.grabshare.contract.NavigationKeys;
+import com.example.grabshare.contract.RepositoryCallback;
+import com.example.grabshare.repository.passenger.FavoriteRepository;
 import com.example.grabshare.model.Favorite;
 import com.example.grabshare.model.PublicProfile;
 import com.example.grabshare.model.Trip;
@@ -384,18 +388,62 @@ public class FavoritesActivity extends AppCompatActivity implements FavoriteAdap
 
     /** Chỉ mở Detail của chuyến còn tồn tại và thuộc lượt tải hiện hành. */
     @Override
-    public void onFavoriteClick(FavoriteItem favoriteItem) {
+    public void onFavoriteClick(final FavoriteItem favoriteItem) {
         if (!currentLoad(loadGeneration)) return;
         if (favoriteItem == null || favoriteItem.getTrip() == null) {
             Toast.makeText(this, "Chuyến đi không khả dụng.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String tripId = favoriteItem.getTrip().getId();
+        final String tripId = favoriteItem.getTrip().getId();
         if (tripId != null && !tripId.trim().isEmpty()) {
-            Intent intent = new Intent(this, TripDetailActivity.class);
-            intent.putExtra(NavigationKeys.TRIP_ID, tripId);
-            startActivity(intent);
+            new AlertDialog.Builder(this).setTitle("Chuyến yêu thích")
+                    .setItems(new String[]{"Xem chi tiết", "Bỏ yêu thích"}, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            if (!currentLoad(loadGeneration)) {
+                                return;
+                            }
+                            if (which == 0) {
+                                Intent intent;
+                                Trip trip = favoriteItem.getTrip();
+                                if ("COMPLETED".equals(trip.getStatus())
+                                        && trip.getAcceptedRequestId() != null
+                                        && !trip.getAcceptedRequestId().isEmpty()) {
+                                    intent = new Intent(FavoritesActivity.this, CompleteActivity.class);
+                                    intent.putExtra(NavigationKeys.REQUEST_ID, trip.getAcceptedRequestId());
+                                } else {
+                                    // Yêu thích cũ vẫn đọc được; không tự xóa hay nhận là chuyến đã đi.
+                                    intent = new Intent(FavoritesActivity.this, TripDetailActivity.class);
+                                    intent.putExtra(NavigationKeys.TRIP_ID, tripId);
+                                }
+                                startActivity(intent);
+                            } else {
+                                final int expectedGeneration = loadGeneration;
+                                recyclerView.setEnabled(false);
+                                new FavoriteRepository(firestore).removeFavorite(currentUserId, tripId,
+                                        new RepositoryCallback<Void>() {
+                                            @Override
+                                            public void onSuccess(Void ignored) {
+                                                if (currentLoad(expectedGeneration)) {
+                                                    recyclerView.setEnabled(true);
+                                                    loadFavorites();
+                                                }
+                                            }
+
+                                            @Override
+                                            public void onError(Exception error) {
+                                                if (currentLoad(expectedGeneration)) {
+                                                    recyclerView.setEnabled(true);
+                                                    Toast.makeText(FavoritesActivity.this,
+                                                            "Chưa xác nhận bỏ yêu thích. Hãy tải lại danh sách.",
+                                                            Toast.LENGTH_LONG).show();
+                                                }
+                                            }
+                                        });
+                            }
+                        }
+                    }).show();
         }
     }
 

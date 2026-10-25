@@ -107,6 +107,29 @@ public class FavoriteRepository implements FavoriteStore {
                 DocumentSnapshot snapshot = transaction.get(favoriteRef);
                 requireOwner(userId);
                 requireMatchingFavorite(snapshot, userId, tripId);
+                // Một lần yêu thích mới chỉ dành cho hành khách thực sự hoàn thành chuyến.
+                DocumentSnapshot trip = transaction.get(firestore.collection("trips").document(tripId));
+                String acceptedRequestId = trip.getString("acceptedRequestId");
+                if (!trip.exists() || !"COMPLETED".equals(trip.getString("status"))
+                        || !Long.valueOf(0).equals(trip.getLong("availableSeats"))
+                        || trip.getTimestamp("departureAt") == null
+                        || trip.getTimestamp("departureAt").compareTo(com.google.firebase.Timestamp.now()) > 0
+                        || userId.equals(trip.getString("driverId"))
+                        || acceptedRequestId == null || acceptedRequestId.isEmpty()
+                        || acceptedRequestId.contains("/")) {
+                    throw new FirebaseFirestoreException("Chỉ có thể yêu thích chuyến đã tham gia và hoàn thành.",
+                            FirebaseFirestoreException.Code.FAILED_PRECONDITION);
+                }
+                DocumentSnapshot request = transaction.get(
+                        firestore.collection("requests").document(acceptedRequestId));
+                if (!request.exists() || !userId.equals(request.getString("passengerId"))
+                        || !tripId.equals(request.getString("tripId"))
+                        || !"ACCEPTED".equals(request.getString("status"))
+                        || trip.getString("driverId") == null
+                        || !trip.getString("driverId").equals(request.getString("driverId"))) {
+                    throw new FirebaseFirestoreException("Bạn không phải hành khách được nhận trên chuyến này.",
+                            FirebaseFirestoreException.Code.PERMISSION_DENIED);
+                }
                 // Nếu chưa tồn tại thì tạo mới với createdAt bằng FieldValue.serverTimestamp()
                 if (!snapshot.exists()) {
                     Map<String, Object> favoriteData = new HashMap<>();

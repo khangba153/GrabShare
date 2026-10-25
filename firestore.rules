@@ -354,11 +354,20 @@ service cloud.firestore {
     }
 
     match /favorites/{fid} {
+      function completedParticipant(tripId) {
+        let t = get(tripPath(tripId)).data;
+        let r = get(/databases/$(database)/documents/requests/$(t.acceptedRequestId)).data;
+        return t.status == 'COMPLETED' && t.availableSeats == 0 && t.departureAt <= request.time
+          && t.acceptedRequestId is string && t.acceptedRequestId.size() > 0
+          && r.status == 'ACCEPTED' && r.passengerId == request.auth.uid
+          && r.tripId == tripId && r.driverId == t.driverId && r.passengerId != t.driverId;
+      }
       function favoriteData(d) {
         return exact(d, ['userId', 'tripId', 'createdAt'])
           && d.userId == request.auth.uid && id(d.tripId)
           && fid == request.auth.uid + '_' + d.tripId
           && exists(tripPath(d.tripId))
+          && completedParticipant(d.tripId)
           && d.createdAt is timestamp && d.createdAt == request.time;
       }
       allow get: if signedIn() && (

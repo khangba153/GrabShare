@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.grabshare.R;
+import com.example.grabshare.presentation.TripCardText;
 import com.example.grabshare.adapter.search.TripAdapter;
 import com.example.grabshare.contract.NavigationKeys;
 import com.example.grabshare.model.Place;
@@ -152,8 +153,14 @@ public class ResultsActivity extends AppCompatActivity {
                         });
         try {
             criteria = readCriteria(savedInstanceState);
-            ((TextView) findViewById(R.id.route_start)).setText(criteria.pickup.getName());
-            ((TextView) findViewById(R.id.route_end)).setText(criteria.dropoff.getName());
+            TextView pickupSummary = findViewById(R.id.route_start);
+            TextView dropoffSummary = findViewById(R.id.route_end);
+            pickupSummary.setText(TripCardText.place(criteria.pickup));
+            dropoffSummary.setText(TripCardText.place(criteria.dropoff));
+            pickupSummary.setMaxLines(1);
+            dropoffSummary.setMaxLines(1);
+            pickupSummary.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            dropoffSummary.setEllipsize(android.text.TextUtils.TruncateAt.END);
             SimpleDateFormat format =
                     new SimpleDateFormat("dd/MM/yyyy · HH:mm", new Locale("vi", "VN"));
             format.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
