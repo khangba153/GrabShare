@@ -69,13 +69,21 @@ public class NotificationAdapter extends BaseAdapter {
         TextView unread = row.findViewById(R.id.notification_unread);
 
         title.setText(titleFor(item.getType()));
-        actor.setText("Liên quan: " + safeText(item.getActorDisplayName(), "Người liên quan"));
+        actor.setText(safeText(item.getActorDisplayName(), "Người liên quan"));
         body.setText(bodyFor(item));
         time.setText(formatTime(item));
 
         boolean isRead = Boolean.TRUE.equals(item.getIsRead());
-        unread.setVisibility(isRead ? View.GONE : View.VISIBLE);
-        row.setAlpha(isRead ? 0.78f : 1.0f);
+        unread.setVisibility(View.VISIBLE);
+        unread.setText("Chưa đọc");
+        unread.setTextColor(row.getContext().getColor(R.color.primary));
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        if (isRead) {
+            unread.setText("Đã đọc");
+            unread.setTextColor(row.getContext().getColor(R.color.muted));
+            title.setTypeface(null, android.graphics.Typeface.NORMAL);
+        }
+        row.setAlpha(1.0f);
         icon.setImageResource(iconFor(item.getType()));
         row.setContentDescription(title.getText() + ". " + body.getText()
                 + (isRead ? ". Đã đọc" : ". Chưa đọc"));
@@ -98,22 +106,22 @@ public class NotificationAdapter extends BaseAdapter {
         String type = item.getType();
 
         if ("REQUEST_SENT".equals(type)) {
-            return actor + " đã gửi yêu cầu cho chuyến: " + trip;
+            return "Muốn đi nhờ · " + trip;
         }
         if ("REQUEST_CANCELLED".equals(type)) {
-            return actor + " đã hủy yêu cầu đi nhờ. Chuyến liên quan: " + trip;
+            return "Đã hủy yêu cầu · " + trip;
         }
         if ("REQUEST_ACCEPTED".equals(type)) {
-            return actor + " đã chấp nhận yêu cầu đi nhờ. Chuyến: " + trip;
+            return "Chỗ của bạn đã được giữ · " + trip;
         }
         if ("REQUEST_REJECTED".equals(type)) {
-            return actor + " đã từ chối yêu cầu đi nhờ. Chuyến: " + trip;
+            return "Yêu cầu chưa được nhận · " + trip;
         }
         if ("TRIP_CANCELLED".equals(type)) {
-            return actor + " đã hủy chuyến. Tuyến: " + trip;
+            return "Chuyến đã hủy · " + trip;
         }
         if ("TRIP_COMPLETED".equals(type)) {
-            return "Hành trình " + trip + " đã được hoàn thành bởi " + actor + ".";
+            return "Có thể đánh giá chuyến đi · " + trip;
         }
         return "Có cập nhật liên quan đến chuyến: " + trip;
     }

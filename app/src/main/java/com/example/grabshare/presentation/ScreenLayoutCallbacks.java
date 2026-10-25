@@ -15,6 +15,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 /** Chừa vùng hệ thống cho màn thật, giữ nguyên padding thiết kế và hỗ trợ bàn phím. */
 public final class ScreenLayoutCallbacks implements Application.ActivityLifecycleCallbacks {
+    private final java.util.Map<Activity, NotificationBellController> bells = new java.util.HashMap<Activity, NotificationBellController>();
 
 
     /** Mỗi root được gắn một lần sau khi Activity đã dựng xong giao diện. */
@@ -65,11 +66,24 @@ public final class ScreenLayoutCallbacks implements Application.ActivityLifecycl
     }
 
     @Override
+    public void onActivityPostResumed(@NonNull Activity activity) {
+        NotificationBellController controller = NotificationBellController.create(activity);
+        if (controller != null) {
+            bells.put(activity, controller);
+            controller.start();
+        }
+    }
+
+    @Override
     public void onActivityResumed(@NonNull Activity activity) {
     }
 
     @Override
     public void onActivityPaused(@NonNull Activity activity) {
+        NotificationBellController controller = bells.remove(activity);
+        if (controller != null) {
+            controller.stop();
+        }
     }
 
     @Override
@@ -83,5 +97,9 @@ public final class ScreenLayoutCallbacks implements Application.ActivityLifecycl
 
     @Override
     public void onActivityDestroyed(@NonNull Activity activity) {
+        NotificationBellController controller = bells.remove(activity);
+        if (controller != null) {
+            controller.stop();
+        }
     }
 }
