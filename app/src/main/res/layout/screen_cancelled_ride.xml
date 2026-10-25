@@ -29,6 +29,13 @@
             android:src="@drawable/ic_bell"
             android:contentDescription="Thông báo" />
     </LinearLayout>
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/chat_open"
+        style="@style/ButtonSecondary"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="8dp"
+        android:text="Xem trò chuyện"
+        android:visibility="gone" />
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"

@@ -481,6 +481,91 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Chat gắn với đúng một lần yêu cầu; không bổ sung field vào requests/trips cũ.
+    function chatPath(requestId) {
+      return /databases/$(database)/documents/conversations/$(requestId);
+    }
+    function chatMessagePath(requestId, messageId) {
+      return /databases/$(database)/documents/conversations/$(requestId)/messages/$(messageId);
+    }
+    function chatParticipant(requestId) {
+      let r = get(reqPath(requestId)).data;
+      return signedIn() && request.auth.uid in [r.driverId, r.passengerId];
+    }
+    function chatActive(requestId) {
+      let r = get(reqPath(requestId)).data;
+      let t = get(tripPath(r.tripId)).data;
+      return chatParticipant(requestId) && r.status == 'ACCEPTED'
+        && t.status == 'FULL' && t.availableSeats == 0
+        && t.acceptedRequestId == requestId && t.driverId == r.driverId;
+    }
+    function createConversation(requestId, data) {
+      let r = get(reqPath(requestId)).data;
+      let t = get(tripPath(r.tripId)).data;
+      return chatActive(requestId)
+        && exact(data, ['requestId', 'tripId', 'driverId', 'passengerId',
+          'participantIds', 'createdAt', 'lastSentAt', 'lastMessageId', 'lastText',
+          'lastSenderId', 'driverReadAt', 'passengerReadAt',
+          'pickupName', 'dropoffName', 'departureAt'])
+        && data.requestId == requestId && data.tripId == r.tripId
+        && data.driverId == r.driverId && data.passengerId == r.passengerId
+        && data.driverId != data.passengerId
+        && data.participantIds == [r.driverId, r.passengerId]
+        && data.pickupName == r.pickup.name
+        && data.dropoffName == r.get('dropoff', t.destination).name
+        && data.departureAt == t.departureAt
+        && data.createdAt == request.time && data.lastSentAt == request.time
+        && data.lastMessageId == '' && data.lastText == '' && data.lastSenderId == ''
+        && data.driverReadAt == null && data.passengerReadAt == null;
+    }
+    function chatSummaryUpdate(requestId) {
+      let next = request.resource.data;
+      let messagePath = chatMessagePath(requestId, next.lastMessageId);
+      let message = getAfter(messagePath).data;
+      return chatActive(requestId)
+        && next.diff(resource.data).affectedKeys()
+          .hasOnly(['lastMessageId', 'lastText', 'lastSenderId', 'lastSentAt'])
+        && next.lastMessageId.matches('[a-f0-9]{32}')
+        && !exists(messagePath) && existsAfter(messagePath)
+        && next.lastSenderId == request.auth.uid && next.lastSentAt == request.time
+        && next.lastText == message.text && message.senderId == request.auth.uid
+        && message.createdAt == request.time;
+    }
+    function chatReadUpdate() {
+      let next = request.resource.data;
+      return (owner(resource.data.driverId)
+          && next.diff(resource.data).affectedKeys().hasOnly(['driverReadAt'])
+          && next.driverReadAt == request.time)
+        || (owner(resource.data.passengerId)
+          && next.diff(resource.data).affectedKeys().hasOnly(['passengerReadAt'])
+          && next.passengerReadAt == request.time);
+    }
+    match /conversations/{requestId} {
+      // GET bản chưa tồn tại phục vụ mở chat lần đầu, không cho list chat người khác.
+      allow get: if chatParticipant(requestId);
+      allow list: if signedIn() && request.auth.uid in resource.data.participantIds;
+      allow create: if signedIn() && createConversation(requestId, request.resource.data);
+      allow update: if chatParticipant(requestId)
+        && (chatReadUpdate() || chatSummaryUpdate(requestId));
+      allow delete: if false;
+      match /messages/{messageId} {
+        allow read: if chatParticipant(requestId)
+          && exists(chatPath(requestId));
+        allow create: if chatActive(requestId)
+          && exists(chatPath(requestId))
+          && messageId.matches('[a-f0-9]{32}')
+          && exact(request.resource.data, ['senderId', 'text', 'createdAt'])
+          && owner(request.resource.data.senderId)
+          && nonblank(request.resource.data.text, 1000)
+          && request.resource.data.createdAt == request.time
+          && getAfter(chatPath(requestId)).data.lastMessageId == messageId
+          && getAfter(chatPath(requestId)).data.lastSenderId == request.auth.uid
+          && getAfter(chatPath(requestId)).data.lastText == request.resource.data.text
+          && getAfter(chatPath(requestId)).data.lastSentAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
     match /{document=**} { allow read, write: if false; }
   }
 }

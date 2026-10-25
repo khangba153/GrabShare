@@ -41,6 +41,13 @@
             android:clickable="false"
             android:focusable="false" />
     </FrameLayout>
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/chat_open"
+        style="@style/ButtonSecondary"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="8dp"
+        android:text="Nhắn tin"
+        android:visibility="gone" />
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
