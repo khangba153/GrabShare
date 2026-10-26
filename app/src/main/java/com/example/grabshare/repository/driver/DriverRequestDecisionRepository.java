@@ -114,7 +114,7 @@ public class DriverRequestDecisionRepository {
             /** Chưa xác nhận được dữ liệu đầu vào thì không tạo quyết định hoặc thông báo. */
             @Override
             public void onFailure(@NonNull Exception error) {
-                callback.onError(error);
+                resolveAcceptanceFailure(requestReference, driverIdentifier, error, callback);
             }
         });
     }
@@ -319,9 +319,129 @@ public class DriverRequestDecisionRepository {
         }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception error) {
-                callback.onError(error);
+                if ("ACCEPTED".equals(targetStatus)) {
+                    resolveAcceptanceFailure(requestReference, currentDriverId, error, callback);
+                } else {
+                    callback.onError(error);
+                }
             }
         });
+    }
+
+    /** Chỉ giải thích tranh chỗ sau khi đọc lại cả yêu cầu và chuyến từ máy chủ. */
+    private void resolveAcceptanceFailure(
+            final DocumentReference requestReference,
+            final String driverIdentifier,
+            final Exception originalError,
+            final RepositoryCallback<Void> callback
+    ) {
+        if (!sameSession(driverIdentifier)) {
+            callback.onError(new IllegalStateException("Phiên đăng nhập đã đổi."));
+            return;
+        }
+        firestore.runTransaction(new Transaction.Function<AcceptanceResolution>() {
+            @Override
+            public AcceptanceResolution apply(@NonNull Transaction transaction)
+                    throws FirebaseFirestoreException {
+                requireSession(driverIdentifier);
+                DocumentSnapshot request = transaction.get(requestReference);
+                String tripIdentifier = request.getString("tripId");
+                if (!request.exists() || !driverIdentifier.equals(request.getString("driverId"))
+                        || tripIdentifier == null || tripIdentifier.trim().isEmpty()
+                        || tripIdentifier.contains("/")) {
+                    return new AcceptanceResolution(false, null);
+                }
+                DocumentSnapshot trip = transaction.get(
+                        firestore.collection("trips").document(tripIdentifier));
+                if (!trip.exists() || !driverIdentifier.equals(trip.getString("driverId"))) {
+                    return new AcceptanceResolution(false, null);
+                }
+                String requestStatus = request.getString("status");
+                String tripStatus = trip.getString("status");
+                String acceptedIdentifier = trip.getString("acceptedRequestId");
+                Long remainingSeats = trip.getLong("availableSeats");
+                boolean acceptedThisRequest = requestReference.getId().equals(acceptedIdentifier);
+                boolean tripHasPassenger = "FULL".equals(tripStatus)
+                        && remainingSeats != null && remainingSeats.longValue() == 0L
+                        && acceptedIdentifier != null && !acceptedIdentifier.trim().isEmpty();
+                // Đối soát kết quả đã ghi, không ghi lại hay tạo thông báo lần thứ hai.
+                if ("ACCEPTED".equals(requestStatus) && acceptedThisRequest
+                        && (tripHasPassenger || "COMPLETED".equals(tripStatus))) {
+                    return new AcceptanceResolution(true, null);
+                }
+                if ("CANCELLED".equals(requestStatus)) {
+                    return new AcceptanceResolution(false, "Yêu cầu này đã bị hủy. Không thể nhận khách.");
+                }
+                if ("REJECTED".equals(requestStatus)) {
+                    return new AcceptanceResolution(false, "Yêu cầu này đã bị từ chối. Hãy tải lại danh sách.");
+                }
+                if ("CANCELLED".equals(tripStatus) || "COMPLETED".equals(tripStatus)) {
+                    return new AcceptanceResolution(false, "Chuyến đã hủy hoặc hoàn thành. Không thể nhận thêm khách.");
+                }
+                if ("PENDING".equals(requestStatus) && tripHasPassenger && !acceptedThisRequest) {
+                    return new AcceptanceResolution(false,
+                            "Chuyến đã có khách khác và không còn chỗ. Yêu cầu này chưa được chấp nhận.");
+                }
+                Timestamp departure = trip.getTimestamp("departureAt");
+                if (departure != null && departure.toDate().getTime() <= System.currentTimeMillis()) {
+                    return new AcceptanceResolution(false, "Đã đến giờ khởi hành. Không thể nhận thêm khách.");
+                }
+                return new AcceptanceResolution(false, null);
+            }
+        }).addOnSuccessListener(new OnSuccessListener<AcceptanceResolution>() {
+            @Override
+            public void onSuccess(AcceptanceResolution resolution) {
+                if (!sameSession(driverIdentifier)) {
+                    callback.onError(new IllegalStateException("Phiên đăng nhập đã đổi."));
+                    return;
+                }
+                if (resolution.alreadyAccepted) {
+                    callback.onSuccess(null);
+                } else if (resolution.message != null) {
+                    callback.onError(new IllegalStateException(resolution.message, originalError));
+                } else {
+                    callback.onError(readableAcceptanceError(originalError));
+                }
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception verificationError) {
+                // Không xác minh được thì không suy đoán hết chỗ hoặc báo nhận thành công.
+                callback.onError(readableAcceptanceError(originalError));
+            }
+        });
+    }
+
+    /** Giữ lỗi quyền và mạng riêng, không thay mọi PERMISSION_DENIED bằng hết chỗ. */
+    private Exception readableAcceptanceError(Exception error) {
+        Throwable cause = error;
+        for (int depth = 0; cause != null && depth < 10; depth = depth + 1) {
+            if (cause instanceof FirebaseFirestoreException) {
+                FirebaseFirestoreException.Code code = ((FirebaseFirestoreException) cause).getCode();
+                if (code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                    return new IllegalStateException("Máy chủ chưa cho phép nhận yêu cầu này."
+                            + " Chưa xác minh được nguyên nhân; hãy tải lại hoặc liên hệ nhóm quản lý.", error);
+                }
+                if (code == FirebaseFirestoreException.Code.UNAVAILABLE
+                        || code == FirebaseFirestoreException.Code.DEADLINE_EXCEEDED) {
+                    return new IllegalStateException("Chưa xác nhận được kết quả nhận khách."
+                            + " Kiểm tra mạng và tải lại yêu cầu trước khi thử lại.", error);
+                }
+            }
+            cause = cause.getCause();
+        }
+        return error;
+    }
+
+    /** Kết quả đối soát chỉ dùng phản hồi giao diện, không thay đổi dữ liệu nghiệp vụ. */
+    private static final class AcceptanceResolution {
+        private final boolean alreadyAccepted;
+        private final String message;
+
+        private AcceptanceResolution(boolean alreadyAccepted, String message) {
+            this.alreadyAccepted = alreadyAccepted;
+            this.message = message;
+        }
     }
 
     /** Kiểm tra cả UID và trạng thái đóng để callback muộn không ghi cho tài khoản khác. */

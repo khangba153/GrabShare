@@ -34,8 +34,10 @@ import androidx.credentials.GetCredentialRequest;
 import androidx.credentials.GetCredentialResponse;
 import androidx.credentials.exceptions.GetCredentialException;
 import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.NoCredentialException;
 
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 import java.util.concurrent.TimeoutException;
@@ -56,6 +58,7 @@ public class LoginActivity extends AppCompatActivity {
     private boolean submitting;
     private Button googleButton;
     private CancellationSignal googleCancellation;
+    private int googleRequestGeneration;
     private LoginProfileViewModel profileViewModel;
     private boolean homeOpened;
     private LogoutViewModel logoutViewModel;
@@ -280,83 +283,111 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    /** Mở trình chọn tài khoản Google bằng Credential Manager. */
+    /** Ưu tiên tài khoản đã cấp quyền; người dùng vẫn chủ động chọn, không tự đăng nhập. */
     private void startGoogleLogin() {
-        if (submitting) {
+        if (submitting || logoutInProgress()) {
             return;
         }
-
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            checkLoginProfile(currentUser);
+            return;
+        }
         setSubmitting(true);
-        showStatus("Đang chọn tài khoản Google...");
+        showStatus("Đang chọn tài khoản Google…");
+        googleRequestGeneration = googleRequestGeneration + 1;
+        requestGoogleCredential(true, googleRequestGeneration);
+    }
 
-        GetSignInWithGoogleOption option =
-                new GetSignInWithGoogleOption.Builder(
-                        getString(R.string.default_web_client_id))
-                        .build();
-
-        GetCredentialRequest request = new GetCredentialRequest.Builder()
-                .addCredentialOption(option)
-                .build();
-
+    /** Không có tài khoản đã cấp quyền thì mở luồng Google đầy đủ đúng một lần. */
+    private void requestGoogleCredential(final boolean authorizedAccountsOnly, final int generation) {
+        if (!isCurrentGoogleRequest(generation)) {
+            return;
+        }
+        GetCredentialRequest.Builder requestBuilder = new GetCredentialRequest.Builder();
+        if (authorizedAccountsOnly) {
+            GetGoogleIdOption option = new GetGoogleIdOption.Builder()
+                    .setServerClientId(getString(R.string.default_web_client_id))
+                    .setFilterByAuthorizedAccounts(true)
+                    .setAutoSelectEnabled(false)
+                    .build();
+            requestBuilder.addCredentialOption(option);
+        } else {
+            GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(
+                    getString(R.string.default_web_client_id)).build();
+            requestBuilder.addCredentialOption(option);
+        }
         googleCancellation = new CancellationSignal();
-
-        CredentialManager.create(this).getCredentialAsync(
-                this,
-                request,
-                googleCancellation,
-                ContextCompat.getMainExecutor(this),
-                new CredentialManagerCallback<
-                        GetCredentialResponse, GetCredentialException>() {
-
-                    /** Nhận token Google rồi chuyển sang xác thực Firebase. */
-                    @Override
-                    public void onResult(GetCredentialResponse result) {
-                        if (isFinishing() || isDestroyed()) {
-                            return;
-                        }
-
-                        Credential credential = result.getCredential();
-
-                        if (credential instanceof CustomCredential
-                                && GoogleIdTokenCredential
-                                .TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                                .equals(credential.getType())) {
+        try {
+            CredentialManager.create(this).getCredentialAsync(
+                    this, requestBuilder.build(), googleCancellation,
+                    ContextCompat.getMainExecutor(this),
+                    new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                        @Override
+                        public void onResult(GetCredentialResponse result) {
+                            if (!isCurrentGoogleRequest(generation)) {
+                                return;
+                            }
+                            googleCancellation = null;
+                            Credential credential = result.getCredential();
+                            if (!(credential instanceof CustomCredential)
+                                    || !GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                                    .equals(credential.getType())) {
+                                setSubmitting(false);
+                                showError("Thông tin đăng nhập Google không hợp lệ. Vui lòng thử lại.");
+                                return;
+                            }
                             try {
                                 GoogleIdTokenCredential googleCredential =
-                                        GoogleIdTokenCredential.createFrom(
-                                                credential.getData());
-
-                                authenticateGoogle(
-                                        googleCredential.getIdToken());
+                                        GoogleIdTokenCredential.createFrom(credential.getData());
+                                authenticateGoogle(googleCredential.getIdToken());
                             } catch (Exception error) {
                                 setSubmitting(false);
-                                showError(
-                                        "Không đọc được tài khoản Google. Hãy thử lại.");
+                                android.util.Log.w("GrabShareGoogleLogin", "Không đọc được credential: "
+                                        + error.getClass().getSimpleName());
+                                showError("Không đọc được tài khoản Google. Hãy thử lại.");
                             }
-                        } else {
+                        }
+
+                        @Override
+                        public void onError(@NonNull GetCredentialException error) {
+                            if (!isCurrentGoogleRequest(generation)) {
+                                return;
+                            }
+                            googleCancellation = null;
+                            // Không ghi email, token hay nội dung credential vào log.
+                            android.util.Log.w("GrabShareGoogleLogin", "Google credential failed; type="
+                                    + error.getType() + "; exception=" + error.getClass().getSimpleName()
+                                    + "; authorizedAccountsOnly=" + authorizedAccountsOnly);
+                            if (authorizedAccountsOnly && error instanceof NoCredentialException) {
+                                requestGoogleCredential(false, generation);
+                                return;
+                            }
                             setSubmitting(false);
-                            showError("Thông tin đăng nhập Google không hợp lệ.");
+                            if (error instanceof GetCredentialCancellationException) {
+                                // Google có thể trả cancellation vì lỗi cấp quyền; không quy lỗi cho người dùng.
+                                // Không tự mở lại hộp thoại khi người dùng đã đóng hoặc quá trình bị gián đoạn.
+                                showStatus("Đăng nhập Google chưa hoàn tất. Nếu bạn không bấm hủy, "
+                                        + "hãy thử lại và kiểm tra kết nối trên thiết bị.");
+                            } else {
+                                showError("Chưa mở được đăng nhập Google. Kiểm tra mạng và tài khoản "
+                                        + "Google trên thiết bị rồi thử lại.");
+                            }
                         }
-                    }
+                    });
+        } catch (RuntimeException error) {
+            googleCancellation = null;
+            setSubmitting(false);
+            android.util.Log.w("GrabShareGoogleLogin", "Không khởi tạo được credential: "
+                    + error.getClass().getSimpleName());
+            showError("Không mở được đăng nhập Google. Vui lòng thử lại.");
+        }
+    }
 
-                    /** Cho phép thử lại sau khi hủy hoặc gặp lỗi chọn tài khoản. */
-                    @Override
-                    public void onError(@NonNull GetCredentialException error) {
-                        if (isFinishing() || isDestroyed()) {
-                            return;
-                        }
-
-                        setSubmitting(false);
-
-                        if (error instanceof GetCredentialCancellationException) {
-                            showStatus("Bạn đã hủy đăng nhập Google.");
-                        } else {
-                            showError(
-                                    "Không mở được đăng nhập Google. Kiểm tra mạng "
-                                            + "và tài khoản Google trên thiết bị.");
-                        }
-                    }
-                });
+    /** Bỏ callback cũ khi màn bị đóng hoặc đã bắt đầu một lần đăng nhập khác. */
+    private boolean isCurrentGoogleRequest(int generation) {
+        return generation == googleRequestGeneration && !isFinishing() && !isDestroyed()
+                && !logoutInProgress();
     }
 
     /** Dùng token Google để tạo phiên đăng nhập Firebase thật. */
@@ -386,9 +417,17 @@ public class LoginActivity extends AppCompatActivity {
                         }
 
                         setSubmitting(false);
-                        showError(
-                                "Firebase chưa xác thực được Google. "
-                                        + "Kiểm tra mạng hoặc cấu hình đăng nhập.");
+                        String errorCode = error.getClass().getSimpleName();
+                        if (error instanceof com.google.firebase.auth.FirebaseAuthException) {
+                            errorCode = ((com.google.firebase.auth.FirebaseAuthException) error).getErrorCode();
+                        }
+                        android.util.Log.w("GrabShareGoogleLogin", "Firebase Google sign-in failed: " + errorCode);
+                        if (error instanceof FirebaseNetworkException) {
+                            showError("Không kết nối được Firebase. Kiểm tra mạng rồi thử lại.");
+                        } else {
+                            showError("Firebase chưa xác thực được tài khoản Google. "
+                                    + "Vui lòng thử lại. Mã lỗi: " + errorCode);
+                        }
                     }
                 });
     }
@@ -396,6 +435,7 @@ public class LoginActivity extends AppCompatActivity {
     /** Hủy trình chọn Google khi màn bị đóng, không tự mở lại khi xoay. */
     @Override
     protected void onDestroy() {
+        googleRequestGeneration = googleRequestGeneration + 1;
         super.onDestroy();
 
         if (googleCancellation != null) {
