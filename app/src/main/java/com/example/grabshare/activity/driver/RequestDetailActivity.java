@@ -30,6 +30,11 @@ import com.example.grabshare.repository.driver.DriverRequestRepository;
 import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.EventListener;
+import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.MetadataChanges;
 
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
@@ -73,6 +78,9 @@ public class RequestDetailActivity extends AppCompatActivity {
     private boolean isLoading;
     private boolean isResponding;
     private boolean requestDetailsValid;
+    private int requestLoadGeneration;
+    private ListenerRegistration requestStatusListener;
+    private TripRequest latestServerRequest;
 
     /** Khởi tạo giao diện và khôi phục ID yêu cầu sau khi xoay màn hình. */
     @Override
@@ -127,7 +135,43 @@ public class RequestDetailActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         renderDecisionState(decisionViewModel.getState().getValue());
+        watchRequestStatus();
         loadRequest();
+    }
+
+    /** Đồng bộ thay đổi từ server ngay trên màn đang mở, không chờ người dùng quay lại. */
+    private void watchRequestStatus() {
+        if (requestStatusListener != null || requestId == null
+                || FirebaseAuth.getInstance().getCurrentUser() == null) {
+            return;
+        }
+        final String driverIdentifier = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        requestStatusListener = FirebaseFirestore.getInstance().collection("requests").document(requestId)
+                .addSnapshotListener(MetadataChanges.INCLUDE, new EventListener<DocumentSnapshot>() {
+                    @Override
+                    public void onEvent(DocumentSnapshot document, FirebaseFirestoreException error) {
+                        com.google.firebase.auth.FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                        if (isFinishing() || isDestroyed() || user == null
+                                || !driverIdentifier.equals(user.getUid()) || error != null
+                                || document == null || !document.exists()
+                                || document.getMetadata().isFromCache()
+                                || document.getMetadata().hasPendingWrites()
+                                || !driverIdentifier.equals(document.getString("driverId"))) {
+                            return;
+                        }
+                        TripRequest request = document.toObject(TripRequest.class);
+                        if (request == null) {
+                            return;
+                        }
+                        request.setId(document.getId());
+                        latestServerRequest = request;
+                        if (!isResponding && !isLoading && currentItem != null
+                                && currentItem.getRequest() != null
+                                && !java.util.Objects.equals(request.getStatus(), currentItem.getRequest().getStatus())) {
+                            loadRequest(true);
+                        }
+                    }
+                });
     }
 
     /** Lưu các ID cần thiết để dựng lại đúng chi tiết. */
@@ -210,20 +254,41 @@ public class RequestDetailActivity extends AppCompatActivity {
 
     /** Tải yêu cầu và dữ liệu chuyến liên quan từ repository. */
     private void loadRequest() {
-        if (isLoading || isResponding || requestId == null || requestId.trim().isEmpty()) {
+        loadRequest(false);
+    }
+
+    /** Kết quả quyết định phải đọc lại ngay, không chờ lượt tải cũ đã bắt đầu trước khi ghi. */
+    private void loadRequest(boolean forceRefresh) {
+        if ((isLoading && !forceRefresh) || isResponding
+                || requestId == null || requestId.trim().isEmpty()) {
             return;
         }
-
+        requestLoadGeneration = requestLoadGeneration + 1;
+        final int expectedGeneration = requestLoadGeneration;
+        final com.google.firebase.auth.FirebaseUser loadingUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (loadingUser == null) {
+            currentItem = null;
+            hideActionButtons();
+            statusText.setText("Phiên đăng nhập đã kết thúc. Hãy đăng nhập lại.");
+            return;
+        }
+        final String expectedUserIdentifier = loadingUser.getUid();
         isLoading = true;
         requestDetailsValid = false;
         statusText.setText("Đang tải yêu cầu…");
+        DriverRequestDecisionViewModel.State decisionState = decisionViewModel.getState().getValue();
+        if (decisionState != null && !decisionState.confirmedRequestStatus.isEmpty()) {
+            statusText.setText("Kết quả phản hồi: "
+                    + formatRequestStatus(decisionState.confirmedRequestStatus)
+                    + " · Đang tải lại dữ liệu…");
+        }
         hideActionButtons();
         requestRepository.loadRequestForCurrentDriver(
                 requestId,
                 new RepositoryCallback<DriverRequestItem>() {
                     @Override
                     public void onSuccess(DriverRequestItem item) {
-                        if (isFinishing() || isDestroyed()) {
+                        if (!isCurrentRequestLoad(expectedGeneration, expectedUserIdentifier)) {
                             return;
                         }
 
@@ -237,7 +302,7 @@ public class RequestDetailActivity extends AppCompatActivity {
 
                     @Override
                     public void onError(Exception error) {
-                        if (isFinishing() || isDestroyed()) {
+                        if (!isCurrentRequestLoad(expectedGeneration, expectedUserIdentifier)) {
                             return;
                         }
 
@@ -255,8 +320,28 @@ public class RequestDetailActivity extends AppCompatActivity {
         );
     }
 
+    /** Callback trước quyết định hoặc của phiên cũ không được ghi đè giao diện mới. */
+    private boolean isCurrentRequestLoad(int expectedGeneration, String expectedUserIdentifier) {
+        com.google.firebase.auth.FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        return expectedGeneration == requestLoadGeneration && !isResponding
+                && !isFinishing() && !isDestroyed() && currentUser != null
+                && expectedUserIdentifier.equals(currentUser.getUid());
+    }
+
     /** Hiển thị dữ liệu thật và chỉ mở hành động khi trạng thái còn hợp lệ. */
     private void renderRequest(DriverRequestItem item) {
+        // Hồ sơ công khai có thể tải chậm; không để trạng thái cũ đè snapshot server mới hơn.
+        if (latestServerRequest != null && item.getRequest() != null
+                && requestId.equals(latestServerRequest.getId())
+                && latestServerRequest.getUpdatedAt() != null
+                && (item.getRequest().getUpdatedAt() == null
+                || latestServerRequest.getUpdatedAt().compareTo(item.getRequest().getUpdatedAt()) > 0)) {
+            DriverRequestItem refreshedItem = new DriverRequestItem(latestServerRequest);
+            refreshedItem.setTrip(item.getTrip());
+            refreshedItem.setPassengerProfile(item.getPassengerProfile());
+            item = refreshedItem;
+            currentItem = refreshedItem;
+        }
         TripRequest request = item.getRequest();
         Trip trip = item.getTrip();
 
@@ -308,6 +393,8 @@ public class RequestDetailActivity extends AppCompatActivity {
                 statusMessage += " · Không thể xác thực giờ khởi hành.";
             } else if (!isDepartureInFuture(trip)) {
                 statusMessage += " · Đã qua giờ khởi hành.";
+            } else if (isTripFull(trip) && !requestId.equals(trip.getAcceptedRequestId())) {
+                statusMessage += " · Chuyến đã có khách khác, không còn chỗ để nhận yêu cầu này.";
             } else if (!isTripOpen(trip) && !isTripFull(trip)) {
                 statusMessage += " · Chuyến không còn nhận phản hồi.";
             }
@@ -404,12 +491,18 @@ public class RequestDetailActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
+        if (requestStatusListener != null) {
+            requestStatusListener.remove();
+            requestStatusListener = null;
+        }
+        latestServerRequest = null;
         actionTimeRefresh.stop();
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
+        requestLoadGeneration = requestLoadGeneration + 1;
         actionTimeRefresh.close();
         super.onDestroy();
     }
@@ -526,6 +619,11 @@ public class RequestDetailActivity extends AppCompatActivity {
         if (state == null) {
             return;
         }
+        if (state.busy && !isResponding) {
+            // Vô hiệu lượt đọc PENDING có thể đã bắt đầu trước khi nhấn nhận khách.
+            requestLoadGeneration = requestLoadGeneration + 1;
+            isLoading = false;
+        }
         isResponding = state.busy;
         decisionNoticeText.setVisibility(View.GONE);
         if (state.busy) {
@@ -535,6 +633,9 @@ public class RequestDetailActivity extends AppCompatActivity {
             return;
         }
         acceptButton.setText("Chấp nhận");
+        if (!state.confirmedRequestStatus.isEmpty()) {
+            statusText.setText("Kết quả phản hồi: " + formatRequestStatus(state.confirmedRequestStatus));
+        }
         if (!state.message.isEmpty()) {
             decisionNoticeText.setText(state.message);
             decisionNoticeText.setVisibility(View.VISIBLE);
@@ -543,7 +644,7 @@ public class RequestDetailActivity extends AppCompatActivity {
             String message = state.message;
             decisionViewModel.acknowledgeResult();
             Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-            loadRequest();
+            loadRequest(true);
         }
     }
 

@@ -16,6 +16,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.Source;
+import com.google.firebase.firestore.Transaction;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -148,43 +149,58 @@ public class DriverRequestRepository {
         }
 
         final String driverId = currentUser.getUid();
-        firestore.collection("requests").document(requestId.trim())
-                .get(Source.SERVER)
-                .addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
-                    @Override
-                    public void onSuccess(DocumentSnapshot document) {
-                        if (!document.exists()) {
-                            callback.onError(new IllegalStateException(
-                                    "Yêu cầu không tồn tại hoặc đã bị xóa."
-                            ));
-                            return;
-                        }
-
-                        TripRequest request = document.toObject(TripRequest.class);
-                        if (request == null) {
-                            callback.onError(new IllegalStateException(
-                                    "Không thể đọc dữ liệu yêu cầu."
-                            ));
-                            return;
-                        }
-
-                        request.setId(document.getId());
-                        if (!driverId.equals(request.getDriverId())) {
-                            callback.onError(new SecurityException(
-                                    "Bạn không có quyền xem yêu cầu của chuyến khác."
-                            ));
-                            return;
-                        }
-
-                        loadRelatedDataForOne(request, callback);
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception error) {
-                        callback.onError(error);
-                    }
-                });
+        final String requestIdentifier = requestId.trim();
+        firestore.runTransaction(new Transaction.Function<DriverRequestItem>() {
+            /** Đọc yêu cầu và chuyến cùng phiên bản, không ghép trạng thái trước và sau nhận khách. */
+            @Override
+            public DriverRequestItem apply(@NonNull Transaction transaction)
+                    throws FirebaseFirestoreException {
+                FirebaseUser user = firebaseAuth.getCurrentUser();
+                if (user == null || !driverId.equals(user.getUid())) {
+                    throw new IllegalStateException("Phiên đăng nhập đã đổi.");
+                }
+                DocumentSnapshot document = transaction.get(
+                        firestore.collection("requests").document(requestIdentifier));
+                TripRequest request = document.toObject(TripRequest.class);
+                if (!document.exists() || request == null) {
+                    throw new IllegalStateException("Yêu cầu không tồn tại hoặc đã bị xóa.");
+                }
+                if (!driverId.equals(request.getDriverId())) {
+                    throw new SecurityException("Bạn không có quyền xem yêu cầu của chuyến khác.");
+                }
+                if (request.getTripId() == null || request.getTripId().trim().isEmpty()
+                        || request.getTripId().contains("/") || request.getPassengerId() == null
+                        || request.getPassengerId().trim().isEmpty()) {
+                    throw new IllegalStateException("Yêu cầu thiếu mã chuyến hoặc hành khách hợp lệ.");
+                }
+                DocumentSnapshot tripDocument = transaction.get(
+                        firestore.collection("trips").document(request.getTripId()));
+                Trip trip = tripDocument.toObject(Trip.class);
+                if (!tripDocument.exists() || trip == null || !driverId.equals(trip.getDriverId())) {
+                    throw new IllegalStateException("Không đọc được chuyến của chủ xe hiện tại.");
+                }
+                request.setId(document.getId());
+                trip.setId(tripDocument.getId());
+                DriverRequestItem item = new DriverRequestItem(request);
+                item.setTrip(trip);
+                return item;
+            }
+        }).addOnSuccessListener(new OnSuccessListener<DriverRequestItem>() {
+            @Override
+            public void onSuccess(DriverRequestItem item) {
+                FirebaseUser user = firebaseAuth.getCurrentUser();
+                if (user == null || !driverId.equals(user.getUid())) {
+                    callback.onError(new IllegalStateException("Phiên đăng nhập đã đổi."));
+                    return;
+                }
+                loadPublicProfile(item, item.getRequest().getPassengerId(), callback);
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception error) {
+                callback.onError(error);
+            }
+        });
     }
 
     /** Tải chuyến và hồ sơ công khai cho toàn bộ yêu cầu theo đúng thứ tự ban đầu. */

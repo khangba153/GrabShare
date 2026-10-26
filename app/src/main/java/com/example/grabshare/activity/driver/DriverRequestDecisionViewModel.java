@@ -16,12 +16,19 @@ public final class DriverRequestDecisionViewModel extends ViewModel {
         public final boolean busy;
         public final boolean completed;
         public final String message;
+        public final String confirmedRequestStatus;
 
         /** Kết quả chỉ được thông báo một lần sau khi màn trở lại RESUMED. */
         State(boolean busy, boolean completed, String message) {
+            this(busy, completed, message, "");
+        }
+
+        /** Chỉ giữ mã trạng thái khi repository xác nhận thao tác đã thành công. */
+        State(boolean busy, boolean completed, String message, String confirmedRequestStatus) {
             this.busy = busy;
             this.completed = completed;
             this.message = message;
+            this.confirmedRequestStatus = confirmedRequestStatus;
         }
     }
 
@@ -49,7 +56,7 @@ public final class DriverRequestDecisionViewModel extends ViewModel {
                 .release(requestIdentifier, driverIdentifier, new RepositoryCallback<Void>() {
                     @Override
                     public void onSuccess(Void unused) {
-                        finish(driverIdentifier, "Khách này không còn giữ chỗ. Bạn có thể chọn yêu cầu khác khi chuyến còn mở.");
+                        finish(driverIdentifier, "Khách này không còn giữ chỗ. Bạn có thể chọn yêu cầu khác khi chuyến còn mở.", "CANCELLED");
                     }
 
                     @Override
@@ -93,7 +100,11 @@ public final class DriverRequestDecisionViewModel extends ViewModel {
                 if (accepting) {
                     message = "Đã chấp nhận yêu cầu. Khách có thể xem xác nhận trong app.";
                 }
-                finish(driverIdentifier, message);
+                String confirmedStatus = "REJECTED";
+                if (accepting) {
+                    confirmedStatus = "ACCEPTED";
+                }
+                finish(driverIdentifier, message, confirmedStatus);
             }
 
             /** Không tự thử ghi lại sau lỗi mạng; lần bấm tiếp theo phải đọc lại máy chủ. */
@@ -115,24 +126,32 @@ public final class DriverRequestDecisionViewModel extends ViewModel {
 
     /** Callback của phiên cũ không được hiển thị kết quả nhận khách cho tài khoản mới. */
     private void finish(String driverIdentifier, String message) {
+        finish(driverIdentifier, message, "");
+    }
+
+    /** Trạng thái đã được máy chủ xác nhận được giữ qua xoay, không đoán từ thông báo lỗi. */
+    private void finish(String driverIdentifier, String message, String confirmedRequestStatus) {
         if (closed) {
             return;
         }
         FirebaseUser currentUser = authentication.getCurrentUser();
         if (currentUser == null || !driverIdentifier.equals(currentUser.getUid())) {
             message = "Phiên đăng nhập đã đổi. Hãy mở lại yêu cầu bằng đúng tài khoản chủ xe.";
+            confirmedRequestStatus = "";
         }
-        state.setValue(new State(false, true, message));
+        state.setValue(new State(false, true, message, confirmedRequestStatus));
     }
 
     /** Chỉ tiêu thụ thông báo, không khởi động lại thao tác đã hoàn tất. */
     public void acknowledgeResult() {
         State currentState = state.getValue();
         String message = "";
+        String confirmedStatus = "";
         if (currentState != null) {
             message = currentState.message;
+            confirmedStatus = currentState.confirmedRequestStatus;
         }
-        state.setValue(new State(false, false, message));
+        state.setValue(new State(false, false, message, confirmedStatus));
     }
 
     /** Back khỏi màn giải phóng worker; xoay màn vẫn giữ cùng ViewModel. */
