@@ -1,15 +1,12 @@
 package com.example.grabshare.activity.account;
 
 import android.app.Application;
-import android.util.Log;
 import android.os.CancellationSignal;
 
-import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 
 import com.example.grabshare.local.TripCacheRepository;
 import com.example.grabshare.repository.account.AuthRepository;
-import com.example.grabshare.repository.notifications.FcmInstallationRepository;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,8 +24,6 @@ import androidx.credentials.CredentialManager;
 import androidx.credentials.CredentialManagerCallback;
 import androidx.credentials.exceptions.ClearCredentialException;
 
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseUser;
 
 /** Giữ tác vụ đăng xuất qua lần xoay màn hình. */
@@ -86,7 +81,7 @@ public class LogoutViewModel extends AndroidViewModel {
         return state;
     }
 
-    /** Xóa cache và kết thúc Auth cùng khóa với writer, không chờ xác nhận FID. */
+    /** Xóa cache và kết thúc Auth cùng khóa với tiến trình ghi dữ liệu. */
     private void clearCacheAndSignOut(final String userId) {
         executor.execute(new Runnable() {
             @Override
@@ -128,18 +123,7 @@ public class LogoutViewModel extends AndroidViewModel {
         });
     }
 
-    /** Chỉ callback ghi log, không giữ ViewModel hoặc tác động Auth của phiên mới. */
-    private static class InstallationRemovalListener implements OnCompleteListener<Void> {
-        @Override
-        public void onComplete(@NonNull Task<Void> task) {
-            if (!task.isSuccessful()) {
-                Log.w("LogoutViewModel", "Chưa xóa được FID trên server khi đăng xuất.",
-                        task.getException());
-            }
-        }
-    }
-
-    /** Xếp yêu cầu xóa FID khi còn Auth rồi signOut ngay, kể cả khi ngoại tuyến. */
+    /** Kết thúc đúng phiên đang xóa cache, kể cả khi thiết bị ngoại tuyến. */
     private void signOutLocally(String userId) {
         FirebaseUser currentUser = authRepository.getCurrentUser();
         if (currentUser != null && !userId.equals(currentUser.getUid())) {
@@ -147,13 +131,6 @@ public class LogoutViewModel extends AndroidViewModel {
         }
         if (currentUser == null) {
             return;
-        }
-        try {
-            FcmInstallationRepository.deleteInstallationForUser(userId)
-                    .addOnCompleteListener(new InstallationRemovalListener());
-        } catch (Exception error) {
-            // Xóa đăng ký thông báo là tác vụ nền; lỗi không được chặn signOut cục bộ.
-            Log.w("LogoutViewModel", "Không khởi tạo được yêu cầu xóa FID.", error);
         }
         authRepository.signOut();
     }

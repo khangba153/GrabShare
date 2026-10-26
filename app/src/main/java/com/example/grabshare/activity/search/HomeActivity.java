@@ -24,7 +24,6 @@ import com.example.grabshare.activity.account.LoginActivity;
 import com.example.grabshare.api.VietnamRoutingClient;
 import com.example.grabshare.contract.LocationKeys;
 import com.example.grabshare.model.Place;
-import com.example.grabshare.notifications.NotificationPermissionHelper;
 import com.example.grabshare.presentation.MainNavigation;
 import com.example.grabshare.presentation.PlaceNameFormatter;
 import com.example.grabshare.repository.search.SearchTripPolicy;
@@ -98,9 +97,6 @@ public class HomeActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.screen_home);
-        if (savedInstanceState == null) {
-            NotificationPermissionHelper.requestIfNeeded(this);
-        }
         originValueTextView = findViewById(R.id.pick_start_value);
         destinationValueTextView = findViewById(R.id.pick_end_value);
         departureDateTextView = findViewById(R.id.pick_date_value);
